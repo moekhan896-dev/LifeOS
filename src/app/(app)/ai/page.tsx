@@ -1,0 +1,414 @@
+'use client'
+
+import { useState, useRef, useEffect, useCallback, Suspense } from 'react'
+import { useSearchParams } from 'next/navigation'
+import { useStore } from '@/stores/store'
+
+const SUGGESTED_PROMPTS = [
+  'What should I focus on this week?',
+  'How do I get to $50K/mo fastest?',
+  'Analyze my revenue concentration risk',
+  'Should I restart cold email for the agency?',
+  "What's the ROI of signing the office lease?",
+  'How should I monetize Madison Clark?',
+  'Give me a brutal honest assessment',
+  'What am I avoiding right now?',
+]
+
+const BUSINESS_LABELS: Record<string, string> = {
+  agency: 'Arbaaz Digital (Agency)',
+  plumbing: 'Plumbing Lead Gen',
+  madison: 'Madison Clark',
+  moggley: 'Moggley',
+  brand: 'Personal Brand',
+  airbnb: 'Airbnb',
+}
+
+function renderMarkdown(text: string) {
+  return text.split('\n').map((line, i) => {
+    // Bold
+    let html = line.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+    // Italic
+    html = html.replace(/\*(.*?)\*/g, '<em>$1</em>')
+    // Bullet points
+    if (/^[-*]\s/.test(html)) {
+      html = '<span class="inline-block w-1.5 h-1.5 rounded-full bg-accent mr-2 mt-2 shrink-0"></span>' + html.slice(2)
+      return <div key={i} className="flex items-start ml-2 my-0.5" dangerouslySetInnerHTML={{ __html: html }} />
+    }
+    // Numbered lists
+    if (/^\d+\.\s/.test(html)) {
+      return <div key={i} className="ml-2 my-0.5" dangerouslySetInnerHTML={{ __html: html }} />
+    }
+    // Empty line
+    if (!html.trim()) return <div key={i} className="h-2" />
+    return <div key={i} className="my-0.5" dangerouslySetInnerHTML={{ __html: html }} />
+  })
+}
+
+function buildContextSnapshot(state: ReturnType<typeof useStore.getState>) {
+  const snap = state.financialSnapshots[state.financialSnapshots.length - 1]
+  const activeCommitments = state.commitments.filter(c => !c.fulfilled)
+  const recentTasks = state.tasks.slice(-10)
+  const activeStreaks = state.streaks
+
+  return `=== ART OS - BUSINESS CONTEXT SNAPSHOT ===
+Date: ${new Date().toLocaleDateString()}
+
+--- FINANCIALS (Latest Month) ---
+Agency Gross: $${snap?.agencyGross?.toLocaleString() ?? 'N/A'}
+Agency Net: $${snap?.agencyNet?.toLocaleString() ?? 'N/A'}
+Plumbing Revenue: $${snap?.plumbingRevenue?.toLocaleString() ?? 'N/A'}
+Plumbing Cut (40%): $${snap?.plumbingCut?.toLocaleString() ?? 'N/A'}
+Airbnb Net: $${snap?.airbnbNet?.toLocaleString() ?? 'N/A'}
+Total Take-Home: $${snap?.totalTakeHome?.toLocaleString() ?? 'N/A'}
+Total Expenses: $${snap?.totalExpenses?.toLocaleString() ?? 'N/A'}
+
+--- BUSINESS UNITS ---
+1. Arbaaz Digital (Agency): $26K gross, $15.3K net, 6 clients, AWS = 69% of revenue
+2. Plumbing Lead Gen: ~$18K revenue, 9 GMBs, 1-2 calls/day avg
+3. Madison Clark: 16K followers, $0 revenue, no brand deals yet
+4. Moggley: Pre-revenue, app in development
+5. Personal Brand: Dormant
+6. Airbnb: ~$1K/mo net
+
+--- STREAKS ---
+${activeStreaks.map(s => `${s.habit}: ${s.currentStreak} day streak (best: ${s.longestStreak})`).join('\n')}
+
+--- ACTIVE COMMITMENTS ---
+${activeCommitments.length ? activeCommitments.map(c => `- ${c.text} (source: ${c.source}${c.dueDate ? ', due: ' + c.dueDate : ''})`).join('\n') : 'None'}
+
+--- RECENT TASKS ---
+${recentTasks.map(t => `- [${t.done ? 'x' : ' '}] ${t.text} (${t.priority})`).join('\n') || 'None'}
+
+--- PIPELINE ---
+${state.pipeline.map(d => `- ${d.companyName}: ${d.stage}${d.dealValue ? ' ($' + d.dealValue.toLocaleString() + ')' : ''}`).join('\n') || 'Empty'}
+
+--- ACTIVE SPRINT ---
+${state.sprints.filter(s => s.status === 'active').map(s => `Sprint ${s.sprintNumber}:\n${s.deliverables.map(d => `  - [${d.done ? 'x' : ' '}] ${d.text}`).join('\n')}`).join('\n') || 'None'}
+
+--- XP / LEVEL ---
+Level ${state.level} | ${state.xp} XP
+`
+}
+
+function AIPageInner() {
+  const searchParams = useSearchParams()
+  const businessFilter = searchParams.get('business')
+
+  const {
+    aiMessages, addAiMessage, clearAiMessages,
+    tasks, commitments, streaks, financialSnapshots, pipeline, sprints, level, xp
+  } = useStore()
+
+  const [input, setInput] = useState('')
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [copied, setCopied] = useState(false)
+  const messagesEndRef = useRef<HTMLDivElement>(null)
+  const textareaRef = useRef<HTMLTextAreaElement>(null)
+
+  const scrollToBottom = useCallback(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+  }, [])
+
+  useEffect(() => { scrollToBottom() }, [aiMessages.length, scrollToBottom])
+
+  useEffect(() => {
+    if (textareaRef.current) {
+      textareaRef.current.style.height = 'auto'
+      textareaRef.current.style.height = Math.min(textareaRef.current.scrollHeight, 160) + 'px'
+    }
+  }, [input])
+
+  const sendMessage = async (text: string) => {
+    if (!text.trim() || loading) return
+    setError(null)
+
+    const userContent = businessFilter && BUSINESS_LABELS[businessFilter]
+      ? `Context: ${BUSINESS_LABELS[businessFilter]}\n\n${text.trim()}`
+      : text.trim()
+
+    addAiMessage({ role: 'user', content: userContent, businessContext: businessFilter || undefined })
+    setInput('')
+
+    if (textareaRef.current) textareaRef.current.style.height = 'auto'
+
+    setLoading(true)
+
+    const currentMessages = useStore.getState().aiMessages
+    const apiMessages = currentMessages.map(m => ({ role: m.role, content: m.content }))
+
+    try {
+      const res = await fetch('/api/ai', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          messages: apiMessages,
+          context: buildContextSnapshot(useStore.getState()),
+        }),
+      })
+
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}))
+        throw new Error(data.error || 'Failed to get response')
+      }
+
+      const data = await res.json()
+      addAiMessage({ role: 'assistant', content: data.content })
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : 'Unknown error'
+      if (msg.includes('API key') || msg.includes('ANTHROPIC_API_KEY')) {
+        setError('AI requires an Anthropic API key. Add ANTHROPIC_API_KEY to your environment variables, or use the \'Copy Context\' button to paste into Claude.ai.')
+      } else {
+        setError(msg)
+      }
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault()
+      sendMessage(input)
+    }
+  }
+
+  const copyContext = () => {
+    const snap = buildContextSnapshot(useStore.getState())
+    navigator.clipboard.writeText(snap)
+    setCopied(true)
+    setTimeout(() => setCopied(false), 2000)
+  }
+
+  const snap = financialSnapshots[financialSnapshots.length - 1]
+  const activeCommitments = commitments.filter(c => !c.fulfilled)
+  const recentTasks = tasks.slice(-5)
+  const noMessages = aiMessages.length === 0
+
+  return (
+    <div className="h-[calc(100vh-0px)] flex">
+      {/* LEFT: Chat Panel */}
+      <div className="flex-1 lg:w-[70%] flex flex-col min-w-0">
+        {/* Header */}
+        <div className="px-6 py-4 border-b border-border flex items-center justify-between shrink-0">
+          <div>
+            <h1 className="text-lg font-semibold text-text">AI Strategist</h1>
+            <p className="text-xs text-text-dim mt-0.5">
+              {businessFilter && BUSINESS_LABELS[businessFilter]
+                ? `Focused: ${BUSINESS_LABELS[businessFilter]}`
+                : 'Your AI co-founder. Hard truths only.'}
+            </p>
+          </div>
+          {aiMessages.length > 0 && (
+            <button
+              onClick={clearAiMessages}
+              className="text-xs text-text-dim hover:text-rose transition-colors px-3 py-1.5 rounded-lg border border-border hover:border-rose/30"
+            >
+              Clear Chat
+            </button>
+          )}
+        </div>
+
+        {/* Messages */}
+        <div className="flex-1 overflow-y-auto px-4 md:px-6 py-4 space-y-3">
+          {noMessages && !error && (
+            <div className="flex flex-col items-center justify-center h-full animate-in fade-in duration-500">
+              <div className="w-12 h-12 rounded-2xl bg-accent/10 border border-accent/20 flex items-center justify-center mb-4">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="text-accent">
+                  <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" />
+                </svg>
+              </div>
+              <h2 className="text-text font-medium mb-1">What&apos;s on your mind?</h2>
+              <p className="text-text-dim text-sm mb-6">Pick a prompt or type your own</p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-w-xl w-full">
+                {SUGGESTED_PROMPTS.map((p) => (
+                  <button
+                    key={p}
+                    onClick={() => sendMessage(p)}
+                    className="text-left text-sm px-4 py-3 rounded-xl bg-surface2 border border-border hover:border-accent/40 hover:bg-surface3 text-text-mid hover:text-text transition-all duration-200"
+                  >
+                    {p}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {aiMessages.map((msg) => (
+            <div
+              key={msg.id}
+              className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'} animate-in slide-in-from-bottom-2 duration-300`}
+            >
+              <div
+                className={`max-w-[85%] md:max-w-[75%] px-4 py-3 rounded-2xl text-sm leading-relaxed ${
+                  msg.role === 'user'
+                    ? 'bg-surface3 border border-border text-text rounded-br-md'
+                    : 'bg-surface2 border border-border text-text rounded-bl-md'
+                }`}
+              >
+                {msg.role === 'assistant' ? (
+                  <div className="space-y-0.5">{renderMarkdown(msg.content)}</div>
+                ) : (
+                  <div className="whitespace-pre-wrap">{msg.content}</div>
+                )}
+                <div className="text-[10px] text-text-dim mt-2 opacity-60">
+                  {new Date(msg.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                </div>
+              </div>
+            </div>
+          ))}
+
+          {loading && (
+            <div className="flex justify-start animate-in fade-in duration-200">
+              <div className="bg-surface2 border border-border px-4 py-3 rounded-2xl rounded-bl-md">
+                <div className="flex gap-1.5">
+                  <span className="w-2 h-2 bg-accent/60 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
+                  <span className="w-2 h-2 bg-accent/60 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
+                  <span className="w-2 h-2 bg-accent/60 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+                </div>
+              </div>
+            </div>
+          )}
+
+          {error && (
+            <div className="mx-auto max-w-lg bg-rose/10 border border-rose/20 rounded-xl px-4 py-3 text-sm text-rose">
+              {error}
+            </div>
+          )}
+
+          <div ref={messagesEndRef} />
+        </div>
+
+        {/* Input */}
+        <div className="px-4 md:px-6 pb-4 pt-2 border-t border-border shrink-0">
+          <div className="flex gap-2 items-end bg-surface2 border border-border rounded-2xl px-4 py-2 focus-within:border-accent/40 transition-colors">
+            <textarea
+              ref={textareaRef}
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              onKeyDown={handleKeyDown}
+              placeholder="Ask your AI co-founder anything..."
+              rows={1}
+              className="flex-1 bg-transparent text-sm text-text placeholder-text-dim resize-none outline-none py-1.5 max-h-40"
+            />
+            <button
+              onClick={() => sendMessage(input)}
+              disabled={!input.trim() || loading}
+              className="shrink-0 w-9 h-9 rounded-xl bg-accent hover:bg-accent/80 disabled:bg-surface3 disabled:text-text-dim text-bg flex items-center justify-center transition-all duration-200"
+            >
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <line x1="22" y1="2" x2="11" y2="13" />
+                <polygon points="22 2 15 22 11 13 2 9 22 2" />
+              </svg>
+            </button>
+          </div>
+          <p className="text-[10px] text-text-dim mt-1.5 text-center opacity-50">Shift+Enter for new line</p>
+        </div>
+      </div>
+
+      {/* RIGHT: Context Panel (desktop only) */}
+      <div className="hidden lg:flex w-[30%] border-l border-border flex-col overflow-y-auto bg-surface/50">
+        <div className="px-5 py-4 border-b border-border">
+          <h2 className="text-sm font-semibold text-text">Business Context</h2>
+          <p className="text-[11px] text-text-dim mt-0.5">Live data snapshot</p>
+        </div>
+
+        <div className="px-5 py-4 space-y-5 text-xs">
+          {/* Business Snapshot */}
+          <div>
+            <h3 className="text-text-mid font-medium mb-2 uppercase tracking-wider text-[10px]">Revenue Streams</h3>
+            <div className="space-y-2">
+              {[
+                { name: 'Agency', detail: '$26K gross, $15.3K net, 6 clients', sub: 'AWS = 69% concentration', color: 'accent' },
+                { name: 'Plumbing', detail: '~$18K rev, 9 GMBs', sub: '1-2 calls/day', color: 'cyan' },
+                { name: 'Madison Clark', detail: '16K followers', sub: '$0 revenue', color: 'pink' },
+                { name: 'Moggley', detail: 'Pre-revenue', sub: 'App in development', color: 'purple' },
+                { name: 'Personal Brand', detail: 'Dormant', sub: '', color: 'amber' },
+                { name: 'Airbnb', detail: '$1K net/mo', sub: '', color: 'blue' },
+              ].map(b => (
+                <div key={b.name} className="bg-surface2 border border-border rounded-lg px-3 py-2">
+                  <div className="flex items-center gap-2">
+                    <div className={`w-1.5 h-1.5 rounded-full bg-${b.color}`} />
+                    <span className="text-text font-medium">{b.name}</span>
+                  </div>
+                  <p className="text-text-mid ml-3.5">{b.detail}</p>
+                  {b.sub && <p className="text-text-dim ml-3.5">{b.sub}</p>}
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Streaks */}
+          <div>
+            <h3 className="text-text-mid font-medium mb-2 uppercase tracking-wider text-[10px]">Streaks</h3>
+            <div className="grid grid-cols-2 gap-1.5">
+              {streaks.map(s => (
+                <div key={s.habit} className="bg-surface2 border border-border rounded-lg px-2.5 py-1.5">
+                  <span className="text-text capitalize">{s.habit.replace('_', ' ')}</span>
+                  <span className={`ml-1 font-mono font-bold ${s.currentStreak > 0 ? 'text-accent' : 'text-text-dim'}`}>
+                    {s.currentStreak}d
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Recent Tasks */}
+          <div>
+            <h3 className="text-text-mid font-medium mb-2 uppercase tracking-wider text-[10px]">Recent Tasks</h3>
+            <div className="space-y-1">
+              {recentTasks.length ? recentTasks.map(t => (
+                <div key={t.id} className="flex items-center gap-2 text-text-mid">
+                  <span className={`w-3 h-3 rounded border ${t.done ? 'bg-accent border-accent' : 'border-border'} shrink-0 flex items-center justify-center`}>
+                    {t.done && <svg width="8" height="8" viewBox="0 0 12 12" fill="none" stroke="white" strokeWidth="2"><path d="M2 6l3 3 5-5"/></svg>}
+                  </span>
+                  <span className={t.done ? 'line-through text-text-dim' : ''}>{t.text}</span>
+                </div>
+              )) : <p className="text-text-dim italic">No tasks yet</p>}
+            </div>
+          </div>
+
+          {/* Active Commitments */}
+          <div>
+            <h3 className="text-text-mid font-medium mb-2 uppercase tracking-wider text-[10px]">Active Commitments</h3>
+            <div className="space-y-1">
+              {activeCommitments.length ? activeCommitments.map(c => (
+                <div key={c.id} className="text-text-mid flex gap-2">
+                  <span className="text-amber shrink-0">!</span>
+                  <span>{c.text}</span>
+                </div>
+              )) : <p className="text-text-dim italic">No open commitments</p>}
+            </div>
+          </div>
+
+          {/* Copy Context Button */}
+          <button
+            onClick={copyContext}
+            className="w-full py-2.5 rounded-xl bg-surface3 border border-border hover:border-accent/40 text-text-mid hover:text-text text-xs font-medium transition-all duration-200 flex items-center justify-center gap-2"
+          >
+            {copied ? (
+              <>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-accent"><path d="M20 6L9 17l-5-5"/></svg>
+                Copied to Clipboard!
+              </>
+            ) : (
+              <>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+                Copy Context to Claude.ai
+              </>
+            )}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+export default function AIPage() {
+  return (
+    <Suspense fallback={<div className="h-screen flex items-center justify-center text-text-dim">Loading...</div>}>
+      <AIPageInner />
+    </Suspense>
+  )
+}
