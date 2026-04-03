@@ -7,8 +7,11 @@ import { useRouter } from 'next/navigation'
 import { useStore } from '@/stores/store'
 import { XP_VALUES } from '@/lib/constants'
 
+const BAR_DURATIONS = [0.3, 0.45, 0.35, 0.5, 0.6]
+
 export default function VoiceButton() {
   const [recording, setRecording] = useState(false)
+  const [processing, setProcessing] = useState(false)
   const [transcript, setTranscript] = useState('')
   const recognitionRef = useRef<any>(null)
   const router = useRouter()
@@ -48,8 +51,17 @@ export default function VoiceButton() {
     if (recording) {
       recognitionRef.current?.stop()
       setRecording(false)
-      if (transcript) processTranscript(transcript)
-      setTranscript('')
+      const currentTranscript = transcript
+      if (currentTranscript) {
+        setProcessing(true)
+        setTimeout(() => {
+          processTranscript(currentTranscript)
+          setProcessing(false)
+          setTranscript('')
+        }, 300)
+      } else {
+        setTranscript('')
+      }
       return
     }
 
@@ -86,31 +98,84 @@ export default function VoiceButton() {
 
   return (
     <>
+      {/* Recording Panel */}
       <AnimatePresence>
-        {recording && transcript && (
+        {(recording || processing) && (
           <motion.div
-            initial={{ opacity: 0, y: 8 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: 8 }}
-            className="fixed bottom-24 right-4 z-[60] glass border border-[var(--color-border)] rounded-[10px] px-4 py-3 max-w-[300px] shadow-xl"
+            initial={{ opacity: 0, y: 20, scale: 0.9 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 20, scale: 0.9 }}
+            transition={{ type: 'spring', stiffness: 400, damping: 30 }}
+            className="fixed bottom-[5.5rem] right-5 z-[60] glass border border-[var(--color-border)] rounded-[14px] p-4 w-[300px] shadow-xl"
           >
-            <p className="text-[12px] text-[var(--color-text-mid)] mb-1 label">LISTENING...</p>
-            <p className="text-[13px] text-[var(--color-text)]">{transcript}</p>
+            {/* Header */}
+            <div className="flex items-center gap-2 mb-3">
+              <motion.div
+                className="w-2 h-2 rounded-full"
+                style={{ backgroundColor: processing ? 'var(--color-cyan)' : '#f43f5e' }}
+                animate={{ opacity: [1, 0.3, 1] }}
+                transition={{ duration: 1, repeat: Infinity }}
+              />
+              <span className="label text-[11px] text-[var(--color-text-mid)]">
+                {processing ? 'Processing...' : 'Listening...'}
+              </span>
+            </div>
+
+            {/* Sound Wave Visualizer */}
+            {!processing && (
+              <div className="flex items-center justify-center gap-1.5 h-8 mb-3">
+                {BAR_DURATIONS.map((dur, i) => (
+                  <motion.div
+                    key={i}
+                    className="w-1 rounded-full bg-gradient-to-t from-emerald-500 to-cyan-400"
+                    animate={{ height: [8, 28, 8] }}
+                    transition={{
+                      duration: dur,
+                      repeat: Infinity,
+                      repeatType: 'reverse',
+                      delay: i * 0.08,
+                    }}
+                  />
+                ))}
+              </div>
+            )}
+
+            {/* Transcript */}
+            {transcript && (
+              <motion.p
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                className="text-[13px] text-[var(--color-text)] leading-relaxed"
+              >
+                {transcript}
+              </motion.p>
+            )}
           </motion.div>
         )}
       </AnimatePresence>
 
+      {/* Floating Mic Button */}
       <motion.button
         onClick={toggleRecording}
         whileHover={{ scale: 1.08 }}
         whileTap={{ scale: 0.92 }}
-        className={`fixed bottom-5 right-5 z-[60] w-12 h-12 rounded-full flex items-center justify-center shadow-lg transition-colors ${
+        animate={{
+          width: recording ? 56 : 52,
+          height: recording ? 56 : 52,
+        }}
+        transition={{ type: 'spring', stiffness: 400, damping: 25 }}
+        className={`fixed bottom-5 right-5 z-[60] rounded-full flex items-center justify-center shadow-lg ${
           recording
-            ? 'bg-[var(--color-rose)] animate-pulse-ring'
-            : 'bg-[var(--color-surface)] border border-[var(--color-border)] hover:border-[var(--color-accent)]'
+            ? 'bg-gradient-to-br from-rose-500 to-red-500'
+            : 'bg-gradient-to-br from-emerald-500 to-cyan-400'
         }`}
+        style={{
+          boxShadow: recording
+            ? '0 4px 20px rgba(244,63,94,0.4)'
+            : '0 4px 20px rgba(16,185,129,0.3)',
+        }}
       >
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={recording ? 'white' : 'var(--color-text-mid)'} strokeWidth="2" strokeLinecap="round">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round">
           <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/>
           <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
           <line x1="12" y1="19" x2="12" y2="23"/>

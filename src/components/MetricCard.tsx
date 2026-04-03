@@ -8,12 +8,14 @@ interface MetricCardProps {
   sub?: string
   color?: string
   icon?: string
+  accentColor?: string
 }
 
-export default function MetricCard({ label, value, sub, color, icon }: MetricCardProps) {
+export default function MetricCard({ label, value, sub, color, icon, accentColor }: MetricCardProps) {
   return (
     <motion.div
-      className="bg-[var(--surface)] border border-[var(--border)] rounded-[10px] p-4 group"
+      className="card bg-[var(--surface)] border border-[var(--border)] rounded-[10px] p-4 group"
+      style={accentColor ? { borderTop: `2px solid ${accentColor}` } : undefined}
       whileHover={{
         y: -2,
         boxShadow: '0 4px 20px rgba(0,0,0,0.15)',

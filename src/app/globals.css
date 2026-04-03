@@ -51,11 +51,16 @@
 html { scroll-behavior: smooth; }
 
 body {
-  background: var(--color-bg);
+  background: linear-gradient(180deg, #06070b 0%, #0a0c14 100%);
   color: var(--color-text);
   font-family: var(--font-sans), system-ui, sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  min-height: 100vh;
+}
+
+.light body {
+  background: linear-gradient(180deg, #faf9f7 0%, #f5f0eb 100%);
 }
 
 /* ── Scanline overlay ── */
@@ -81,6 +86,42 @@ body {
   font-family: var(--font-mono), monospace;
 }
 
+.title-lg {
+  font-size: 24px;
+  font-weight: 300;
+  line-height: 1.2;
+}
+.title-lg strong {
+  font-weight: 700;
+  color: var(--color-accent);
+}
+
+.section-label {
+  font-family: var(--font-mono), monospace;
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 3px;
+  color: var(--color-text-dim);
+}
+
+.value-lg {
+  font-family: var(--font-mono), monospace;
+  font-size: 28px;
+  font-weight: 700;
+}
+
+.value-xl {
+  font-family: var(--font-mono), monospace;
+  font-size: 36px;
+  font-weight: 700;
+}
+
+.body-text {
+  font-size: 13px;
+  font-weight: 400;
+  line-height: 1.5;
+}
+
 /* ── Depth layers ── */
 .card {
   background: var(--color-surface);
@@ -90,10 +131,47 @@ body {
 }
 .card:hover {
   border-color: var(--color-border-glow);
-  box-shadow: 0 2px 16px rgba(0,0,0,0.15), 0 0 0 1px var(--color-border-glow);
+  box-shadow: 0 4px 24px rgba(0,0,0,0.12);
 }
+
+.card-accent {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  border-top: 2px solid var(--color-accent);
+  transition: border-color 0.2s, box-shadow 0.2s, transform 0.15s;
+}
+.card-accent:hover {
+  border-color: var(--color-border-glow);
+  border-top-color: var(--color-accent);
+  box-shadow: 0 4px 24px rgba(0,0,0,0.12);
+}
+
 .card-elevated {
   box-shadow: 0 4px 24px rgba(0,0,0,0.2), 0 0 0 1px var(--color-border);
+}
+
+/* ── Card variants ── */
+.card-urgent {
+  background: rgba(239,68,68,0.03);
+  border: 1px solid rgba(239,68,68,0.15);
+  border-radius: 10px;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+.card-urgent:hover {
+  border-color: rgba(239,68,68,0.3);
+  box-shadow: 0 4px 24px rgba(239,68,68,0.06);
+}
+
+.card-sacred {
+  background: rgba(234,179,8,0.03);
+  border: 1px solid rgba(234,179,8,0.15);
+  border-radius: 10px;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+.card-sacred:hover {
+  border-color: rgba(234,179,8,0.3);
+  box-shadow: 0 4px 24px rgba(234,179,8,0.06);
 }
 
 /* ── Glass morphism ── */
@@ -101,6 +179,67 @@ body {
   background: color-mix(in srgb, var(--color-surface) 80%, transparent);
   backdrop-filter: blur(16px) saturate(180%);
   -webkit-backdrop-filter: blur(16px) saturate(180%);
+  border: 1px solid rgba(255,255,255,0.06);
+}
+
+/* ── Gradient text ── */
+.gradient-text {
+  background: linear-gradient(135deg, var(--color-accent), var(--color-cyan));
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  color: transparent;
+}
+
+/* ── Gradient border animated ── */
+@keyframes gradientBorderRotate {
+  0% { --gradient-angle: 0deg; }
+  100% { --gradient-angle: 360deg; }
+}
+
+@property --gradient-angle {
+  syntax: "<angle>";
+  initial-value: 0deg;
+  inherits: false;
+}
+
+.gradient-border-animated {
+  position: relative;
+  background: var(--color-surface2);
+  border: 1px solid transparent;
+  background-clip: padding-box;
+  border-radius: 10px;
+}
+.gradient-border-animated::before {
+  content: '';
+  position: absolute;
+  inset: -1px;
+  border-radius: 10px;
+  padding: 1px;
+  background: conic-gradient(from var(--gradient-angle), var(--color-accent), var(--color-cyan), var(--color-purple), var(--color-accent));
+  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  animation: gradientBorderRotate 3s linear infinite;
+  pointer-events: none;
+}
+
+/* ── Score ring ── */
+.score-ring {
+  transform: rotate(-90deg);
+  transform-origin: center;
+}
+.score-ring-bg {
+  fill: none;
+  stroke: var(--color-surface2);
+  stroke-width: 4;
+}
+.score-ring-fill {
+  fill: none;
+  stroke: url(#scoreGradient);
+  stroke-width: 4;
+  stroke-linecap: round;
+  transition: stroke-dashoffset 0.6s ease-out;
 }
 
 /* ── Animations ── */

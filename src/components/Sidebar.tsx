@@ -74,6 +74,11 @@ export default function Sidebar() {
     toggleTheme()
   }
 
+  // Score ring calculations
+  const ringRadius = 24
+  const ringCircumference = 2 * Math.PI * ringRadius
+  const ringOffset = ringCircumference - (dailyScore / 100) * ringCircumference
+
   const navLink = (href: string, label: string, icon?: string, badge?: number) => (
     <Link
       key={href}
@@ -82,23 +87,18 @@ export default function Sidebar() {
       className="block"
     >
       <motion.div
-        className={`relative flex items-center gap-2.5 px-3 py-1 rounded-lg text-[13px] group ${
-          isActive(href) ? 'text-[var(--accent)]' : 'text-[var(--text-mid)]'
+        className={`relative flex items-center gap-2.5 px-3 py-1 text-[12px] group border-l-2 transition-colors ${
+          isActive(href)
+            ? 'border-l-[var(--color-accent)] bg-[var(--color-accent)]/5 text-[var(--color-accent)] font-medium'
+            : 'border-l-transparent text-[var(--color-text-mid)]'
         }`}
-        whileHover={{ x: 2, backgroundColor: 'var(--color-surface2, rgba(255,255,255,0.06))' }}
+        whileHover={{ x: 2, backgroundColor: 'var(--color-surface2)' }}
         transition={{ duration: 0.15, ease: 'easeOut' }}
       >
-        {isActive(href) && (
-          <motion.div
-            layoutId="activeIndicator"
-            className="absolute left-0 top-1/2 -translate-y-1/2 w-[2px] h-4 rounded-full bg-[var(--accent)]"
-            transition={{ type: 'spring', stiffness: 350, damping: 30 }}
-          />
-        )}
         {icon && <span className="w-4 text-center opacity-60 group-hover:opacity-100 transition-opacity">{icon}</span>}
-        <span className={`flex-1 ${isActive(href) ? 'font-medium' : ''}`}>{label}</span>
+        <span className="flex-1">{label}</span>
         {badge !== undefined && badge > 0 && (
-          <span className="data text-[10px] bg-[var(--accent)]/15 text-[var(--accent)] px-1.5 py-0.5 rounded-md min-w-[20px] text-center">
+          <span className="data text-[10px] bg-[var(--color-accent)]/15 text-[var(--color-accent)] px-1.5 py-0.5 rounded-md min-w-[20px] text-center">
             {badge}
           </span>
         )}
@@ -107,13 +107,15 @@ export default function Sidebar() {
   )
 
   const sidebarContent = (
-    <div className="flex flex-col h-full bg-[var(--surface)] border-r border-[var(--border)] w-[220px] overflow-hidden">
+    <div className="flex flex-col h-full bg-[var(--color-surface)] border-r border-[var(--color-border)] w-[220px] overflow-hidden">
       {/* Header */}
       <div className="flex items-center justify-between px-4 pt-4 pb-2">
-        <Link href="/dashboard" className="text-[15px] font-bold tracking-widest text-[var(--text)]">ART OS</Link>
+        <Link href="/dashboard" className="data text-[14px] font-bold tracking-[5px] text-[var(--color-accent)]">
+          ART OS
+        </Link>
         <motion.button
           onClick={handleThemeToggle}
-          className="w-7 h-7 flex items-center justify-center rounded-lg hover:bg-[var(--surface2)] text-[var(--text-mid)] transition-colors"
+          className="w-7 h-7 flex items-center justify-center rounded-lg hover:bg-[var(--color-surface2)] text-[var(--color-text-mid)] transition-colors"
           animate={{ rotate: themeRotation }}
           transition={{ type: 'spring', stiffness: 200, damping: 15 }}
           title="Toggle theme"
@@ -126,18 +128,14 @@ export default function Sidebar() {
         </motion.button>
       </div>
 
-      {/* AI Button */}
+      {/* AI Strategist Button */}
       <div className="px-3 pb-2">
         <Link href="/ai" className="block">
           <motion.div
-            className="w-full text-center py-2 rounded-lg text-[12px] font-semibold tracking-wide text-[var(--text)]"
-            style={{
-              background: 'linear-gradient(var(--surface2), var(--surface2)) padding-box, linear-gradient(135deg, var(--accent), var(--cyan), var(--purple)) border-box',
-              border: '1px solid transparent',
-            }}
+            className="gradient-border-animated w-full text-center py-2 text-[12px] font-semibold tracking-wide text-[var(--color-text)]"
             whileHover={{
               scale: 1.02,
-              boxShadow: '0 0 16px rgba(16, 185, 129, 0.2)',
+              boxShadow: '0 0 20px rgba(16, 185, 129, 0.25)',
             }}
             transition={{ duration: 0.2 }}
           >
@@ -150,7 +148,7 @@ export default function Sidebar() {
       <div className="flex-1 overflow-y-auto px-1.5 space-y-3 scrollbar-thin">
         {/* Operations */}
         <div>
-          <div className="label text-[10px] text-[var(--text-dim)] px-3 mb-1">OPERATIONS</div>
+          <div className="section-label px-3 mb-1">OPERATIONS</div>
           <div className="space-y-0.5">
             {OPS_LINKS.map((l) => navLink(l.href, l.label, l.icon, l.badge ? badges[l.badge] : undefined))}
           </div>
@@ -158,7 +156,7 @@ export default function Sidebar() {
 
         {/* Businesses */}
         <div>
-          <div className="label text-[10px] text-[var(--text-dim)] px-3 mb-1">BUSINESSES</div>
+          <div className="section-label px-3 mb-1">BUSINESSES</div>
           <div className="space-y-0.5">
             {BUSINESSES.map((b) => (
               <Link
@@ -168,22 +166,17 @@ export default function Sidebar() {
                 className="block"
               >
                 <motion.div
-                  className={`relative flex items-center gap-2.5 px-3 py-1 rounded-lg text-[13px] group ${
-                    isActive(BUSINESS_ROUTES[b.id]) ? 'text-[var(--accent)]' : 'text-[var(--text-mid)]'
+                  className={`relative flex items-center gap-2.5 px-3 py-1 text-[12px] group border-l-2 transition-colors ${
+                    isActive(BUSINESS_ROUTES[b.id])
+                      ? 'border-l-[var(--color-accent)] bg-[var(--color-accent)]/5 text-[var(--color-accent)] font-medium'
+                      : 'border-l-transparent text-[var(--color-text-mid)]'
                   }`}
-                  whileHover={{ x: 2, backgroundColor: 'var(--color-surface2, rgba(255,255,255,0.06))' }}
+                  whileHover={{ x: 2, backgroundColor: 'var(--color-surface2)' }}
                   transition={{ duration: 0.15, ease: 'easeOut' }}
                 >
-                  {isActive(BUSINESS_ROUTES[b.id]) && (
-                    <motion.div
-                      layoutId="activeIndicatorBiz"
-                      className="absolute left-0 top-1/2 -translate-y-1/2 w-[2px] h-4 rounded-full bg-[var(--accent)]"
-                      transition={{ type: 'spring', stiffness: 350, damping: 30 }}
-                    />
-                  )}
                   <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: b.color }} />
-                  <span className={`flex-1 truncate ${isActive(BUSINESS_ROUTES[b.id]) ? 'font-medium' : ''}`}>{b.name}</span>
-                  <span className="data text-[10px] text-[var(--text-dim)]">{REVENUE_LABELS[b.id]}</span>
+                  <span className={`flex-1 truncate`}>{b.name}</span>
+                  <span className="data text-[10px] text-[var(--color-text-dim)]">{REVENUE_LABELS[b.id]}</span>
                 </motion.div>
               </Link>
             ))}
@@ -192,39 +185,62 @@ export default function Sidebar() {
 
         {/* System */}
         <div>
-          <div className="label text-[10px] text-[var(--text-dim)] px-3 mb-1">SYSTEM</div>
+          <div className="section-label px-3 mb-1">SYSTEM</div>
           <div className="space-y-0.5">
             {SYSTEM_LINKS.map((l) => navLink(l.href, l.label))}
           </div>
         </div>
       </div>
 
-      {/* Daily Score */}
-      <div className="border-t border-[var(--border)] p-3 space-y-2">
-        <div className="flex items-baseline justify-between">
-          <span className="label text-[10px] text-[var(--text-dim)]">DAILY SCORE</span>
-          <span className="data text-[10px] text-[var(--text-dim)]">LVL {level}</span>
-        </div>
-        <div className="flex items-baseline gap-1">
-          <motion.span
-            key={dailyScore}
-            initial={{ opacity: 0, y: 8 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ type: 'spring', stiffness: 300, damping: 25 }}
-            className="data text-2xl font-bold text-[var(--text)]"
-          >
-            {dailyScore}
-          </motion.span>
-          <span className="data text-sm text-[var(--text-dim)]">/100</span>
-        </div>
-        <div className="space-y-1">
-          <div className="flex justify-between">
-            <span className="text-[10px] text-[var(--text-dim)]">XP</span>
-            <span className="data text-[10px] text-[var(--text-dim)]">{xpInLevel}/500</span>
+      {/* Daily Score with SVG Ring */}
+      <div className="border-t border-[var(--color-border)] p-3 space-y-2">
+        <div className="flex items-center justify-center">
+          <div className="relative w-[60px] h-[60px]">
+            <svg className="score-ring w-full h-full" viewBox="0 0 60 60">
+              <defs>
+                <linearGradient id="scoreGradient" x1="0%" y1="0%" x2="100%" y2="0%">
+                  <stop offset="0%" stopColor="var(--color-accent)" />
+                  <stop offset="100%" stopColor="var(--color-cyan)" />
+                </linearGradient>
+              </defs>
+              <circle className="score-ring-bg" cx="30" cy="30" r={ringRadius} />
+              <circle
+                className="score-ring-fill"
+                cx="30"
+                cy="30"
+                r={ringRadius}
+                strokeDasharray={ringCircumference}
+                strokeDashoffset={ringOffset}
+              />
+            </svg>
+            <div className="absolute inset-0 flex items-center justify-center">
+              <motion.span
+                key={dailyScore}
+                initial={{ opacity: 0, scale: 0.8 }}
+                animate={{ opacity: 1, scale: 1 }}
+                transition={{ type: 'spring', stiffness: 300, damping: 25 }}
+                className="gradient-text data text-lg font-bold"
+              >
+                {dailyScore}
+              </motion.span>
+            </div>
           </div>
-          <div className="h-1.5 bg-[var(--surface2)] rounded-full overflow-hidden">
+        </div>
+
+        {/* XP Bar */}
+        <div className="space-y-1">
+          <div className="flex justify-between items-center">
+            <span className="text-[10px] text-[var(--color-text-dim)]">XP</span>
+            <div className="flex items-center gap-1.5">
+              <span className="data text-[10px] text-[var(--color-text-dim)]">{xpInLevel}/500</span>
+              <span className="data text-[9px] font-bold bg-[var(--color-accent)] text-[var(--color-bg)] px-1.5 py-0.5 rounded-full">
+                LVL {level}
+              </span>
+            </div>
+          </div>
+          <div className="h-1.5 bg-[var(--color-surface2)] rounded-full overflow-hidden">
             <motion.div
-              className="h-full bg-[var(--accent)] rounded-full"
+              className="h-full bg-[var(--color-accent)] rounded-full"
               initial={false}
               animate={{ width: `${xpPercent}%` }}
               transition={{ duration: 0.6, ease: 'easeOut' }}
@@ -234,7 +250,7 @@ export default function Sidebar() {
 
         {/* Cmd+K hint */}
         <div className="flex justify-center pt-1">
-          <span className="text-[10px] text-[var(--text-dim)] bg-[var(--surface2)] px-2 py-0.5 rounded font-mono">
+          <span className="data text-[10px] text-[var(--color-text-dim)] bg-[var(--color-surface2)] px-2 py-0.5 rounded">
             ⌘K
           </span>
         </div>
@@ -247,7 +263,7 @@ export default function Sidebar() {
       {/* Mobile hamburger */}
       <button
         onClick={toggleSidebar}
-        className="md:hidden fixed top-3 left-3 z-50 w-9 h-9 flex items-center justify-center rounded-lg bg-[var(--surface)] border border-[var(--border)] text-[var(--text)] hover:bg-[var(--surface2)] transition-all"
+        className="md:hidden fixed top-3 left-3 z-50 w-9 h-9 flex items-center justify-center rounded-lg bg-[var(--color-surface)] border border-[var(--color-border)] text-[var(--color-text)] hover:bg-[var(--color-surface2)] transition-all"
       >
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
       </button>

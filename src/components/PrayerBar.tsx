@@ -1,6 +1,6 @@
 'use client'
 
-import { motion } from 'framer-motion'
+import { motion, AnimatePresence } from 'framer-motion'
 import { useStore } from '@/stores/store'
 import type { HealthLog } from '@/stores/store'
 import { toast } from 'sonner'
@@ -28,10 +28,25 @@ export default function PrayerBar({ times = {} }: PrayerBarProps) {
     if (willBeActive) toast.success(`${key.charAt(0).toUpperCase() + key.slice(1)} prayed`)
   }
 
+  const allActive = count === 5
+
   return (
-    <div className="bg-[var(--surface)] border border-[var(--border)] rounded-[10px] p-4">
+    <div className="relative bg-[var(--surface)] border border-[var(--border)] rounded-[10px] p-4 overflow-hidden">
+      {/* Golden shimmer when all 5 prayed */}
+      <AnimatePresence>
+        {allActive && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: [0, 0.15, 0] }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 2, repeat: Infinity }}
+            className="absolute inset-0 rounded-[10px] pointer-events-none"
+            style={{ background: 'linear-gradient(135deg, transparent 30%, rgba(234,179,8,0.3) 50%, transparent 70%)' }}
+          />
+        )}
+      </AnimatePresence>
       <div className="flex items-center justify-between mb-3">
-        <span className="label text-[10px] text-[var(--text-dim)]">PRAYERS</span>
+        <span className="label text-[10px]" style={{ color: 'var(--gold, #d4a017)' }}>PRAYERS</span>
         <motion.span
           key={count}
           className="data text-[12px] font-semibold"
@@ -50,11 +65,12 @@ export default function PrayerBar({ times = {} }: PrayerBarProps) {
             <motion.button
               key={key}
               onClick={() => handleToggle(key)}
-              className={`flex-1 flex flex-col items-center gap-1 py-2.5 rounded-lg border ${
+              className={`flex-1 flex flex-col items-center gap-1 py-2.5 rounded-lg border relative ${
                 active
                   ? 'border-[var(--gold)]/40 text-[var(--gold)]'
                   : 'bg-[var(--surface2)] border-[var(--border)] text-[var(--text-dim)] hover:text-[var(--text-mid)]'
               }`}
+              style={active ? { boxShadow: '0 0 12px rgba(234,179,8,0.35), 0 0 4px rgba(234,179,8,0.2)' } : undefined}
               whileHover={{ scale: 1.04 }}
               whileTap={{ scale: 0.96 }}
               transition={{ type: 'spring', stiffness: 400, damping: 20 }}

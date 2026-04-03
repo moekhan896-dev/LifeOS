@@ -157,11 +157,21 @@ export interface EnergyLog {
 }
 
 interface AppState {
-  // Auth
+  // Auth & Onboarding
   authenticated: boolean
   pin: string
+  onboardingComplete: boolean
+  incomeTarget: number
+  targetMonths: number
+  exitTarget: number
+  wakeUpTime: string
   setAuthenticated: (v: boolean) => void
   setPin: (v: string) => void
+  completeOnboarding: () => void
+  setIncomeTarget: (v: number) => void
+  setTargetMonths: (v: number) => void
+  setExitTarget: (v: number) => void
+  setWakeUpTime: (v: string) => void
 
   // Theme
   theme: 'dark' | 'light'
@@ -263,11 +273,21 @@ const today = () => new Date().toISOString().split('T')[0]
 export const useStore = create<AppState>()(
   persist(
     (set, get) => ({
-      // Auth
+      // Auth & Onboarding
       authenticated: false,
       pin: '1234',
+      onboardingComplete: false,
+      incomeTarget: 50000,
+      targetMonths: 6,
+      exitTarget: 1000000,
+      wakeUpTime: '07:00',
       setAuthenticated: (v) => set({ authenticated: v }),
       setPin: (v) => set({ pin: v }),
+      completeOnboarding: () => set({ onboardingComplete: true }),
+      setIncomeTarget: (v) => set({ incomeTarget: v }),
+      setTargetMonths: (v) => set({ targetMonths: v }),
+      setExitTarget: (v) => set({ exitTarget: v }),
+      setWakeUpTime: (v) => set({ wakeUpTime: v }),
 
       // Theme
       theme: 'dark',

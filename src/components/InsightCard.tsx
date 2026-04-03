@@ -29,7 +29,14 @@ export default function InsightCard({ insight }: InsightCardProps) {
       <motion.div
         layout
         key={insight.id}
-        className="bg-[var(--surface)] border border-[var(--border)] rounded-[10px] p-4 group"
+        className="card bg-[var(--surface)] border border-[var(--border)] rounded-[10px] p-4 group"
+        style={{
+          borderTop: `2px solid ${
+            insight.type === 'revenue' ? 'var(--accent)' :
+            insight.type === 'risk' ? 'var(--rose)' :
+            'var(--blue)'
+          }`,
+        }}
         initial={{ opacity: 0, y: 12 }}
         animate={{ opacity: 1, y: 0 }}
         exit={{ opacity: 0, height: 0, marginBottom: 0, padding: 0, overflow: 'hidden' }}
