@@ -42,6 +42,8 @@ export interface Task {
   done: boolean
   dueDate?: string
   xpValue: number
+  drip?: DripZone
+  projectId?: string
   createdAt: string
   completedAt?: string
 }
@@ -62,6 +64,41 @@ export interface EnergyLog { date: string; timeOfDay: 'morning' | 'afternoon' | 
 export interface RevenueEntry { id: string; businessId: string; amount: number; date: string; source?: string; notes?: string }
 export interface ExpenseEntry { id: string; category: string; amount: number; date: string; notes?: string; recurring: boolean }
 export interface GmbProfile { id: string; businessId: string; city: string; reviewCount: number; callsPerMonth: number; ranking: string; status: 'strong' | 'medium' | 'new'; hasAddress: boolean }
+
+// ── New Strategic Types ──
+export type DripZone = 'double_down' | 'replace' | 'design' | 'eliminate'
+export type IdentityStatus = 'aspirational' | 'developing' | 'integrated'
+export type ProjectStatus = 'not_started' | 'in_progress' | 'blocked' | 'complete'
+
+export interface IdentityStatement { id: string; text: string; status: IdentityStatus; order: number }
+export interface VisionItem { id: string; text: string; type: 'vision' | 'anti_vision'; order: number }
+export interface NorthStar { id: string; label: string; current: number; target: number; unit: string }
+
+export interface Goal {
+  id: string; title: string; targetMetric: string; currentValue: number; targetValue: number
+  cycleStart: string; cycleEnd: string; linkedProjectIds: string[]; createdAt: string
+}
+
+export interface Project {
+  id: string; name: string; description: string; businessId?: string; goalId?: string
+  impact: number; confidence: number; ease: number
+  status: ProjectStatus; progress: number; deadline?: string; createdAt: string
+}
+
+export interface FocusSession {
+  id: string; taskId?: string; projectId?: string; startedAt: string; endedAt?: string
+  duration: number; quality?: number; notes?: string; distractions: number
+}
+
+export interface KnowledgeEntry {
+  id: string; title: string; source: string; type: 'book' | 'podcast' | 'article' | 'video' | 'idea' | 'framework' | 'swipe'
+  takeaways: string; actionItem?: string; status?: string; createdAt: string
+}
+
+export interface AiReport {
+  id: string; level: 'daily' | 'weekly' | 'monthly' | 'quarterly' | 'annual'
+  content: string; date: string; grade?: string; createdAt: string
+}
 
 interface AppState {
   // ── Auth & Onboarding ──
@@ -209,6 +246,45 @@ interface AppState {
 
   // ── Scorecards ──
   scorecards: any[]
+
+  // ── Identity & Vision ──
+  identityStatements: IdentityStatement[]
+  visionItems: VisionItem[]
+  northStars: NorthStar[]
+  addIdentity: (text: string) => void
+  updateIdentity: (id: string, updates: Partial<IdentityStatement>) => void
+  deleteIdentity: (id: string) => void
+  addVisionItem: (text: string, type: 'vision' | 'anti_vision') => void
+  deleteVisionItem: (id: string) => void
+  addNorthStar: (ns: Omit<NorthStar, 'id'>) => void
+  updateNorthStar: (id: string, updates: Partial<NorthStar>) => void
+
+  // ── Goals (12-Week Year) ──
+  goals: Goal[]
+  addGoal: (g: Omit<Goal, 'id' | 'createdAt'>) => void
+  updateGoal: (id: string, updates: Partial<Goal>) => void
+  deleteGoal: (id: string) => void
+
+  // ── Projects ──
+  projects: Project[]
+  addProject: (p: Omit<Project, 'id' | 'createdAt'>) => void
+  updateProject: (id: string, updates: Partial<Project>) => void
+  deleteProject: (id: string) => void
+
+  // ── Focus Sessions ──
+  focusSessions: FocusSession[]
+  addFocusSession: (s: Omit<FocusSession, 'id'>) => void
+  updateFocusSession: (id: string, updates: Partial<FocusSession>) => void
+
+  // ── Knowledge Vault ──
+  knowledgeEntries: KnowledgeEntry[]
+  addKnowledge: (k: Omit<KnowledgeEntry, 'id' | 'createdAt'>) => void
+  updateKnowledge: (id: string, updates: Partial<KnowledgeEntry>) => void
+  deleteKnowledge: (id: string) => void
+
+  // ── AI Reports ──
+  aiReports: AiReport[]
+  addAiReport: (r: Omit<AiReport, 'id' | 'createdAt'>) => void
 }
 
 const uid = () => Math.random().toString(36).slice(2, 10) + Date.now().toString(36)
@@ -470,6 +546,45 @@ export const useStore = create<AppState>()(
 
       // ── Scorecards ──
       scorecards: [],
+
+      // ── Identity & Vision ──
+      identityStatements: [],
+      visionItems: [],
+      northStars: [],
+      addIdentity: (text) => set((s) => ({ identityStatements: [...s.identityStatements, { id: uid(), text, status: 'aspirational' as const, order: s.identityStatements.length }] })),
+      updateIdentity: (id, updates) => set((s) => ({ identityStatements: s.identityStatements.map((i) => i.id === id ? { ...i, ...updates } : i) })),
+      deleteIdentity: (id) => set((s) => ({ identityStatements: s.identityStatements.filter((i) => i.id !== id) })),
+      addVisionItem: (text, type) => set((s) => ({ visionItems: [...s.visionItems, { id: uid(), text, type, order: s.visionItems.length }] })),
+      deleteVisionItem: (id) => set((s) => ({ visionItems: s.visionItems.filter((v) => v.id !== id) })),
+      addNorthStar: (ns) => set((s) => ({ northStars: [...s.northStars, { ...ns, id: uid() }] })),
+      updateNorthStar: (id, updates) => set((s) => ({ northStars: s.northStars.map((n) => n.id === id ? { ...n, ...updates } : n) })),
+
+      // ── Goals ──
+      goals: [],
+      addGoal: (g) => set((s) => ({ goals: [...s.goals, { ...g, id: uid(), createdAt: new Date().toISOString() }] })),
+      updateGoal: (id, updates) => set((s) => ({ goals: s.goals.map((g) => g.id === id ? { ...g, ...updates } : g) })),
+      deleteGoal: (id) => set((s) => ({ goals: s.goals.filter((g) => g.id !== id) })),
+
+      // ── Projects ──
+      projects: [],
+      addProject: (p) => set((s) => ({ projects: [...s.projects, { ...p, id: uid(), createdAt: new Date().toISOString() }] })),
+      updateProject: (id, updates) => set((s) => ({ projects: s.projects.map((p) => p.id === id ? { ...p, ...updates } : p) })),
+      deleteProject: (id) => set((s) => ({ projects: s.projects.filter((p) => p.id !== id) })),
+
+      // ── Focus Sessions ──
+      focusSessions: [],
+      addFocusSession: (s_) => set((s) => ({ focusSessions: [...s.focusSessions, { ...s_, id: uid() }] })),
+      updateFocusSession: (id, updates) => set((s) => ({ focusSessions: s.focusSessions.map((f) => f.id === id ? { ...f, ...updates } : f) })),
+
+      // ── Knowledge Vault ──
+      knowledgeEntries: [],
+      addKnowledge: (k) => set((s) => ({ knowledgeEntries: [...s.knowledgeEntries, { ...k, id: uid(), createdAt: new Date().toISOString() }] })),
+      updateKnowledge: (id, updates) => set((s) => ({ knowledgeEntries: s.knowledgeEntries.map((k) => k.id === id ? { ...k, ...updates } : k) })),
+      deleteKnowledge: (id) => set((s) => ({ knowledgeEntries: s.knowledgeEntries.filter((k) => k.id !== id) })),
+
+      // ── AI Reports ──
+      aiReports: [],
+      addAiReport: (r) => set((s) => ({ aiReports: [...s.aiReports, { ...r, id: uid(), createdAt: new Date().toISOString() }] })),
     }),
     { name: 'art-os-store' }
   )
@@ -490,4 +605,23 @@ export function getDailyScore(health: HealthLog, tasksDoneToday: number) {
   const h = (health.gym ? 15 : 0) + (health.energyDrinks === 0 ? 10 : 0)
   const prod = Math.min(40, tasksDoneToday * 8)
   return Math.round(prayer + h + prod)
+}
+
+export function getExecutionScore(health: HealthLog, tasksCommitted: number, tasksDone: number, focusSessionsToday: number) {
+  const commitment = tasksCommitted > 0 ? (tasksDone / tasksCommitted) * 35 : 0
+  const energy = (health.gym ? 10 : 0) + (health.mealQuality === 'good' ? 5 : 0) + (health.energyDrinks < 2 ? 5 : 0) + ((health.sleepTime && health.wakeTime) ? 5 : 0)
+  const focus = Math.min(20, focusSessionsToday * 5)
+  const prayerCount = Object.values(health.prayers).filter(Boolean).length
+  const faith = prayerCount * 4
+  return Math.round(Math.min(100, commitment + energy + focus + faith))
+}
+
+export function getProjectIce(p: Project) { return p.impact * p.confidence * p.ease }
+
+export function getScoreZone(score: number) {
+  if (score >= 86) return { label: 'Peak performance', color: '#10b981', emoji: '✨' }
+  if (score >= 71) return { label: 'Locked in', color: '#10b981', emoji: '🟢' }
+  if (score >= 51) return { label: 'Solid day', color: '#3b82f6', emoji: '🔵' }
+  if (score >= 31) return { label: 'Getting there', color: '#f59e0b', emoji: '🟡' }
+  return { label: 'Restart tomorrow', color: '#ef4444', emoji: '🔴' }
 }

@@ -14,8 +14,9 @@ function fmt(n: number) {
 }
 
 export default function FinancialsPage() {
-  const { businesses, clients, expenseEntries } = useStore()
+  const { businesses, clients, expenseEntries, streaks } = useStore()
   const savings = 35000
+  const noGambleStreak = streaks.find(s => s.habit === 'no_gamble')
 
   const agencyTotals = getAgencyTotals(clients)
 
@@ -219,6 +220,54 @@ export default function FinancialsPage() {
             </div>
           </StaggerItem>
 
+          {/* Profit First Allocations */}
+          <StaggerItem>
+            <div className="card p-4">
+              <span className="label text-[10px] tracking-widest text-[var(--accent)]">PROFIT FIRST ALLOCATIONS</span>
+              <div className="mt-3 flex gap-1 h-3 rounded-full overflow-hidden">
+                <div className="bg-emerald-500 rounded-l-full" style={{ width: '50%' }} />
+                <div className="bg-amber-500" style={{ width: '15%' }} />
+                <div className="bg-blue-500" style={{ width: '30%' }} />
+                <div className="bg-purple-500 rounded-r-full" style={{ width: '5%' }} />
+              </div>
+              <div className="mt-3 grid grid-cols-4 gap-2">
+                {[
+                  { label: "Owner's Pay", pct: 50, color: 'text-emerald-400' },
+                  { label: 'Taxes', pct: 15, color: 'text-amber-400' },
+                  { label: 'OpEx', pct: 30, color: 'text-blue-400' },
+                  { label: 'Profit', pct: 5, color: 'text-purple-400' },
+                ].map(a => (
+                  <motion.div key={a.label} whileHover={{ y: -1 }} className="rounded-[12px] border border-[var(--border)] bg-[var(--bg)] p-3 text-center">
+                    <p className="text-[10px] text-[var(--text-dim)]">{a.label}</p>
+                    <p className={`text-xs font-semibold ${a.color} mt-0.5`}>{a.pct}%</p>
+                    <p className="data text-sm font-bold text-[var(--text)] mt-1">{fmt(Math.round(TOTAL_INCOME * a.pct / 100))}</p>
+                  </motion.div>
+                ))}
+              </div>
+            </div>
+          </StaggerItem>
+
+          {/* Agency Valuation */}
+          <StaggerItem>
+            <motion.div whileHover={{ y: -1 }} className="card p-4">
+              <span className="label text-[10px] tracking-widest text-[var(--cyan)]">ESTIMATED NET WORTH</span>
+              <div className="mt-3 space-y-2">
+                <div className="flex justify-between text-sm">
+                  <span className="text-[var(--text-dim)]">Savings</span>
+                  <span className="data text-[var(--text)]">{fmt(savings)}</span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span className="text-[var(--text-dim)]">Agency Valuation (Net MRR x 12 x 3.5)</span>
+                  <span className="data text-[var(--text)]">{fmt(Math.round(agencyTotals.net * 12 * 3.5))}</span>
+                </div>
+                <div className="border-t border-[var(--border)] pt-2 flex justify-between">
+                  <span className="text-sm font-bold text-[var(--text)]">Estimated Net Worth</span>
+                  <span className="data text-lg font-bold text-[var(--accent)]">{fmt(savings + Math.round(agencyTotals.net * 12 * 3.5))}</span>
+                </div>
+              </div>
+            </motion.div>
+          </StaggerItem>
+
           {/* Time vs Money Matrix */}
           <StaggerItem>
             <div className="card p-4">
@@ -246,6 +295,18 @@ export default function FinancialsPage() {
               </div>
             </div>
           </StaggerItem>
+          {/* Days Clean */}
+          {noGambleStreak && (
+            <StaggerItem>
+              <motion.div whileHover={{ y: -1 }} className="card p-3 flex items-center gap-3 opacity-70 hover:opacity-100 transition-opacity">
+                <div className="w-8 h-8 rounded-full bg-emerald-500/10 flex items-center justify-center text-xs text-emerald-400 font-bold">{noGambleStreak.currentStreak}</div>
+                <div>
+                  <p className="text-xs font-medium text-[var(--text-mid)]">Days clean</p>
+                  <p className="text-[10px] text-[var(--text-dim)]">Longest: {noGambleStreak.longestStreak}d</p>
+                </div>
+              </motion.div>
+            </StaggerItem>
+          )}
         </StaggerContainer>
       </div>
     </PageTransition>
