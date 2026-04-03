@@ -23,6 +23,19 @@ const PAGES = [
   { name: 'Commitments', href: '/commitments', icon: '🤝' },
   { name: 'Net Worth', href: '/net-worth', icon: '💎' },
   { name: 'Ecosystem', href: '/ecosystem', icon: '🕸' },
+  { name: 'Vision & Identity', href: '/vision', icon: '👁' },
+  { name: 'Goals', href: '/goals', icon: '🎯' },
+  { name: 'Projects', href: '/projects', icon: '📁' },
+  { name: 'Focus Mode', href: '/focus', icon: '🔥' },
+  { name: 'DRIP Matrix', href: '/drip', icon: '💧' },
+  { name: 'Energy Dashboard', href: '/energy', icon: '⚡' },
+  { name: 'Skill Tree', href: '/skills', icon: '🌳' },
+  { name: 'AI Reports', href: '/reports', icon: '📈' },
+  { name: 'Knowledge Vault', href: '/knowledge', icon: '📚' },
+  { name: 'Decision Journal', href: '/decisions', icon: '⚖' },
+  { name: 'Time Capsule', href: '/capsule', icon: '💊' },
+  { name: 'Reflections', href: '/reflections', icon: '🪞' },
+  { name: 'Contacts', href: '/contacts', icon: '👥' },
 ]
 
 export default function CommandPalette() {

@@ -100,6 +100,43 @@ export interface AiReport {
   content: string; date: string; grade?: string; createdAt: string
 }
 
+// ── V2 Intelligence Types ──
+export interface BehavioralEvent {
+  id: string; eventType: string; eventData: Record<string, any>; timestamp: string
+  dayScoreAtTime?: number; energyAtTime?: number
+}
+
+export interface ObstacleResponse {
+  id: string; taskId: string; reason: string; deeperReason?: string; aiResponse?: string; createdAt: string
+}
+
+export interface SkillLevel {
+  id: string; category: string; skill: string; level: number; xp: number
+}
+
+export interface DecisionEntry {
+  id: string; decision: string; reasoning: string; expectedOutcome: string
+  actualOutcome?: string; reviewDate?: string; createdAt: string
+}
+
+export interface TimeCapsule {
+  id: string; letter: string; deliverDate: string; delivered: boolean; createdAt: string
+}
+
+export interface AccountabilityContract {
+  commitments: string[]; consequence: string; signedDate: string
+}
+
+export interface WeeklyReflection {
+  id: string; weekStart: string; worked: string; didnt: string; avoided: string; change: string; grateful: string; createdAt: string
+}
+
+export interface ContactEntry {
+  id: string; name: string; role: string; lastContact?: string; notes?: string
+}
+
+export type BusinessHealth = 'strong' | 'weak' | 'flatline'
+
 interface AppState {
   // ── Auth & Onboarding ──
   authenticated: boolean
@@ -285,6 +322,30 @@ interface AppState {
   // ── AI Reports ──
   aiReports: AiReport[]
   addAiReport: (r: Omit<AiReport, 'id' | 'createdAt'>) => void
+
+  // ── V2 Intelligence ──
+  behavioralEvents: BehavioralEvent[]
+  logEvent: (eventType: string, eventData: Record<string, any>) => void
+  obstacleResponses: ObstacleResponse[]
+  addObstacle: (o: Omit<ObstacleResponse, 'id' | 'createdAt'>) => void
+  skillLevels: SkillLevel[]
+  addSkillXp: (category: string, skill: string, xp: number) => void
+  decisionJournal: DecisionEntry[]
+  addDecision: (d: Omit<DecisionEntry, 'id' | 'createdAt'>) => void
+  updateDecision: (id: string, updates: Partial<DecisionEntry>) => void
+  deleteDecision: (id: string) => void
+  timeCapsules: TimeCapsule[]
+  addTimeCapsule: (letter: string, deliverDate: string) => void
+  openTimeCapsule: (id: string) => void
+  accountabilityContract: AccountabilityContract | null
+  setContract: (c: AccountabilityContract) => void
+  weeklyReflections: WeeklyReflection[]
+  addReflection: (r: Omit<WeeklyReflection, 'id' | 'createdAt'>) => void
+  contacts: ContactEntry[]
+  addContact: (c: Omit<ContactEntry, 'id'>) => void
+  updateContact: (id: string, updates: Partial<ContactEntry>) => void
+  deleteContact: (id: string) => void
+  contextualQuotes: string[]
 }
 
 const uid = () => Math.random().toString(36).slice(2, 10) + Date.now().toString(36)
@@ -585,6 +646,58 @@ export const useStore = create<AppState>()(
       // ── AI Reports ──
       aiReports: [],
       addAiReport: (r) => set((s) => ({ aiReports: [...s.aiReports, { ...r, id: uid(), createdAt: new Date().toISOString() }] })),
+
+      // ── V2 Intelligence ──
+      behavioralEvents: [],
+      logEvent: (eventType, eventData) => set((s) => {
+        const score = getDailyScore(s.todayHealth, s.tasks.filter(t => t.done && t.completedAt?.startsWith(today())).length)
+        return { behavioralEvents: [...s.behavioralEvents.slice(-500), { id: uid(), eventType, eventData, timestamp: new Date().toISOString(), dayScoreAtTime: score }] }
+      }),
+      obstacleResponses: [],
+      addObstacle: (o) => set((s) => ({ obstacleResponses: [...s.obstacleResponses, { ...o, id: uid(), createdAt: new Date().toISOString() }] })),
+      skillLevels: [
+        { id: '1', category: 'Marketing', skill: 'Cold Email', level: 8, xp: 0 },
+        { id: '2', category: 'Marketing', skill: 'GMB/SEO', level: 9, xp: 0 },
+        { id: '3', category: 'Marketing', skill: 'Paid Ads', level: 2, xp: 0 },
+        { id: '4', category: 'Marketing', skill: 'Content', level: 4, xp: 0 },
+        { id: '5', category: 'Marketing', skill: 'Branding', level: 3, xp: 0 },
+        { id: '6', category: 'Business', skill: 'Sales', level: 7, xp: 0 },
+        { id: '7', category: 'Business', skill: 'Finance', level: 2, xp: 0 },
+        { id: '8', category: 'Business', skill: 'Hiring', level: 1, xp: 0 },
+        { id: '9', category: 'Business', skill: 'SOPs', level: 1, xp: 0 },
+        { id: '10', category: 'Business', skill: 'Systems', level: 3, xp: 0 },
+        { id: '11', category: 'Personal', skill: 'Discipline', level: 2, xp: 0 },
+        { id: '12', category: 'Personal', skill: 'Fitness', level: 1, xp: 0 },
+        { id: '13', category: 'Personal', skill: 'Faith', level: 2, xp: 0 },
+        { id: '14', category: 'Personal', skill: 'Nutrition', level: 1, xp: 0 },
+        { id: '15', category: 'Personal', skill: 'Focus', level: 2, xp: 0 },
+      ],
+      addSkillXp: (category, skill, amount) => set((s) => ({
+        skillLevels: s.skillLevels.map(sl => {
+          if (sl.category === category && sl.skill === skill) {
+            const newXp = sl.xp + amount
+            const levelUp = newXp >= 100
+            return { ...sl, xp: levelUp ? newXp - 100 : newXp, level: levelUp ? sl.level + 1 : sl.level }
+          }
+          return sl
+        })
+      })),
+      decisionJournal: [],
+      addDecision: (d) => set((s) => ({ decisionJournal: [...s.decisionJournal, { ...d, id: uid(), createdAt: new Date().toISOString() }] })),
+      updateDecision: (id, updates) => set((s) => ({ decisionJournal: s.decisionJournal.map(d => d.id === id ? { ...d, ...updates } : d) })),
+      deleteDecision: (id) => set((s) => ({ decisionJournal: s.decisionJournal.filter(d => d.id !== id) })),
+      timeCapsules: [],
+      addTimeCapsule: (letter, deliverDate) => set((s) => ({ timeCapsules: [...s.timeCapsules, { id: uid(), letter, deliverDate, delivered: false, createdAt: new Date().toISOString() }] })),
+      openTimeCapsule: (id) => set((s) => ({ timeCapsules: s.timeCapsules.map(c => c.id === id ? { ...c, delivered: true } : c) })),
+      accountabilityContract: null,
+      setContract: (c) => set({ accountabilityContract: c }),
+      weeklyReflections: [],
+      addReflection: (r) => set((s) => ({ weeklyReflections: [...s.weeklyReflections, { ...r, id: uid(), createdAt: new Date().toISOString() }] })),
+      contacts: [],
+      addContact: (c) => set((s) => ({ contacts: [...s.contacts, { ...c, id: uid() }] })),
+      updateContact: (id, updates) => set((s) => ({ contacts: s.contacts.map(c => c.id === id ? { ...c, ...updates } : c) })),
+      deleteContact: (id) => set((s) => ({ contacts: s.contacts.filter(c => c.id !== id) })),
+      contextualQuotes: [],
     }),
     { name: 'art-os-store' }
   )
@@ -624,4 +737,21 @@ export function getScoreZone(score: number) {
   if (score >= 51) return { label: 'Solid day', color: '#3b82f6', emoji: '🔵' }
   if (score >= 31) return { label: 'Getting there', color: '#f59e0b', emoji: '🟡' }
   return { label: 'Restart tomorrow', color: '#ef4444', emoji: '🔴' }
+}
+
+export function getBusinessHealth(biz: Business, tasks: Task[], revenueEntries: RevenueEntry[]): BusinessHealth {
+  const bizTasks = tasks.filter(t => t.businessId === biz.id)
+  const doneLast7 = bizTasks.filter(t => t.done && t.completedAt && new Date(t.completedAt) > new Date(Date.now() - 7 * 86400000)).length
+  const hasRevenue = biz.monthlyRevenue > 0 || revenueEntries.some(r => r.businessId === biz.id)
+  if (doneLast7 === 0 && biz.status !== 'dormant') return 'flatline'
+  if (doneLast7 < 2 || (!hasRevenue && biz.status !== 'active_prerevenue' && biz.status !== 'dormant')) return 'weak'
+  return 'strong'
+}
+
+export function getTaskPriorityScore(task: Task, biz?: Business): number {
+  const priorityBase = { crit: 90, high: 70, med: 50, low: 20 }[task.priority]
+  const revenueBonus = biz && biz.monthlyRevenue > 10000 ? 10 : biz && biz.monthlyRevenue > 0 ? 5 : 0
+  const dripBonus = task.drip === 'double_down' ? 15 : task.drip === 'replace' ? 5 : 0
+  const ageBonus = Math.min(10, Math.floor((Date.now() - new Date(task.createdAt).getTime()) / 86400000))
+  return Math.min(100, priorityBase + revenueBonus + dripBonus + ageBonus)
 }

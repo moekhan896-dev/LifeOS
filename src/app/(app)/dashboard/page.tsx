@@ -1,58 +1,13 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import Link from 'next/link'
 import { motion } from 'framer-motion'
 import { toast } from 'sonner'
-import { AreaChart, Area, ResponsiveContainer, Tooltip, XAxis, BarChart, Bar, PieChart, Pie, Cell } from 'recharts'
-import { useStore, getClientNet, getAgencyTotals, getDailyScore } from '@/stores/store'
+import { AreaChart, Area, ResponsiveContainer } from 'recharts'
+import { useStore, getExecutionScore, getScoreZone, getClientNet, getAgencyTotals, getBusinessHealth, getTaskPriorityScore } from '@/stores/store'
 import PageTransition from '@/components/PageTransition'
-
-/* ── Constants ── */
-
-const PRAYER_TIMES: Record<string, string> = {
-  fajr: '5:47', dhuhr: '1:15', asr: '4:48', maghrib: '7:52', isha: '9:15',
-}
-
-const PRAYER_KEYS = ['fajr', 'dhuhr', 'asr', 'maghrib', 'isha'] as const
-
-const MOTIVATIONAL_LINES = [
-  "Let's build something today.",
-  "Your competitors are sleeping.",
-  "Focus beats talent when talent doesn't focus.",
-  "One task at a time.",
-  "Revenue solves everything.",
-]
-
-const SALAH_QUOTES = [
-  "Your dad hasn't missed in 20 years.",
-  "Consistency is worship.",
-  "Fajr is the hardest and the most rewarding.",
-  "The masjid is 10 minutes away.",
-]
-
-const COST_OF_INACTION = [
-  { label: 'Sleeping til noon', amount: 2100 },
-  { label: 'Phone scrolling', amount: 0 },
-  { label: 'No cold email', amount: 4000 },
-  { label: 'No GMB SEO', amount: 7000 },
-]
-
-const STREAK_META: Record<string, { label: string; emoji: string; color: string }> = {
-  prayer: { label: 'Prayer', emoji: '🕌', color: 'var(--gold)' },
-  gym: { label: 'Gym', emoji: '🏋️', color: 'var(--accent)' },
-  sleep: { label: 'Sleep', emoji: '😴', color: 'var(--cyan)' },
-  no_gamble: { label: 'No Gambling', emoji: '🚫', color: 'var(--purple)' },
-  cold_email: { label: 'Cold Email', emoji: '📧', color: 'var(--rose)' },
-}
-
-const PRIORITY_BORDER: Record<string, string> = {
-  crit: 'var(--rose)', high: 'var(--amber)', med: 'var(--blue)', low: 'var(--border)',
-}
-
-const GMB_TOP_BORDER: Record<string, string> = {
-  strong: 'var(--accent)', medium: 'var(--amber)', new: 'var(--blue)',
-}
+import CommandInput from '@/components/CommandInput'
 
 /* ── Helpers ── */
 
@@ -63,46 +18,16 @@ function getGreeting() {
   return 'Good evening'
 }
 
-function getDayOfYear() {
-  const now = new Date()
-  const start = new Date(now.getFullYear(), 0, 0)
-  return Math.floor((now.getTime() - start.getTime()) / 86400000)
-}
-
-function formatDate() {
-  return new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })
-}
-
-const sparkData = (base: number, variance: number) =>
-  Array.from({ length: 7 }, (_, i) => ({ v: base + Math.sin(i * 1.2) * variance + i * variance * 0.1 }))
-
-const flatSparkData = () => Array.from({ length: 7 }, () => ({ v: 0 }))
-
-/* ── Animation helpers ── */
-
 const cardAnim = (delay: number) => ({
   initial: { opacity: 0, y: 12 } as const,
   animate: { opacity: 1, y: 0 } as const,
   transition: { delay, duration: 0.35 },
 })
 
-/* ── Custom Tooltip ── */
+const sparkData = (base: number, variance: number) =>
+  Array.from({ length: 7 }, (_, i) => ({ v: base + Math.sin(i * 1.2) * variance + i * variance * 0.1 }))
 
-function ChartTooltip({ active, payload, label }: any) {
-  if (!active || !payload?.length) return null
-  return (
-    <div className="rounded-[8px] border border-[var(--border)] p-2" style={{ background: 'var(--bg)' }}>
-      <p className="text-[10px] text-[var(--text-dim)] mb-1">{label}</p>
-      {payload.map((p: any) => (
-        <p key={p.dataKey} className="data text-[11px] font-semibold" style={{ color: p.color }}>
-          {p.dataKey}: ${Math.round(p.value).toLocaleString()}
-        </p>
-      ))}
-    </div>
-  )
-}
-
-/* ── Circular Progress Ring ── */
+/* ── Progress Ring ── */
 
 function ProgressRing({ value, max, size, color }: { value: number; max: number; size: number; color: string }) {
   const r = (size - 6) / 2
@@ -122,568 +47,470 @@ function ProgressRing({ value, max, size, color }: { value: number; max: number;
   )
 }
 
+/* ── Schedule Block Colors ── */
+const BLOCK_COLORS: Record<string, string> = {
+  prayer: 'var(--gold)', work: 'var(--blue)', health: 'var(--accent)',
+  personal: 'var(--purple)', meal: 'var(--amber)',
+}
+
 /* ── Main ── */
 
 export default function DashboardPage() {
   const {
-    businesses, clients, tasks, insights, todayHealth, streaks, gmbProfiles,
-    addTask, toggleTask, togglePrayer, incomeTarget, targetDate, revenueEntries, expenseEntries,
-    userName,
+    businesses, clients, tasks, todayHealth, gmbProfiles, projects,
+    toggleTask, incomeTarget, targetDate, revenueEntries, expenseEntries,
+    userName, todaySchedule, energyLogs, commitments, wakeUpTime,
+    focusSessions, goals, identityStatements, logEvent,
   } = useStore()
-  const [newTaskText, setNewTaskText] = useState('')
-  const [chartRange, setChartRange] = useState<'week' | 'month'>('month')
 
-  const dayOfYear = getDayOfYear()
-  const motiveLine = MOTIVATIONAL_LINES[dayOfYear % MOTIVATIONAL_LINES.length]
-  const salahQuote = SALAH_QUOTES[dayOfYear % SALAH_QUOTES.length]
   const todayStr = new Date().toISOString().split('T')[0]
+  const now = new Date()
+  const hour = now.getHours()
+  const isMorning = hour < 14
+
+  // ── Core metrics ──
+  const agencyTotals = getAgencyTotals(clients)
+  const totalBizRevenue = businesses.reduce((s, b) => s + b.monthlyRevenue, 0)
+  const totalExpenses = expenseEntries.filter(e => e.recurring).reduce((s, e) => s + e.amount, 0)
+  const netIncome = totalBizRevenue - totalExpenses
+
   const tasksDoneToday = tasks.filter(t => t.done && t.completedAt?.startsWith(todayStr)).length
+  const todayFocusSessions = focusSessions.filter(s => s.startedAt.startsWith(todayStr)).length
+  const tasksCommitted = tasks.filter(t => t.createdAt.startsWith(todayStr) || (!t.done && t.priority !== 'low')).length
+  const executionScore = getExecutionScore(todayHealth, tasksCommitted, tasksDoneToday, todayFocusSessions)
+  const scoreZone = getScoreZone(executionScore)
+
   const prayersDone = Object.values(todayHealth.prayers).filter(Boolean).length
 
-  const priorityOrder: Record<string, number> = { crit: 0, high: 1, med: 2, low: 3 }
-  const incompleteTasks = [...tasks].filter(t => !t.done).sort((a, b) => priorityOrder[a.priority] - priorityOrder[b.priority])
-  const theOneThing = incompleteTasks[0]
+  const latestEnergy = useMemo(() => {
+    const today = energyLogs.filter(e => e.date === todayStr)
+    return today.length > 0 ? today[today.length - 1] : null
+  }, [energyLogs, todayStr])
 
-  // ── Real data from store ──
-  const agencyTotals = getAgencyTotals(clients)
-  const plumbingBiz = businesses.find(b => b.name.toLowerCase().includes('plumb'))
-  const plumbingRevenue = plumbingBiz?.monthlyRevenue || 0
-  const airbnbBiz = businesses.find(b => b.name.toLowerCase().includes('airbnb'))
-  const airbnbRevenue = airbnbBiz?.monthlyRevenue || 0
-  const totalExpenses = expenseEntries.filter(e => e.recurring).reduce((s, e) => s + e.amount, 0)
-  const netTakeHome = agencyTotals.net + plumbingRevenue + airbnbRevenue - totalExpenses
-  const maxClientNet = clients.length > 0 ? Math.max(...clients.filter(c => c.active).map(c => getClientNet(c))) : 0
-  const totalGmbCalls = gmbProfiles.reduce((s, g) => s + g.callsPerMonth, 0)
-  const dailyScore = getDailyScore(todayHealth, tasksDoneToday)
+  // ── THE ONE THING (highest priority incomplete task) ──
+  const sortedTasks = useMemo(() => {
+    return [...tasks]
+      .filter(t => !t.done)
+      .map(t => {
+        const biz = businesses.find(b => b.id === t.businessId)
+        return { ...t, score: getTaskPriorityScore(t, biz) }
+      })
+      .sort((a, b) => b.score - a.score)
+  }, [tasks, businesses])
 
-  // ── Income target ──
-  function daysUntilTarget() {
-    if (!targetDate) return 0
-    return Math.max(0, Math.ceil((new Date(targetDate).getTime() - new Date().getTime()) / 86400000))
-  }
-  const remaining = daysUntilTarget()
-  const currentIncome = agencyTotals.net + plumbingRevenue + airbnbRevenue
-  const progressPercent = incomeTarget > 0 ? Math.min(100, (currentIncome / incomeTarget) * 100) : 0
+  const theOneThing = sortedTasks[0]
+  const theOneThingBiz = theOneThing ? businesses.find(b => b.id === theOneThing.businessId) : null
+  const theOneThingProject = theOneThing?.projectId ? projects.find(p => p.id === theOneThing.projectId) : null
+  const theOneThingGoal = theOneThingProject?.goalId ? goals.find(g => g.id === theOneThingProject.goalId) : null
 
-  // ── Revenue chart data from revenueEntries ──
-  const hasRevenueData = revenueEntries.length > 0
-  const revenueData = hasRevenueData
-    ? (() => {
-        const last30 = Array.from({ length: 30 }, (_, i) => {
-          const d = new Date(); d.setDate(d.getDate() - 29 + i)
-          const ds = d.toISOString().split('T')[0]
-          const agencyRev = revenueEntries.filter(r => r.date === ds && clients.some(c => c.businessId === r.businessId)).reduce((s, r) => s + r.amount, 0)
-          const plumbRev = revenueEntries.filter(r => r.date === ds && r.businessId === plumbingBiz?.id).reduce((s, r) => s + r.amount, 0)
-          return { day: `D${i + 1}`, agency: agencyRev, plumbing: plumbRev }
-        })
-        return last30
-      })()
-    : Array.from({ length: 30 }, (_, i) => ({ day: `D${i + 1}`, agency: 0, plumbing: 0 }))
+  // ── Active projects ──
+  const activeProjects = projects.filter(p => p.status === 'in_progress').slice(0, 3)
 
-  const coiTotal = COST_OF_INACTION.reduce((s, c) => s + c.amount, 0)
+  // ── Alerts ──
+  const alerts = useMemo(() => {
+    const list: { text: string; color: string; type: string }[] = []
+    // Concentration risk
+    const activeClients = clients.filter(c => c.active)
+    const totalNet = activeClients.reduce((s, c) => s + getClientNet(c), 0)
+    activeClients.forEach(c => {
+      const pct = totalNet > 0 ? (getClientNet(c) / totalNet) * 100 : 0
+      if (pct > 40) list.push({ text: `${c.name} is ${Math.round(pct)}% of revenue — concentration risk`, color: 'var(--rose)', type: 'risk' })
+    })
+    // Business health
+    businesses.filter(b => b.status !== 'dormant' && b.status !== 'idea').forEach(b => {
+      const health = getBusinessHealth(b, tasks, revenueEntries)
+      if (health === 'flatline') list.push({ text: `${b.name} is flatlined — 0 tasks done in 7 days`, color: 'var(--rose)', type: 'health' })
+    })
+    // Stale tasks
+    const staleTasks = tasks.filter(t => !t.done && (Date.now() - new Date(t.createdAt).getTime()) > 7 * 86400000)
+    if (staleTasks.length > 0) list.push({ text: `${staleTasks.length} stale task${staleTasks.length > 1 ? 's' : ''} older than 7 days`, color: 'var(--amber)', type: 'stale' })
+    // Commitment rate
+    const total = commitments.length
+    const fulfilled = commitments.filter(c => c.fulfilled).length
+    if (total > 0 && (fulfilled / total) < 0.5) list.push({ text: `Commitment rate is ${Math.round((fulfilled / total) * 100)}% — below 50%`, color: 'var(--amber)', type: 'commitment' })
+    return list.slice(0, 5)
+  }, [clients, businesses, tasks, revenueEntries, commitments])
 
-  const activeInsights = insights
-    .filter(i => !i.snoozedUntil || new Date(i.snoozedUntil) < new Date())
-    .slice(0, 6)
+  // ── Cost of inaction ──
+  const costOfInaction = useMemo(() => {
+    const wakeHour = wakeUpTime ? parseInt(wakeUpTime.split(':')[0]) : 8
+    const hoursSinceWake = Math.max(0, hour - wakeHour)
+    const critHighUndone = tasks.filter(t => !t.done && (t.priority === 'crit' || t.priority === 'high'))
+    const estimatedHourlyRate = netIncome > 0 ? netIncome / 160 : 25
+    const costPerTask = critHighUndone.map(t => {
+      const weight = t.priority === 'crit' ? 1.5 : 1
+      return { label: t.text.slice(0, 40), amount: Math.round(estimatedHourlyRate * weight * (hoursSinceWake / critHighUndone.length || 1)) }
+    }).slice(0, 4)
+    const total = costPerTask.reduce((s, c) => s + c.amount, 0)
+    return { items: costPerTask, total }
+  }, [tasks, netIncome, hour, wakeUpTime])
 
-  const handleAddTask = (e: React.FormEvent) => {
-    e.preventDefault()
-    if (!newTaskText.trim()) return
-    addTask({ businessId: 'agency', text: newTaskText.trim(), tag: '', priority: 'med', done: false, xpValue: 20 })
-    setNewTaskText('')
-    toast.success('Task added')
-  }
+  // ── Days remaining ──
+  const daysRemaining = targetDate ? Math.max(0, Math.ceil((new Date(targetDate).getTime() - Date.now()) / 86400000)) : 0
 
-  const chartData = chartRange === 'week' ? revenueData.slice(-7) : revenueData
+  // ── Yesterday's score (hardcoded for now) ──
+  const yesterdayScore = 62
+
+  // ── Sparkline for net income ──
+  const incomeSparkData = netIncome > 0 ? sparkData(netIncome, netIncome * 0.05) : Array.from({ length: 7 }, () => ({ v: 0 }))
+
+  // ── Schedule timeline ──
+  const currentMinutes = hour * 60 + now.getMinutes()
+  const scheduleStart = todaySchedule.length > 0 ? parseInt(todaySchedule[0].time.split(':')[0]) * 60 + parseInt(todaySchedule[0].time.split(':')[1] || '0') : 480
+  const scheduleEnd = todaySchedule.length > 0
+    ? Math.max(...todaySchedule.map(b => {
+        const [h, m] = b.time.split(':').map(Number)
+        return h * 60 + (m || 0) + b.duration
+      }))
+    : 1380
 
   return (
     <PageTransition>
-      <div className="pb-24">
-
-        {/* ── 1. STICKY TOP BAR ── */}
-        <motion.div
-          className="glass sticky top-0 z-30 -mx-4 px-4 py-3 mb-4"
-          initial={{ opacity: 0, y: -12 }} animate={{ opacity: 1, y: 0 }}
-        >
-          <div className="flex items-center justify-between">
-            <div>
-              <h1 style={{ fontSize: 28, fontWeight: 600 }} className="text-[var(--text)]">
-                {getGreeting()}, {userName || 'Art'}
-              </h1>
-              <p className="text-[12px] text-[var(--text-mid)] italic mt-0.5">{motiveLine}</p>
-            </div>
-            <div className="flex items-center gap-4">
-              <div className="flex items-center gap-1.5">
-                {PRAYER_KEYS.map(p => (
-                  <div key={p} className="rounded-full transition-colors duration-300" style={{
-                    width: 8, height: 8,
-                    borderColor: 'var(--gold)',
-                    borderWidth: 2,
-                    borderStyle: 'solid',
-                    backgroundColor: todayHealth.prayers[p] ? 'var(--gold)' : 'transparent',
-                  }} />
-                ))}
-              </div>
-              <span className="data text-[12px] text-[var(--text-dim)]">{formatDate()}</span>
-            </div>
-          </div>
-        </motion.div>
-
-        {/* ── BENTO GRID ── */}
+      <div className="pb-32">
         <div className="grid grid-cols-12 gap-4">
 
-          {/* ── 2. THE ONE THING ── */}
-          <motion.div className="gradient-border col-span-12" {...cardAnim(0.05)}>
-            <div className="bg-[var(--surface)] rounded-[16px] p-6 flex items-center justify-between">
-              <div className="flex-1 text-center">
-                <span className="text-[10px] font-mono uppercase tracking-[2px] text-[var(--accent)] font-semibold">THE ONE THING</span>
-                <p className="text-[12px] text-[var(--text-mid)] mt-1">If you do only one thing today, do this.</p>
-                {theOneThing ? (
-                  <p className="text-[20px] font-semibold text-[var(--text)] mt-3">{theOneThing.text}</p>
-                ) : (
-                  <div>
-                    <p className="text-[20px] font-semibold text-[var(--text)] mt-3">Your plate is clear.</p>
-                    <div className="flex items-center justify-center gap-3 mt-2">
-                      <Link href="/ai" className="text-[12px] text-[var(--accent)] hover:underline">Ask AI what to focus on &rarr;</Link>
-                      <Link href="/tasks" className="text-[12px] text-[var(--text-mid)] hover:underline">Add a task &rarr;</Link>
-                    </div>
-                  </div>
-                )}
-              </div>
-              {theOneThing && (
-                <motion.button
-                  onClick={() => { toggleTask(theOneThing.id); toast.success('Done! +XP earned') }}
-                  className="ml-4 px-4 py-2 rounded-[10px] text-[13px] font-semibold flex-shrink-0 transition-colors"
-                  style={{ background: 'color-mix(in srgb, var(--accent) 15%, transparent)', color: 'var(--accent)' }}
-                  whileHover={{ scale: 1.05 }}
-                  whileTap={{ scale: 0.95 }}
-                >
-                  &#10003; Done
-                </motion.button>
-              )}
-            </div>
-          </motion.div>
-
-          {/* ── 3. FOUR METRIC CARDS ── */}
-          {([
-            {
-              label: 'NET TAKE-HOME',
-              value: `$${netTakeHome > 0 ? Math.round(netTakeHome).toLocaleString() : '0'}`,
-              sub: new Date().toLocaleDateString('en-US', { month: 'long', year: 'numeric' }),
-              color: 'var(--accent)',
-              emoji: '💰',
-              data: revenueEntries.length > 0 ? sparkData(netTakeHome, netTakeHome * 0.05) : flatSparkData(),
-              hasData: netTakeHome > 0,
-            },
-            {
-              label: 'AGENCY MRR',
-              value: `$${agencyTotals.net > 0 ? Math.round(agencyTotals.net).toLocaleString() : '0'}`,
-              sub: `${agencyTotals.count} client${agencyTotals.count !== 1 ? 's' : ''} active`,
-              color: 'var(--cyan)',
-              emoji: '⬡',
-              data: clients.length > 0 ? sparkData(agencyTotals.net, agencyTotals.net * 0.04) : flatSparkData(),
-              hasData: clients.length > 0,
-            },
-            {
-              label: 'PLUMBING REV',
-              value: plumbingRevenue > 0 ? `$${(plumbingRevenue / 1000).toFixed(0)}K` : '$0',
-              sub: `${gmbProfiles.length} GMB profile${gmbProfiles.length !== 1 ? 's' : ''}`,
-              color: 'var(--amber)',
-              emoji: '🔧',
-              data: plumbingRevenue > 0 ? sparkData(plumbingRevenue, plumbingRevenue * 0.1) : flatSparkData(),
-              hasData: plumbingRevenue > 0,
-            },
-          ] as const).map((m, i) => (
-            <motion.div
-              key={m.label}
-              className="card rounded-[16px] p-5 col-span-12 md:col-span-3"
-              {...cardAnim(0.08 + i * 0.04)}
-              whileHover={{ y: -3, scale: 1.01 }}
-            >
-              <div className="flex items-start justify-between">
-                <span className="text-[10px] font-mono uppercase tracking-[2px] text-[var(--text-dim)]">{m.label}</span>
-                <div className="w-6 h-6 rounded-full flex items-center justify-center text-[12px]" style={{ background: `color-mix(in srgb, ${m.color} 20%, transparent)` }}>{m.emoji}</div>
-              </div>
-              <div className="data mt-2" style={{ fontSize: 36, fontWeight: 700, color: m.color }}>{m.value}</div>
-              <p className="text-[12px] text-[var(--text-mid)]">{m.sub}</p>
-              <div className="mt-2">
-                {m.hasData ? (
-                  <ResponsiveContainer width={120} height={40}>
-                    <AreaChart data={m.data}>
-                      <defs>
-                        <linearGradient id={`spark-${i}`} x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="0%" stopColor={m.color} stopOpacity={0.4} />
-                          <stop offset="100%" stopColor={m.color} stopOpacity={0} />
-                        </linearGradient>
-                      </defs>
-                      <Area type="monotone" dataKey="v" stroke={m.color} strokeWidth={1.5} fill={`url(#spark-${i})`} />
-                    </AreaChart>
-                  </ResponsiveContainer>
-                ) : (
-                  <div className="h-[40px] flex items-center">
-                    <span className="text-[10px] text-[var(--text-dim)] italic">Start tracking</span>
-                  </div>
-                )}
+          {/* ── ROW 0: PREDICTIVE MORNING BRIEFING ── */}
+          {isMorning && (
+            <motion.div className="col-span-12" {...cardAnim(0)}>
+              <div className="rounded-[20px] p-6" style={{ background: 'linear-gradient(135deg, rgba(139,92,246,0.04), rgba(16,185,129,0.02))', border: '1px solid rgba(139,92,246,0.12)' }}>
+                <span className="text-[10px] font-mono uppercase tracking-[2px] font-semibold" style={{ color: 'var(--purple)' }}>🔮 TODAY&apos;S PREDICTION</span>
+                <div className="mt-3 space-y-1.5">
+                  <p className="text-[13px] text-[var(--text-mid)]">🕌 If you pray Fajr, there&apos;s a ~78% chance of 7+ tasks done</p>
+                  <p className="text-[13px] text-[var(--text-mid)]">⚡ Your energy peaks 9-11pm based on recent patterns</p>
+                  <p className="text-[13px] text-[var(--text-mid)]">📱 High chance of 3+ hours scrolling if you skip gym</p>
+                </div>
+                <div className="mt-4">
+                  <p className="text-[12px] font-semibold text-[var(--text)]">⚡ TO BEAT THE PREDICTION:</p>
+                  <ul className="mt-1.5 space-y-1">
+                    <li className="text-[12px] text-[var(--text-mid)]">1. Pray Fajr on time</li>
+                    <li className="text-[12px] text-[var(--text-mid)]">2. Hit the gym before 2pm</li>
+                    <li className="text-[12px] text-[var(--text-mid)]">3. Complete THE ONE THING before anything else</li>
+                  </ul>
+                </div>
+                <div className="mt-4 flex items-center justify-between">
+                  <p className="text-[11px] text-[var(--text-dim)]">Yesterday you scored {yesterdayScore}. Beat it today.</p>
+                  <motion.button
+                    onClick={() => {
+                      logEvent('challenge_accepted', { date: todayStr })
+                      toast.success('Challenge accepted! Let\'s go.')
+                    }}
+                    className="px-4 py-2 rounded-[10px] text-[12px] font-semibold"
+                    style={{ background: 'rgba(139,92,246,0.15)', color: 'var(--purple)' }}
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.95 }}
+                  >
+                    🎯 CHALLENGE ACCEPTED →
+                  </motion.button>
+                </div>
               </div>
             </motion.div>
-          ))}
+          )}
 
-          {/* Daily Score card with ring */}
-          <motion.div className="card rounded-[16px] p-5 col-span-12 md:col-span-3" {...cardAnim(0.2)} whileHover={{ y: -3, scale: 1.01 }}>
-            <div className="flex items-start justify-between">
-              <span className="text-[10px] font-mono uppercase tracking-[2px] text-[var(--text-dim)]">DAILY SCORE</span>
-              <div className="w-6 h-6 rounded-full flex items-center justify-center text-[12px]" style={{ background: 'color-mix(in srgb, var(--accent) 20%, transparent)' }}>⚡</div>
-            </div>
-            <div className="data mt-2" style={{ fontSize: 36, fontWeight: 700, color: 'var(--accent)' }}>{dailyScore}<span className="text-[16px] text-[var(--text-dim)]">/100</span></div>
-            <p className="text-[12px] text-[var(--text-mid)]">{dailyScore >= 80 ? 'Unstoppable.' : dailyScore >= 50 ? 'Building momentum.' : 'Get moving.'}</p>
-            <div className="mt-2 flex justify-center relative">
-              <ProgressRing value={dailyScore} max={100} size={40} color="var(--accent)" />
-              <span className="absolute inset-0 flex items-center justify-center data text-[10px] font-bold text-[var(--text)]">{dailyScore}</span>
+          {/* ── ROW 1: THE ONE THING ── */}
+          <motion.div className="gradient-border col-span-12" {...cardAnim(0.04)}>
+            <div className="bg-[#0e1018] rounded-[16px] p-6">
+              <div className="text-center">
+                <span className="text-[10px] font-mono uppercase tracking-[2px] text-[var(--accent)] font-semibold">THE ONE THING</span>
+                {theOneThing ? (
+                  <>
+                    <p className="text-[20px] font-semibold text-white mt-3">{theOneThing.text}</p>
+                    {theOneThing.score && (
+                      <span className="inline-block mt-2 px-2 py-0.5 rounded-full text-[10px] font-mono" style={{ background: 'rgba(139,92,246,0.15)', color: 'var(--purple)' }}>
+                        Score: {theOneThing.score}/100
+                      </span>
+                    )}
+                    {(theOneThingProject || theOneThingGoal) && (
+                      <p className="text-[11px] text-[var(--text-dim)] mt-2">
+                        {theOneThingProject && <>📋 {theOneThingProject.name}</>}
+                        {theOneThingGoal && <> → 🎯 {theOneThingGoal.title}</>}
+                      </p>
+                    )}
+                    <div className="flex items-center justify-center gap-4 mt-4">
+                      <motion.button
+                        onClick={() => {
+                          toggleTask(theOneThing.id)
+                          toast.success('Done! Loading next task...')
+                        }}
+                        className="px-5 py-2.5 rounded-[10px] text-[13px] font-semibold"
+                        style={{ background: 'color-mix(in srgb, var(--accent) 15%, transparent)', color: 'var(--accent)' }}
+                        whileHover={{ scale: 1.05 }}
+                        whileTap={{ scale: 0.95 }}
+                      >
+                        ✓ Done
+                      </motion.button>
+                      <Link href="/tasks" className="text-[12px] text-[var(--text-dim)] hover:text-[var(--text-mid)] transition-colors">
+                        Skip →
+                      </Link>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <p className="text-[20px] font-semibold text-white mt-3">Your plate is clear.</p>
+                    <div className="flex items-center justify-center gap-3 mt-2">
+                      <Link href="/ai" className="text-[12px] text-[var(--accent)] hover:underline">Ask AI what to focus on →</Link>
+                      <Link href="/tasks" className="text-[12px] text-[var(--text-mid)] hover:underline">Add a task →</Link>
+                    </div>
+                  </>
+                )}
+              </div>
             </div>
           </motion.div>
 
-          {/* ── 4. REVENUE CHART ── */}
-          <motion.div className="card rounded-[16px] p-5 col-span-12 md:col-span-4" {...cardAnim(0.22)}>
-            <div className="flex items-center justify-between mb-3">
-              <span className="text-[10px] font-mono uppercase tracking-[2px] text-[var(--text-dim)]">REVENUE TREND</span>
-              <div className="flex gap-1">
-                {(['week', 'month'] as const).map(r => (
-                  <button key={r} onClick={() => setChartRange(r)}
-                    className="px-2 py-0.5 rounded-full text-[10px] font-semibold transition-colors"
-                    style={{
-                      background: chartRange === r ? 'var(--accent)' : 'var(--surface2)',
-                      color: chartRange === r ? 'var(--bg)' : 'var(--text-dim)',
-                    }}
-                  >{r.charAt(0).toUpperCase() + r.slice(1)}</button>
-                ))}
-              </div>
+          {/* ── ROW 2: 4 METRIC CARDS ── */}
+          {/* NET INCOME */}
+          <motion.div className="card rounded-[16px] p-5 col-span-6 md:col-span-3" {...cardAnim(0.08)} whileHover={{ y: -3, scale: 1.01 }}>
+            <span className="text-[10px] font-mono uppercase tracking-[2px] text-[var(--text-dim)]">NET INCOME</span>
+            <div className="data mt-2" style={{ fontSize: 32, fontWeight: 700, color: 'var(--accent)' }}>
+              ${netIncome > 0 ? Math.round(netIncome).toLocaleString() : '0'}
             </div>
-            {hasRevenueData ? (
-              <ResponsiveContainer width="100%" height={220}>
-                <AreaChart data={chartData}>
-                  <defs>
-                    <linearGradient id="agencyGrad" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="0%" stopColor="var(--cyan)" stopOpacity={0.3} />
-                      <stop offset="100%" stopColor="var(--cyan)" stopOpacity={0} />
-                    </linearGradient>
-                    <linearGradient id="plumbingGrad" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="0%" stopColor="var(--amber)" stopOpacity={0.3} />
-                      <stop offset="100%" stopColor="var(--amber)" stopOpacity={0} />
-                    </linearGradient>
-                  </defs>
-                  <XAxis dataKey="day" tick={{ fill: 'var(--text-dim)', fontSize: 10 }} axisLine={false} tickLine={false} />
-                  <Tooltip content={<ChartTooltip />} />
-                  <Area type="monotone" dataKey="agency" stroke="var(--cyan)" strokeWidth={2} fill="url(#agencyGrad)" />
-                  <Area type="monotone" dataKey="plumbing" stroke="var(--amber)" strokeWidth={2} fill="url(#plumbingGrad)" />
-                </AreaChart>
-              </ResponsiveContainer>
+            <p className="text-[11px] text-[var(--text-mid)]">{new Date().toLocaleDateString('en-US', { month: 'short' })} take-home</p>
+            <div className="mt-2">
+              {netIncome > 0 ? (
+                <ResponsiveContainer width={100} height={32}>
+                  <AreaChart data={incomeSparkData}>
+                    <defs><linearGradient id="sparkIncome" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="var(--accent)" stopOpacity={0.4} /><stop offset="100%" stopColor="var(--accent)" stopOpacity={0} /></linearGradient></defs>
+                    <Area type="monotone" dataKey="v" stroke="var(--accent)" strokeWidth={1.5} fill="url(#sparkIncome)" />
+                  </AreaChart>
+                </ResponsiveContainer>
+              ) : <span className="text-[10px] text-[var(--text-dim)] italic">Start tracking</span>}
+            </div>
+          </motion.div>
+
+          {/* EXECUTION SCORE */}
+          <motion.div className="card rounded-[16px] p-5 col-span-6 md:col-span-3" {...cardAnim(0.12)} whileHover={{ y: -3, scale: 1.01 }}>
+            <span className="text-[10px] font-mono uppercase tracking-[2px] text-[var(--text-dim)]">EXECUTION</span>
+            <div className="data mt-2" style={{ fontSize: 32, fontWeight: 700, color: scoreZone.color }}>
+              {executionScore}<span className="text-[14px] text-[var(--text-dim)]">/100</span>
+            </div>
+            <p className="text-[11px] text-[var(--text-mid)]">{scoreZone.emoji} {scoreZone.label}</p>
+            <div className="mt-2 flex justify-center relative">
+              <ProgressRing value={executionScore} max={100} size={40} color={scoreZone.color} />
+              <span className="absolute inset-0 flex items-center justify-center data text-[10px] font-bold text-[var(--text)]">{executionScore}</span>
+            </div>
+          </motion.div>
+
+          {/* ENERGY */}
+          <motion.div className="card rounded-[16px] p-5 col-span-6 md:col-span-3" {...cardAnim(0.16)} whileHover={{ y: -3, scale: 1.01 }}>
+            <span className="text-[10px] font-mono uppercase tracking-[2px] text-[var(--text-dim)]">ENERGY</span>
+            <div className="data mt-2" style={{ fontSize: 32, fontWeight: 700, color: latestEnergy ? (latestEnergy.level >= 7 ? 'var(--accent)' : latestEnergy.level >= 4 ? 'var(--amber)' : 'var(--rose)') : 'var(--text-dim)' }}>
+              {latestEnergy ? `${latestEnergy.level}/10` : '—'}
+            </div>
+            <p className="text-[11px] text-[var(--text-mid)]">⚡ {latestEnergy ? latestEnergy.timeOfDay : 'Not logged'}</p>
+          </motion.div>
+
+          {/* PRAYERS */}
+          <motion.div className="card rounded-[16px] p-5 col-span-6 md:col-span-3" {...cardAnim(0.2)} whileHover={{ y: -3, scale: 1.01 }}>
+            <span className="text-[10px] font-mono uppercase tracking-[2px] text-[var(--text-dim)]">PRAYERS</span>
+            <div className="data mt-2" style={{ fontSize: 32, fontWeight: 700, color: 'var(--gold)' }}>
+              {prayersDone}<span className="text-[14px] text-[var(--text-dim)]">/5</span>
+            </div>
+            <div className="flex items-center gap-1.5 mt-2">
+              {(['fajr', 'dhuhr', 'asr', 'maghrib', 'isha'] as const).map(p => (
+                <div key={p} className="rounded-full" style={{
+                  width: 8, height: 8,
+                  border: '2px solid var(--gold)',
+                  backgroundColor: todayHealth.prayers[p] ? 'var(--gold)' : 'transparent',
+                }} />
+              ))}
+            </div>
+          </motion.div>
+
+          {/* ── ROW 3: SCHEDULE TIMELINE ── */}
+          <motion.div className="card rounded-[16px] p-5 col-span-12" {...cardAnim(0.24)}>
+            <span className="text-[10px] font-mono uppercase tracking-[2px] text-[var(--text-dim)]">TODAY&apos;S SCHEDULE</span>
+            {todaySchedule.length > 0 ? (
+              <div className="mt-3 relative h-10 rounded-[8px] overflow-hidden" style={{ background: 'var(--surface2)' }}>
+                {todaySchedule.map((block, i) => {
+                  const [bh, bm] = block.time.split(':').map(Number)
+                  const startMin = bh * 60 + (bm || 0)
+                  const leftPct = ((startMin - scheduleStart) / (scheduleEnd - scheduleStart)) * 100
+                  const widthPct = (block.duration / (scheduleEnd - scheduleStart)) * 100
+                  return (
+                    <div
+                      key={i}
+                      className="absolute top-0 h-full flex items-center justify-center text-[9px] font-mono text-white/80 overflow-hidden"
+                      style={{
+                        left: `${Math.max(0, leftPct)}%`,
+                        width: `${Math.min(widthPct, 100 - leftPct)}%`,
+                        background: BLOCK_COLORS[block.type] || 'var(--blue)',
+                        opacity: block.completed ? 0.4 : 0.85,
+                      }}
+                      title={`${block.title} (${block.time})`}
+                    >
+                      {widthPct > 5 && block.title.slice(0, 12)}
+                    </div>
+                  )
+                })}
+                {/* Current time indicator */}
+                {currentMinutes >= scheduleStart && currentMinutes <= scheduleEnd && (
+                  <div
+                    className="absolute top-0 h-full w-[2px]"
+                    style={{
+                      left: `${((currentMinutes - scheduleStart) / (scheduleEnd - scheduleStart)) * 100}%`,
+                      background: 'var(--rose)',
+                      zIndex: 10,
+                    }}
+                  />
+                )}
+              </div>
             ) : (
-              <div className="flex items-center justify-center h-[220px]">
-                <div className="text-center">
-                  <p className="text-[12px] text-[var(--text-dim)]">No revenue entries yet.</p>
-                  <Link href="/financials" className="text-[11px] text-[var(--accent)] hover:underline mt-1 inline-block">Start tracking on Financials &rarr;</Link>
-                </div>
+              <div className="mt-3">
+                <Link href="/schedule" className="text-[12px] text-[var(--accent)] hover:underline">Plan your day →</Link>
               </div>
             )}
           </motion.div>
 
-          {/* ── 5. PRAYER TRACKER ── */}
-          <motion.div
-            className="card-sacred rounded-[16px] p-5 col-span-12 md:col-span-4"
-            style={{ background: 'linear-gradient(135deg, color-mix(in srgb, var(--gold) 5%, var(--surface)), var(--surface))' }}
-            {...cardAnim(0.25)}
-          >
-            <span className="text-[10px] font-mono uppercase tracking-[2px] font-semibold text-[var(--gold)]">SALAH</span>
-            <div className="flex gap-2 mt-3">
-              {PRAYER_KEYS.map(p => {
-                const done = todayHealth.prayers[p]
-                return (
-                  <motion.button key={p} onClick={() => { togglePrayer(p); if (!done) toast.success(`${p.charAt(0).toUpperCase() + p.slice(1)} logged`) }}
-                    className="flex-1 rounded-[10px] py-2 px-1 text-center transition-all border"
-                    style={{
-                      background: done ? 'color-mix(in srgb, var(--gold) 15%, transparent)' : 'var(--surface2)',
-                      borderColor: 'var(--gold)',
-                      borderWidth: 1,
-                      color: done ? 'var(--gold)' : 'var(--text-mid)',
-                      boxShadow: done ? '0 0 12px color-mix(in srgb, var(--gold) 20%, transparent)' : 'none',
-                    }}
-                    whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}
-                  >
-                    <div className="text-[11px] font-semibold">{done ? '✓' : p.charAt(0).toUpperCase() + p.slice(1)}</div>
-                    <div className="text-[9px] mt-0.5 opacity-60">{PRAYER_TIMES[p]}</div>
-                  </motion.button>
-                )
-              })}
-            </div>
-            <div className="flex items-center justify-between mt-4">
-              <div className="relative">
-                <ProgressRing value={prayersDone} max={5} size={40} color="var(--gold)" />
-                <span className="absolute inset-0 flex items-center justify-center data text-[10px] font-bold text-[var(--gold)]">{prayersDone}/5</span>
+          {/* ── ROW 4: ACTIVE PROJECTS + ALERTS ── */}
+          <motion.div className="card rounded-[16px] p-5 col-span-12 md:col-span-5" {...cardAnim(0.28)}>
+            <span className="text-[10px] font-mono uppercase tracking-[2px] text-[var(--text-dim)]">ACTIVE PROJECTS</span>
+            {activeProjects.length > 0 ? (
+              <div className="mt-3 space-y-3">
+                {activeProjects.map(p => {
+                  const biz = businesses.find(b => b.id === p.businessId)
+                  return (
+                    <div key={p.id} className="flex items-center gap-3">
+                      <div className="relative flex-shrink-0">
+                        <ProgressRing value={p.progress} max={100} size={40} color="var(--accent)" />
+                        <span className="absolute inset-0 flex items-center justify-center data text-[9px] font-bold text-[var(--text)]">{p.progress}%</span>
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-[13px] font-semibold text-[var(--text)] truncate">{p.name}</p>
+                        {biz && <span className="inline-block w-2 h-2 rounded-full mr-1" style={{ background: biz.color }} />}
+                      </div>
+                    </div>
+                  )
+                })}
               </div>
-              <div className="text-right">
-                <div className="data text-[14px] font-bold text-[var(--gold)]">{streaks.find(s => s.habit === 'prayer')?.currentStreak || 0} day streak</div>
+            ) : (
+              <div className="mt-3">
+                <Link href="/projects" className="text-[12px] text-[var(--accent)] hover:underline">Start your first project →</Link>
               </div>
-            </div>
-            <p className="text-[11px] text-[var(--gold)] italic text-center mt-3 opacity-70">&ldquo;{salahQuote}&rdquo;</p>
+            )}
           </motion.div>
 
-          {/* ── 6. STREAKS GRID ── */}
-          <motion.div className="card rounded-[16px] p-5 col-span-12 md:col-span-4" {...cardAnim(0.28)}>
-            <span className="text-[10px] font-mono uppercase tracking-[2px] text-[var(--text-dim)]">STREAKS</span>
-            <div className="mt-3 space-y-3">
-              {streaks.map(s => {
-                const meta = STREAK_META[s.habit] || { label: s.habit, emoji: '🔥', color: 'var(--text-mid)' }
-                return (
-                  <div key={s.habit} className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <span className="text-[14px]">{meta.emoji}</span>
-                      <span className="text-[12px] text-[var(--text-mid)]">{meta.label}</span>
-                    </div>
-                    <div className="text-right">
-                      <motion.span
-                        className="data text-[20px] font-bold block leading-none"
-                        style={{ color: s.currentStreak === 0 ? 'var(--rose)' : meta.color }}
-                        animate={s.currentStreak === 0 ? { opacity: [0.6, 1, 0.6] } : {}}
-                        transition={s.currentStreak === 0 ? { duration: 2, repeat: Infinity } : {}}
-                      >{s.currentStreak}</motion.span>
-                      <span className="text-[9px] text-[var(--text-dim)]">days</span>
-                    </div>
+          <motion.div className="card rounded-[16px] p-5 col-span-12 md:col-span-7" {...cardAnim(0.32)}>
+            <span className="text-[10px] font-mono uppercase tracking-[2px] text-[var(--text-dim)]">ALERTS & INSIGHTS</span>
+            {alerts.length > 0 ? (
+              <div className="mt-3 space-y-2">
+                {alerts.map((a, i) => (
+                  <div key={i} className="rounded-[10px] px-3 py-2.5" style={{ borderLeft: `3px solid ${a.color}`, background: 'var(--surface2)' }}>
+                    <p className="text-[12px] text-[var(--text-mid)]">{a.text}</p>
                   </div>
-                )
-              })}
-            </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-[12px] text-[var(--text-dim)] mt-3 italic">All clear. Keep it up.</p>
+            )}
           </motion.div>
 
-          {/* ── 7. COST OF INACTION ── */}
+          {/* ── ROW 5: COST OF INACTION + DAYS + TASKS ── */}
           <motion.div
             className="card-urgent rounded-[16px] p-5 col-span-12 md:col-span-5"
             style={{ background: 'linear-gradient(135deg, color-mix(in srgb, var(--rose) 5%, var(--surface)), var(--surface))' }}
-            {...cardAnim(0.3)}
+            {...cardAnim(0.36)}
           >
-            <span className="text-[10px] font-mono uppercase tracking-[2px] font-semibold text-[var(--rose)]">COST OF INACTION</span>
-            <div className="mt-3 space-y-2">
-              {COST_OF_INACTION.map(item => (
-                <div key={item.label} className="flex items-center justify-between">
-                  <span className="text-[12px] text-[var(--text-mid)]">{item.label}</span>
-                  <span className="data text-[14px] font-semibold text-[var(--rose)]">
-                    {item.amount > 0 ? `-$${item.amount.toLocaleString()}/mo` : '$0'}
-                  </span>
+            <span className="text-[10px] font-mono uppercase tracking-[2px] text-[var(--rose)]">COST OF INACTION</span>
+            <div className="data mt-2" style={{ fontSize: 28, fontWeight: 700, color: 'var(--rose)' }}>
+              ${costOfInaction.total.toLocaleString()}
+            </div>
+            <p className="text-[10px] text-[var(--text-dim)] mb-2">lost today if you don&apos;t act</p>
+            <div className="space-y-1">
+              {costOfInaction.items.map((item, i) => (
+                <div key={i} className="flex items-center justify-between text-[11px]">
+                  <span className="text-[var(--text-mid)] truncate mr-2">{item.label}</span>
+                  <span className="data text-[var(--rose)]">${item.amount}</span>
                 </div>
               ))}
-            </div>
-            <div className="border-t border-[var(--rose)]/20 mt-3 pt-3 flex items-center justify-between">
-              <span className="label text-[10px] text-[var(--text-dim)]">TOTAL LOST</span>
-              <span className="data text-[var(--rose)] font-bold" style={{ fontSize: 28 }}>-${coiTotal.toLocaleString()}/mo</span>
-            </div>
-            <Link href="/ai" className="text-[11px] text-[var(--rose)] hover:underline mt-2 inline-block opacity-70">How to reduce this &rarr;</Link>
-          </motion.div>
-
-          {/* ── 8+9. DAYS REMAINING + TODAY'S TASKS ── */}
-          <motion.div className="card rounded-[16px] p-5 col-span-12 md:col-span-7" {...cardAnim(0.32)}>
-            <div className="grid grid-cols-1 md:grid-cols-7 gap-4">
-              {/* Days Remaining half */}
-              <div className="md:col-span-3">
-                <span className="text-[10px] font-mono uppercase tracking-[2px] text-[var(--text-dim)] mb-3 block">DAYS REMAINING</span>
-                <div className="gradient-text data" style={{ fontSize: 48, fontWeight: 700 }}>{remaining || '—'}</div>
-                <p className="text-[14px] text-[var(--text-mid)]">
-                  {targetDate ? `days to $${(incomeTarget / 1000).toFixed(0)}K/mo` : 'Set a target date in Settings'}
-                </p>
-                <div className="mt-4">
-                  <div className="w-full h-2 rounded-full bg-[var(--surface2)] overflow-hidden">
-                    <motion.div
-                      className="h-full rounded-full"
-                      style={{ background: 'linear-gradient(90deg, var(--accent), var(--cyan))' }}
-                      initial={{ width: 0 }}
-                      animate={{ width: `${progressPercent}%` }}
-                      transition={{ duration: 1, delay: 0.4 }}
-                    />
-                  </div>
-                  <div className="flex justify-between mt-1">
-                    <span className="data text-[10px] text-[var(--text-dim)]">${currentIncome > 0 ? `${(currentIncome / 1000).toFixed(0)}K` : '0'}</span>
-                    <span className="data text-[10px] text-[var(--text-dim)]">${(incomeTarget / 1000).toFixed(0)}K</span>
-                  </div>
-                </div>
-              </div>
-              {/* Divider */}
-              <div className="hidden md:block md:col-span-0 w-px bg-[var(--border)] mx-auto" />
-              {/* Today's Tasks half */}
-              <div className="md:col-span-4 border-t md:border-t-0 md:border-l border-[var(--border)] pt-4 md:pt-0 md:pl-4">
-                <div className="flex items-center justify-between mb-3">
-                  <span className="text-[10px] font-mono uppercase tracking-[2px] text-[var(--text-dim)]">TODAY&apos;S TASKS</span>
-                  <span className="data text-[11px] font-semibold px-2 py-0.5 rounded-full" style={{ background: 'color-mix(in srgb, var(--accent) 15%, transparent)', color: 'var(--accent)' }}>
-                    {tasksDoneToday}/{tasks.length}
-                  </span>
-                </div>
-                <div className="space-y-1.5 max-h-[280px] overflow-y-auto pr-1" style={{ scrollbarWidth: 'none' }}>
-                  {incompleteTasks.length > 0 ? incompleteTasks.slice(0, 8).map(task => (
-                    <motion.div key={task.id} className="flex items-center gap-2 py-1.5 px-2 rounded-[8px] hover:bg-[var(--surface2)] transition-colors"
-                      style={{ borderLeft: `3px solid ${PRIORITY_BORDER[task.priority] || 'var(--border)'}` }}
-                    >
-                      <motion.button
-                        onClick={() => { toggleTask(task.id); toast.success('+XP earned') }}
-                        className="w-4 h-4 rounded-[4px] border-2 flex-shrink-0 flex items-center justify-center"
-                        style={{ borderColor: PRIORITY_BORDER[task.priority] }}
-                        whileTap={{ scale: 0.85 }}
-                      />
-                      <span className="text-[12px] text-[var(--text)] truncate">{task.text}</span>
-                      {task.tag && <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-[var(--surface2)] text-[var(--text-dim)] flex-shrink-0">{task.tag}</span>}
-                    </motion.div>
-                  )) : (
-                    <div className="text-center py-6">
-                      <p className="text-[12px] text-[var(--text-dim)]">Your plate is clear. Add a task or ask the AI.</p>
-                      <div className="flex items-center justify-center gap-3 mt-2">
-                        <Link href="/tasks" className="text-[11px] text-[var(--accent)] hover:underline">Tasks &rarr;</Link>
-                        <Link href="/ai" className="text-[11px] text-[var(--accent)] hover:underline">Ask AI &rarr;</Link>
-                      </div>
-                    </div>
-                  )}
-                </div>
-                <form onSubmit={handleAddTask} className="mt-3">
-                  <input type="text" value={newTaskText} onChange={e => setNewTaskText(e.target.value)}
-                    placeholder="+ Add a task..."
-                    className="w-full bg-[var(--surface2)] border border-[var(--border)] rounded-[10px] px-3 py-2 text-[12px] text-[var(--text)] placeholder:text-[var(--text-dim)] outline-none focus:border-[var(--accent)] transition-colors"
-                  />
-                </form>
-              </div>
-            </div>
-          </motion.div>
-
-          {/* ── 10. CLIENT TABLE ── */}
-          <motion.div className="card rounded-[16px] p-5 overflow-x-auto col-span-12 md:col-span-6" {...cardAnim(0.36)}>
-            <div className="flex items-center justify-between mb-3">
-              <span className="text-[10px] font-mono uppercase tracking-[2px] text-[var(--text-dim)]">CLIENT REVENUE</span>
-              <span className="data text-[11px] font-semibold px-2 py-0.5 rounded-full" style={{ background: 'color-mix(in srgb, var(--accent) 15%, transparent)', color: 'var(--accent)' }}>
-                ${Math.round(agencyTotals.net).toLocaleString()}/mo
-              </span>
-            </div>
-            {clients.filter(c => c.active).length > 0 ? (
-              <table className="w-full text-[12px]">
-                <thead>
-                  <tr className="border-b border-[var(--border)]">
-                    {['Client', 'Gross', 'Ad Spend', 'Net'].map(h => (
-                      <th key={h} className="label text-[10px] text-[var(--text-dim)] text-left px-2 py-1.5 font-medium">{h}</th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {clients.filter(c => c.active).map((c, i) => {
-                    const net = getClientNet(c)
-                    return (
-                      <motion.tr key={c.id} className="border-b border-[var(--border)] last:border-0 cursor-default"
-                        whileHover={{ backgroundColor: 'var(--surface2)' }}
-                      >
-                        <td className="px-2 py-1.5 text-[var(--text)] font-medium">
-                          <span className="inline-block w-2 h-2 rounded-full mr-2" style={{
-                            backgroundColor: i === 0 ? 'var(--accent)' : 'var(--text-dim)',
-                          }} />
-                          {c.name}
-                        </td>
-                        <td className="data px-2 py-1.5 text-[var(--text-mid)]">${c.grossMonthly.toLocaleString()}</td>
-                        <td className="data px-2 py-1.5 text-[var(--text-mid)]">{c.adSpend > 0 ? `$${c.adSpend.toLocaleString()}` : '—'}</td>
-                        <td className="data px-2 py-1.5 text-[var(--accent)] font-semibold relative">
-                          <div className="absolute inset-0 rounded-r-[4px] opacity-10" style={{ width: `${maxClientNet > 0 ? (net / maxClientNet) * 100 : 0}%`, background: 'var(--accent)' }} />
-                          <span className="relative">${Math.round(net).toLocaleString()}</span>
-                        </td>
-                      </motion.tr>
-                    )
-                  })}
-                  <tr className="bg-[var(--surface2)]">
-                    <td className="px-2 py-1.5 font-bold text-[var(--text)]">TOTAL</td>
-                    <td className="data px-2 py-1.5 font-bold text-[var(--text)]">${Math.round(agencyTotals.gross).toLocaleString()}</td>
-                    <td className="data px-2 py-1.5 font-bold text-[var(--text)]">${Math.round(agencyTotals.adSpend).toLocaleString()}</td>
-                    <td className="data px-2 py-1.5 font-bold text-[var(--accent)]">${Math.round(agencyTotals.net).toLocaleString()}</td>
-                  </tr>
-                </tbody>
-              </table>
-            ) : (
-              <div className="text-center py-8">
-                <p className="text-[12px] text-[var(--text-dim)]">No clients yet. Add them on the Agency page.</p>
-                <Link href="/business/agency" className="text-[11px] text-[var(--accent)] hover:underline mt-1 inline-block">Go to Agency &rarr;</Link>
-              </div>
-            )}
-          </motion.div>
-
-          {/* ── 11. PLUMBING GMB GRID ── */}
-          <motion.div className="card rounded-[16px] p-5 col-span-12 md:col-span-6" {...cardAnim(0.38)}>
-            <div className="flex items-center justify-between mb-3">
-              <span className="text-[10px] font-mono uppercase tracking-[2px] text-[var(--text-dim)]">PLUMBING GMBS</span>
-              <span className="data text-[11px] font-semibold px-2 py-0.5 rounded-full" style={{ background: 'color-mix(in srgb, var(--cyan) 15%, transparent)', color: 'var(--cyan)' }}>
-                {totalGmbCalls} calls/mo
-              </span>
-            </div>
-            {gmbProfiles.length > 0 ? (
-              <div className="grid grid-cols-3 gap-2">
-                {gmbProfiles.map(g => (
-                  <motion.div key={g.id} className="bg-[var(--surface2)] rounded-[12px] p-3 relative overflow-hidden"
-                    whileHover={{ y: -2, scale: 1.02 }}
-                    style={{ borderTop: `3px solid ${GMB_TOP_BORDER[g.status] || 'var(--border)'}` }}
-                  >
-                    <div className="text-[13px] font-semibold text-[var(--text)]">{g.city}</div>
-                    <div className="mt-1.5 space-y-0.5 text-[11px] text-[var(--text-mid)]">
-                      <div>⭐ {g.reviewCount}</div>
-                      <div>📞 {g.callsPerMonth}/mo</div>
-                    </div>
-                    <span className="data text-[10px] font-bold mt-1.5 inline-block px-1.5 py-0.5 rounded bg-[var(--surface)] text-[var(--text-dim)]">{g.ranking}</span>
-                  </motion.div>
-                ))}
-              </div>
-            ) : (
-              <div className="text-center py-8">
-                <p className="text-[12px] text-[var(--text-dim)]">No GMB profiles yet. Add them on the Plumbing page.</p>
-                <Link href="/business/plumbing" className="text-[11px] text-[var(--accent)] hover:underline mt-1 inline-block">Go to Plumbing &rarr;</Link>
-              </div>
-            )}
-          </motion.div>
-
-          {/* ── 12. INSIGHTS ROW ── */}
-          <motion.div className="col-span-12" {...cardAnim(0.4)}>
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-[10px] font-mono uppercase tracking-[2px] text-[var(--text-dim)]">INSIGHTS</span>
-              <Link href="/ai" className="text-[11px] text-[var(--accent)] hover:underline">View all &rarr;</Link>
-            </div>
-            <div className="flex gap-3 overflow-x-auto pb-2" style={{ scrollbarWidth: 'none' }}>
-              {activeInsights.length > 0 ? activeInsights.map(ins => {
-                const borderColor = ins.type === 'revenue' ? 'var(--accent)' : ins.type === 'risk' ? 'var(--rose)' : 'var(--blue)'
-                return (
-                  <motion.div key={ins.id} className="card p-4 flex-shrink-0 rounded-[12px]"
-                    style={{ minWidth: 300, maxWidth: 340, borderLeft: `3px solid ${borderColor}` }}
-                    whileHover={{ y: -2 }}
-                  >
-                    <div className="flex gap-2 mb-1">
-                      <span className="text-[9px] font-bold uppercase px-1.5 py-0.5 rounded" style={{ background: `color-mix(in srgb, ${borderColor} 15%, transparent)`, color: borderColor }}>{ins.type}</span>
-                      <span className="text-[9px] font-bold uppercase px-1.5 py-0.5 rounded bg-[var(--surface2)] text-[var(--text-dim)]">{ins.priority}</span>
-                    </div>
-                    <p className="text-[14px] font-semibold text-[var(--text)]">{ins.title}</p>
-                    <p className="text-[12px] text-[var(--text-mid)] mt-1 line-clamp-2">{ins.body}</p>
-                    <div className="flex gap-2 mt-2 opacity-0 hover:opacity-100 transition-opacity">
-                      <button className="text-[14px]" onClick={() => toast.success('Noted')}>👍</button>
-                      <button className="text-[14px]" onClick={() => toast('Dismissed')}>👎</button>
-                    </div>
-                  </motion.div>
-                )
-              }) : (
-                <div className="card p-5 rounded-[12px] text-center w-full">
-                  <p className="text-[12px] text-[var(--text-dim)]">Connect your AI key in Settings to enable daily insights.</p>
-                  <Link href="/settings" className="text-[11px] text-[var(--accent)] hover:underline mt-1 inline-block">Settings &rarr;</Link>
-                </div>
+              {costOfInaction.items.length === 0 && (
+                <p className="text-[11px] text-[var(--text-dim)] italic">No critical tasks pending</p>
               )}
             </div>
           </motion.div>
 
-        </div>{/* end bento grid */}
+          <motion.div className="card rounded-[16px] p-5 col-span-12 md:col-span-7" {...cardAnim(0.4)}>
+            <div className="grid grid-cols-2 gap-4 h-full">
+              {/* Days remaining */}
+              <div>
+                <span className="text-[10px] font-mono uppercase tracking-[2px] text-[var(--text-dim)]">DAYS TO TARGET</span>
+                <div className="data mt-2" style={{ fontSize: 36, fontWeight: 700, color: 'var(--cyan)' }}>
+                  {daysRemaining > 0 ? daysRemaining : '—'}
+                </div>
+                <p className="text-[11px] text-[var(--text-mid)]">{targetDate ? `Target: ${new Date(targetDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}` : 'No target set'}</p>
+                {incomeTarget > 0 && (
+                  <p className="text-[10px] text-[var(--text-dim)] mt-1">${Math.round(incomeTarget).toLocaleString()}/mo goal</p>
+                )}
+              </div>
+              {/* Today's tasks */}
+              <div className="overflow-y-auto max-h-[200px]">
+                <span className="text-[10px] font-mono uppercase tracking-[2px] text-[var(--text-dim)]">TODAY&apos;S TASKS</span>
+                <div className="mt-2 space-y-1.5">
+                  {sortedTasks.slice(0, 6).map(t => (
+                    <div key={t.id} className="flex items-center gap-2">
+                      <button
+                        onClick={() => { toggleTask(t.id); toast.success('Done!') }}
+                        className="flex-shrink-0 w-4 h-4 rounded-[4px] border transition-colors"
+                        style={{ borderColor: t.priority === 'crit' ? 'var(--rose)' : t.priority === 'high' ? 'var(--amber)' : 'var(--border)' }}
+                      />
+                      <span className="text-[11px] text-[var(--text-mid)] truncate">{t.text}</span>
+                    </div>
+                  ))}
+                  {sortedTasks.length === 0 && <p className="text-[11px] text-[var(--text-dim)] italic">No tasks</p>}
+                </div>
+              </div>
+            </div>
+          </motion.div>
 
-        {/* ── 13. COMMAND INPUT (sticky, outside grid) ── */}
-        <motion.div className="sticky bottom-4 z-30 mt-6" {...cardAnim(0.42)}>
-          <div className="glass rounded-[16px] p-3 flex items-center gap-3">
-            <button className="w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0" style={{ background: 'linear-gradient(135deg, var(--accent), var(--cyan))' }}>
-              <span className="text-[14px]">🎤</span>
-            </button>
-            <input type="text" placeholder="Quick update or ask AI..."
-              className="flex-1 bg-transparent text-[13px] text-[var(--text)] placeholder:text-[var(--text-dim)] outline-none"
-            />
-            <span className="text-[11px] text-[var(--text-dim)] flex-shrink-0">↵</span>
+          {/* ── ROW 6: CLIENT TABLE + GMB GRID ── */}
+          <motion.div className="card rounded-[16px] p-5 col-span-12 md:col-span-6" {...cardAnim(0.44)}>
+            <span className="text-[10px] font-mono uppercase tracking-[2px] text-[var(--text-dim)]">CLIENTS</span>
+            {clients.filter(c => c.active).length > 0 ? (
+              <div className="mt-3 space-y-2">
+                {clients.filter(c => c.active).slice(0, 6).map(c => (
+                  <div key={c.id} className="flex items-center justify-between text-[12px]">
+                    <span className="text-[var(--text)] font-medium truncate mr-2">{c.name}</span>
+                    <div className="flex items-center gap-3">
+                      <span className="data text-[var(--accent)]">${Math.round(getClientNet(c)).toLocaleString()}</span>
+                      <span className="text-[var(--text-dim)]">{c.serviceType}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-[12px] text-[var(--text-dim)] mt-3 italic">No active clients</p>
+            )}
+          </motion.div>
+
+          <motion.div className="card rounded-[16px] p-5 col-span-12 md:col-span-6" {...cardAnim(0.48)}>
+            <span className="text-[10px] font-mono uppercase tracking-[2px] text-[var(--text-dim)]">GMB PROFILES</span>
+            {gmbProfiles.length > 0 ? (
+              <div className="mt-3 grid grid-cols-2 gap-2">
+                {gmbProfiles.slice(0, 6).map(g => (
+                  <div key={g.id} className="rounded-[10px] p-2.5" style={{
+                    background: 'var(--surface2)',
+                    borderTop: `2px solid ${g.status === 'strong' ? 'var(--accent)' : g.status === 'medium' ? 'var(--amber)' : 'var(--blue)'}`,
+                  }}>
+                    <p className="text-[12px] font-medium text-[var(--text)] truncate">{g.city}</p>
+                    <div className="flex items-center gap-2 mt-1">
+                      <span className="text-[10px] text-[var(--text-dim)]">⭐ {g.reviewCount}</span>
+                      <span className="text-[10px] text-[var(--text-dim)]">📞 {g.callsPerMonth}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-[12px] text-[var(--text-dim)] mt-3 italic">No GMB profiles</p>
+            )}
+          </motion.div>
+
+        </div>
+
+        {/* ── ROW 7: QUICK CAPTURE (sticky bottom) ── */}
+        <div className="fixed bottom-0 left-0 right-0 z-40 p-4" style={{ background: 'linear-gradient(to top, var(--bg) 80%, transparent)' }}>
+          <div className="max-w-4xl mx-auto">
+            <CommandInput />
           </div>
-        </motion.div>
+        </div>
+
       </div>
     </PageTransition>
   )

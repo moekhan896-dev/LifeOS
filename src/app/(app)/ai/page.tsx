@@ -78,6 +78,21 @@ ${state.sprints.filter(s => s.status === 'active').map(s => `Sprint ${s.sprintNu
 
 --- XP / LEVEL ---
 Level ${state.level} | ${state.xp} XP
+
+--- PROJECTS ---
+${state.projects.map(p => `- ${p.name}: ${p.status}${p.description ? ' — ' + p.description : ''}`).join('\n') || 'None'}
+
+--- GOALS (12-Week Year) ---
+${state.goals.map(g => `- ${g.title}: ${g.currentValue}/${g.targetValue} ${g.targetMetric}`).join('\n') || 'None'}
+
+--- IDENTITY STATEMENTS ---
+${state.identityStatements.map(i => `- "${i.text}" [${i.status}]`).join('\n') || 'None'}
+
+--- SKILL LEVELS ---
+${state.skillLevels.map(s => `- ${s.category} > ${s.skill}: Level ${s.level} (${s.xp} XP)`).join('\n') || 'None'}
+
+--- RECENT BEHAVIORAL EVENTS ---
+${state.behavioralEvents.slice(-10).map(e => `- ${e.eventType} @ ${new Date(e.timestamp).toLocaleString()} (score: ${e.dayScoreAtTime})`).join('\n') || 'None'}
 `
 }
 
@@ -92,7 +107,8 @@ function AIPageInner() {
 
   const {
     aiMessages, addAiMessage, clearAiMessages,
-    businesses, clients, tasks, commitments, streaks, pipeline, sprints, level, xp
+    businesses, clients, tasks, commitments, streaks, pipeline, sprints, level, xp,
+    projects, goals, identityStatements, skillLevels, behavioralEvents
   } = useStore()
 
   const [input, setInput] = useState('')
@@ -141,6 +157,7 @@ function AIPageInner() {
         body: JSON.stringify({
           messages: apiMessages,
           context: buildContextSnapshot(useStore.getState()),
+          apiKey: useStore.getState().anthropicKey || undefined,
         }),
       })
 
@@ -419,6 +436,63 @@ function AIPageInner() {
               )) : <p className="text-text-dim italic">No open commitments</p>}
             </div>
           </div>
+
+          {/* Projects */}
+          {projects.length > 0 && (
+            <div>
+              <h3 className="text-[10px] font-mono uppercase tracking-[2px] text-text-dim mb-2">Projects</h3>
+              <div className="space-y-1">
+                {projects.map(p => (
+                  <div key={p.id} className="flex items-center gap-2 text-text-mid">
+                    <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${p.status === 'in_progress' ? 'bg-accent' : p.status === 'complete' ? 'bg-green-400' : 'bg-zinc-400'}`} />
+                    <span className="truncate">{p.name}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Goals */}
+          {goals.length > 0 && (
+            <div>
+              <h3 className="text-[10px] font-mono uppercase tracking-[2px] text-text-dim mb-2">Goals</h3>
+              <div className="space-y-1">
+                {goals.map(g => (
+                  <div key={g.id} className="text-text-mid flex gap-2">
+                    <span className="text-accent shrink-0">{g.currentValue}/{g.targetValue}</span>
+                    <span className="truncate">{g.title}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Identity */}
+          {identityStatements.length > 0 && (
+            <div>
+              <h3 className="text-[10px] font-mono uppercase tracking-[2px] text-text-dim mb-2">Identity</h3>
+              <div className="space-y-1">
+                {identityStatements.map(i => (
+                  <div key={i.id} className="text-text-mid text-xs italic">&ldquo;{i.text}&rdquo;</div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Skills */}
+          {skillLevels.length > 0 && (
+            <div>
+              <h3 className="text-[10px] font-mono uppercase tracking-[2px] text-text-dim mb-2">Top Skills</h3>
+              <div className="grid grid-cols-2 gap-1.5">
+                {skillLevels.slice(0, 6).map(s => (
+                  <div key={s.id} className="bg-surface2 border border-border rounded-[12px] px-2.5 py-1.5">
+                    <span className="text-text">{s.skill}</span>
+                    <span className="ml-1 font-mono font-bold text-accent">L{s.level}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
 
           {/* Copy Context Button */}
           <motion.button

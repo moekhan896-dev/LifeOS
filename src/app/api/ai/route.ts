@@ -48,16 +48,16 @@ Arsalan "Art" Khalid. 25 years old. Pakistani-American Muslim based in Michigan.
 Each message includes a real-time snapshot of Art's business data, tasks, streaks, commitments, and pipeline from ART OS. Use this data to ground your advice in reality, not generalities.`
 
 export async function POST(req: NextRequest) {
-  const apiKey = process.env.ANTHROPIC_API_KEY
-  if (!apiKey) {
-    return NextResponse.json(
-      { error: 'AI requires an Anthropic API key. Add ANTHROPIC_API_KEY to your environment variables.' },
-      { status: 500 }
-    )
-  }
-
   try {
-    const { messages, context } = await req.json()
+    const { messages, context, apiKey: clientKey } = await req.json()
+
+    const apiKey = process.env.ANTHROPIC_API_KEY || clientKey
+    if (!apiKey) {
+      return NextResponse.json(
+        { error: 'AI requires an Anthropic API key. Add ANTHROPIC_API_KEY to your environment variables.' },
+        { status: 500 }
+      )
+    }
 
     const systemPrompt = SYSTEM_PROMPT + (context ? `\n\n=== CURRENT LIVE DATA ===\n${context}` : '')
 

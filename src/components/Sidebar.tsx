@@ -2,11 +2,11 @@
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
-import { useStore, getExecutionScore } from '@/stores/store'
+import { useStore, getExecutionScore, getBusinessHealth } from '@/stores/store'
 
 const NAV_SECTIONS = [
   {
-    label: 'TODAY',
+    label: 'YOUR DAY',
     items: [
       { href: '/dashboard', label: 'Command Center', icon: '◉' },
       { href: '/focus', label: 'Focus Mode', icon: '◎' },
@@ -16,38 +16,48 @@ const NAV_SECTIONS = [
   {
     label: 'THINK',
     items: [
-      { href: '/vision', label: 'Vision & Identity', icon: '✦' },
-      { href: '/goals', label: 'Goals (12-Week)', icon: '🎯' },
-      { href: '/projects', label: 'Projects', icon: '📋' },
+      { href: '/vision', label: 'Identity & Vision', icon: '🧬' },
+      { href: '/goals', label: '12-Week Goals', icon: '🎯' },
+      { href: '/projects', label: 'Projects', icon: '📋', badge: 'projects' as const },
     ],
   },
   {
-    label: 'DO',
+    label: 'EXECUTE',
     items: [
-      { href: '/tasks', label: 'Tasks', icon: '☐', badge: true },
-      { href: '/revenue-drivers', label: 'Revenue Drivers', icon: '↗' },
+      { href: '/tasks', label: 'Tasks', icon: '☐', badge: 'tasks' as const },
       { href: '/drip', label: 'DRIP Matrix', icon: '📊' },
+      { href: '/revenue-drivers', label: 'Revenue Drivers', icon: '↗' },
     ],
   },
   {
-    label: 'TRACK',
+    label: 'MEASURE',
     items: [
-      { href: '/financials', label: 'Financial Command', icon: '💰' },
-      { href: '/health', label: 'Health & Deen', icon: '♡' },
-      { href: '/energy', label: 'Energy Dashboard', icon: '⚡' },
       { href: '/insights', label: 'Execution Score', icon: '📈' },
+      { href: '/financials', label: 'Financial Command', icon: '💰' },
+      { href: '/energy', label: 'Energy Dashboard', icon: '⚡' },
+      { href: '/health', label: 'Health & Deen', icon: '♡' },
     ],
   },
   {
-    label: 'GROW',
+    label: 'LEARN',
     items: [
       { href: '/reports', label: 'AI Reports', icon: '🧠' },
-      { href: '/idea-bank', label: 'Idea Bank', icon: '💡' },
       { href: '/knowledge', label: 'Knowledge Vault', icon: '📚' },
-      { href: '/ecosystem', label: 'Ecosystem', icon: '🔗' },
+      { href: '/skills', label: 'Skill Tree', icon: '🏆' },
+      { href: '/idea-bank', label: 'Idea Bank', icon: '💡' },
     ],
   },
-] as const
+  {
+    label: 'SYSTEM',
+    items: [
+      { href: '/ecosystem', label: 'Ecosystem', icon: '🔗' },
+      { href: '/wins', label: 'Wins', icon: '🏆' },
+      { href: '/commitments', label: 'Commitments', icon: '📝' },
+      { href: '/decisions', label: 'Decision Journal', icon: '📓' },
+      { href: '/settings', label: 'Settings', icon: '⚙' },
+    ],
+  },
+]
 
 function getRevenueLabel(b: { monthlyRevenue: number; status: string }) {
   if (b.status === 'dormant' || b.status === 'backburner') return 'Dormant'
@@ -60,10 +70,12 @@ export default function Sidebar() {
   const pathname = usePathname()
   const {
     theme, toggleTheme, sidebarOpen, toggleSidebar,
-    businesses, tasks, xp, level, todayHealth, focusSessions,
+    businesses, tasks, revenueEntries, projects,
+    xp, level, todayHealth, focusSessions,
   } = useStore()
 
   const undoneCount = tasks.filter((t) => !t.done).length
+  const activeProjects = projects.filter((p) => p.status === 'in_progress').length
   const today = todayHealth.date
   const todayFocusCount = focusSessions.filter((s) => s.startedAt?.startsWith(today)).length
   const tasksDoneToday = tasks.filter((t) => t.done && t.completedAt?.startsWith(today)).length
@@ -80,6 +92,12 @@ export default function Sidebar() {
 
   const closeMobileIfNeeded = () => {
     if (typeof window !== 'undefined' && window.innerWidth < 768) toggleSidebar()
+  }
+
+  const getBadgeText = (badge: string) => {
+    if (badge === 'tasks') return undoneCount > 0 ? `${undoneCount}` : null
+    if (badge === 'projects') return `${activeProjects}/3 active`
+    return null
   }
 
   const sidebarContent = (
@@ -141,16 +159,17 @@ export default function Sidebar() {
       <div className="flex-1 overflow-y-auto pb-2 scrollbar-thin">
         {NAV_SECTIONS.map((section) => (
           <div key={section.label}>
-            <div className="font-mono text-[9px] uppercase tracking-[3px] text-[#4a5278] px-4 mt-5 mb-1.5">
+            <div className="font-mono text-[9px] uppercase tracking-[3px] text-[#4a5278] px-4 mt-4 mb-1">
               {section.label}
             </div>
             <div className="space-y-0.5">
               {section.items.map((item) => {
                 const active = isActive(item.href)
+                const badgeText = 'badge' in item && item.badge ? getBadgeText(item.badge as string) : null
                 return (
                   <Link key={item.href} href={item.href} onClick={closeMobileIfNeeded} className="block group">
                     <motion.div
-                      className={`relative flex items-center gap-2.5 px-4 py-[7px] text-[13px] font-medium rounded-[10px] mx-1.5 transition-colors ${
+                      className={`relative flex items-center gap-2.5 px-4 py-[6px] text-[12px] font-medium rounded-[10px] mx-1.5 transition-colors ${
                         active
                           ? 'bg-emerald-500/5 text-white font-semibold'
                           : 'text-[#8892b0]'
@@ -165,13 +184,13 @@ export default function Sidebar() {
                           transition={{ type: 'spring', stiffness: 300, damping: 30 }}
                         />
                       )}
-                      <span className="w-4 text-center text-[16px] opacity-60 group-hover:opacity-100 transition-opacity leading-none">
+                      <span className="w-4 text-center text-[14px] opacity-60 group-hover:opacity-100 transition-opacity leading-none">
                         {item.icon}
                       </span>
                       <span className="flex-1 truncate">{item.label}</span>
-                      {'badge' in item && item.badge && undoneCount > 0 && (
+                      {badgeText && (
                         <span className="font-mono text-[9px] bg-emerald-500/15 text-emerald-400 px-1.5 py-0.5 rounded-md min-w-[20px] text-center font-semibold">
-                          {undoneCount}
+                          {badgeText}
                         </span>
                       )}
                     </motion.div>
@@ -184,17 +203,24 @@ export default function Sidebar() {
 
         {/* Businesses */}
         <div>
-          <div className="font-mono text-[9px] uppercase tracking-[3px] text-[#4a5278] px-4 mt-5 mb-1.5">
+          <div className="font-mono text-[9px] uppercase tracking-[3px] text-[#4a5278] px-4 mt-4 mb-1 flex items-center gap-2">
             BUSINESSES
+            <motion.div
+              className="w-1.5 h-1.5 rounded-full bg-emerald-500"
+              animate={{ opacity: [0.4, 1, 0.4] }}
+              transition={{ duration: 2, repeat: Infinity, ease: 'easeInOut' }}
+            />
           </div>
           <div className="space-y-0.5">
             {businesses.map((b) => {
               const href = `/business/${b.id}`
               const active = isActive(href)
+              const health = getBusinessHealth(b, tasks, revenueEntries)
+              const dotColor = health === 'strong' ? '#10b981' : health === 'weak' ? '#f59e0b' : '#ef4444'
               return (
                 <Link key={b.id} href={href} onClick={closeMobileIfNeeded} className="block group">
                   <motion.div
-                    className={`relative flex items-center gap-2.5 px-4 py-[7px] text-[13px] font-medium rounded-[10px] mx-1.5 transition-colors ${
+                    className={`relative flex items-center gap-2.5 px-4 py-[6px] text-[12px] font-medium rounded-[10px] mx-1.5 transition-colors ${
                       active
                         ? 'bg-emerald-500/5 text-white font-semibold'
                         : 'text-[#8892b0]'
@@ -209,7 +235,17 @@ export default function Sidebar() {
                         transition={{ type: 'spring', stiffness: 300, damping: 30 }}
                       />
                     )}
-                    <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: b.color }} />
+                    {health === 'strong' ? (
+                      <motion.div
+                        className="w-2 h-2 rounded-full flex-shrink-0"
+                        style={{ backgroundColor: dotColor }}
+                        animate={{ opacity: [0.5, 1, 0.5] }}
+                        transition={{ duration: 1.5, repeat: Infinity, ease: 'easeInOut' }}
+                      />
+                    ) : (
+                      <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: dotColor }} />
+                    )}
+                    <span className="text-[14px] leading-none">{b.icon}</span>
                     <span className="flex-1 truncate">{b.name}</span>
                     <span className="font-mono text-[10px] text-[#4a5278]">
                       {getRevenueLabel(b)}
@@ -219,33 +255,6 @@ export default function Sidebar() {
               )
             })}
           </div>
-        </div>
-
-        {/* Settings */}
-        <div className="mt-4 mb-2">
-          <Link href="/settings" onClick={closeMobileIfNeeded} className="block group">
-            <motion.div
-              className={`relative flex items-center gap-2.5 px-4 py-[7px] text-[13px] font-medium rounded-[10px] mx-1.5 transition-colors ${
-                isActive('/settings')
-                  ? 'bg-emerald-500/5 text-white font-semibold'
-                  : 'text-[#8892b0]'
-              }`}
-              whileHover={{ x: 1, backgroundColor: '#141824', color: '#ffffff' }}
-              transition={{ duration: 0.15, ease: 'easeOut' }}
-            >
-              {isActive('/settings') && (
-                <motion.div
-                  layoutId="sidebar-active"
-                  className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-4 rounded-r-full bg-emerald-500"
-                  transition={{ type: 'spring', stiffness: 300, damping: 30 }}
-                />
-              )}
-              <span className="w-4 text-center text-[16px] opacity-60 group-hover:opacity-100 transition-opacity leading-none">
-                ⚙
-              </span>
-              <span className="flex-1 truncate">Settings</span>
-            </motion.div>
-          </Link>
         </div>
       </div>
 
