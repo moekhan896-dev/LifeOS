@@ -2,11 +2,11 @@
 
 import { motion } from 'framer-motion'
 import { toast } from 'sonner'
-import { BUSINESSES, AUDIENCE_ASSETS } from '@/lib/constants'
+import { useStore } from '@/stores/store'
 import PageTransition from '@/components/PageTransition'
 import { StaggerContainer, StaggerItem } from '@/components/Stagger'
 
-const biz = BUSINESSES.find((b) => b.id === 'brand')!
+const STATUS_LABELS: Record<string, string> = { active_healthy: 'Active', active_slow: 'Slow', active_prerevenue: 'Pre-Revenue', dormant: 'Dormant', backburner: 'Backburner', idea: 'Idea' }
 
 const SOCIAL_ACCOUNTS = [
   { name: 'Personal IG', followers: '30K', status: 'Dormant', daysSince: '540+ days' },
@@ -23,6 +23,13 @@ const FUNNEL_STEPS = [
 ]
 
 export default function PersonalBrandPage() {
+  const { businesses } = useStore()
+  const biz = businesses.find(b => b.type === 'coaching' || b.name.toLowerCase().includes('brand') || b.name.toLowerCase().includes('coaching'))
+
+  if (!biz) return (
+    <PageTransition><div className="p-4 md:p-7 max-w-[960px] mx-auto"><p className="text-[var(--text-dim)]">No personal brand business found. Add businesses in Settings or re-run onboarding.</p></div></PageTransition>
+  )
+
   return (
     <PageTransition>
       <div className="p-4 md:p-7 max-w-[960px] mx-auto">
@@ -30,7 +37,7 @@ export default function PersonalBrandPage() {
         <div className="flex items-center gap-3 mb-6">
           <h1 className="text-[22px] font-bold tracking-tight text-[var(--text)]">PERSONAL BRAND / COACHING</h1>
           <span className="text-[10px] font-mono uppercase tracking-[2px] text-amber-500 px-2.5 py-0.5 rounded-full bg-amber-500/15">
-            {biz.statusLabel}
+            {STATUS_LABELS[biz.status] || biz.status}
           </span>
         </div>
 

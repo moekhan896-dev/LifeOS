@@ -3,16 +3,14 @@
 import { useState } from 'react'
 import { motion } from 'framer-motion'
 import { toast } from 'sonner'
-import { useStore, type PipelineDeal } from '@/stores/store'
-import { CLIENTS, BUSINESSES, DRIVER_STATUS_COLORS } from '@/lib/constants'
+import { useStore, getClientNet, type PipelineDeal } from '@/stores/store'
+import { DRIVER_STATUS_COLORS } from '@/lib/constants'
 import Link from 'next/link'
 import PageTransition from '@/components/PageTransition'
 import { StaggerContainer, StaggerItem } from '@/components/Stagger'
 import { AreaChart, Area, BarChart, Bar, ResponsiveContainer, XAxis, Tooltip } from 'recharts'
 
 const revenueData = Array.from({length: 6}, (_, i) => ({ month: ['Oct','Nov','Dec','Jan','Feb','Mar'][i], agency: [22,24,28,30,27,26][i] * 1000, plumbing: [15,18,21,19,20,18][i] * 1000 }))
-
-const clientLTVData = CLIENTS.map(c => ({ name: c.name.split(' ')[0], ltv: c.net * 12 }))
 
 const STAGES: { key: PipelineDeal['stage']; label: string }[] = [
   { key: 'lead', label: 'Lead' },
@@ -45,18 +43,23 @@ const AGENCY_GMBS = [
   { city: 'Houston', status: 'Not optimized' },
 ]
 
-const biz = BUSINESSES.find((b) => b.id === 'agency')!
-const totalGross = CLIENTS.reduce((s, c) => s + c.gross, 0)
-const totalNet = CLIENTS.reduce((s, c) => s + c.net, 0)
-const awsGross = CLIENTS.find((c) => c.name.includes('AWS'))!.gross
-const awsConcentration = Math.round((awsGross / totalGross) * 100)
+const STATUS_LABELS: Record<string, string> = { active_healthy: 'Active', active_slow: 'Slow', active_prerevenue: 'Pre-Revenue', dormant: 'Dormant', backburner: 'Backburner', idea: 'Idea' }
 
 export default function AgencyPage() {
-  const { pipeline, addDeal, updateDealStage, deleteDeal, drivers } = useStore()
+  const { businesses, clients, pipeline, addDeal, updateDealStage, deleteDeal, drivers } = useStore()
+  const agencyBiz = businesses.find(b => b.type === 'agency' || b.name.toLowerCase().includes('agency'))
+  const agencyClients = clients.filter(c => c.businessId === agencyBiz?.id)
+
+  const clientLTVData = agencyClients.map(c => ({ name: c.name.split(' ')[0], ltv: getClientNet(c) * 12 }))
+  const totalGross = agencyClients.reduce((s, c) => s + c.grossMonthly, 0)
+  const totalNet = agencyClients.reduce((s, c) => s + getClientNet(c), 0)
+  const awsClient = agencyClients.find((c) => c.name.includes('AWS'))
+  const awsGross = awsClient?.grossMonthly ?? 0
+  const awsConcentration = totalGross > 0 ? Math.round((awsGross / totalGross) * 100) : 0
   const [showAddDeal, setShowAddDeal] = useState(false)
   const [newDeal, setNewDeal] = useState({ companyName: '', dealValue: '', stage: 'lead' as PipelineDeal['stage'] })
 
-  const storeDrivers = drivers.filter((d) => d.businessId === 'agency')
+  const storeDrivers = drivers.filter((d) => d.businessId === agencyBiz?.id)
   const displayDrivers = storeDrivers.length > 0 ? storeDrivers : null
 
   const handleAddDeal = () => {
@@ -67,15 +70,19 @@ export default function AgencyPage() {
     toast.success(`Deal "${newDeal.companyName}" added to pipeline`)
   }
 
+  if (!agencyBiz) return (
+    <PageTransition><div className="p-4 md:p-7 max-w-[960px] mx-auto"><p className="text-[var(--text-dim)]">No agency business found. Add businesses in Settings or re-run onboarding.</p></div></PageTransition>
+  )
+
   return (
     <PageTransition>
       <div className="p-4 md:p-7 max-w-[960px] mx-auto">
         {/* Header */}
         <div className="flex items-center justify-between mb-6">
           <div className="flex items-center gap-3">
-            <h1 className="text-[22px] font-bold tracking-tight text-[var(--text)]">{biz.name.toUpperCase()}</h1>
+            <h1 className="text-[22px] font-bold tracking-tight text-[var(--text)]">{agencyBiz.name.toUpperCase()}</h1>
             <span className="text-[10px] font-mono uppercase tracking-[2px] text-[var(--text-dim)] px-2.5 py-0.5 rounded-full bg-[var(--accent)]/15">
-              {biz.statusLabel}
+              {STATUS_LABELS[agencyBiz.status] || agencyBiz.status}
             </span>
           </div>
           <motion.div whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }}>
@@ -151,7 +158,7 @@ export default function AgencyPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {CLIENTS.map((c) => (
+                  {agencyClients.map((c) => (
                     <tr key={c.name} className="border-t border-[var(--border)]">
                       <td className="py-2 pr-3 text-[14px] text-[var(--text-mid)] font-medium flex items-center gap-2">
                         {c.name}
@@ -161,12 +168,12 @@ export default function AgencyPage() {
                           </span>
                         )}
                       </td>
-                      <td className="py-2 pr-3 data text-[14px]">${c.gross.toLocaleString()}</td>
+                      <td className="py-2 pr-3 data text-[14px]">${c.grossMonthly.toLocaleString()}</td>
                       <td className="py-2 pr-3 text-[14px] text-[var(--text-mid)]">${c.adSpend.toLocaleString()}</td>
-                      <td className="py-2 pr-3 text-[14px] text-[var(--text-mid)]">${c.stripe}</td>
-                      <td className="py-2 pr-3 data text-[14px] text-[var(--accent)]">${c.net.toLocaleString()}</td>
-                      <td className="py-2 pr-3 text-[14px] text-[var(--text-mid)]">{c.service}</td>
-                      <td className="py-2 text-[14px] text-[var(--text-mid)]">{c.meeting}</td>
+                      <td className="py-2 pr-3 text-[14px] text-[var(--text-mid)]">${Math.round(c.grossMonthly * 0.03)}</td>
+                      <td className="py-2 pr-3 data text-[14px] text-[var(--accent)]">${getClientNet(c).toLocaleString()}</td>
+                      <td className="py-2 pr-3 text-[14px] text-[var(--text-mid)]">{c.serviceType}</td>
+                      <td className="py-2 text-[14px] text-[var(--text-mid)]">{c.meetingFrequency}</td>
                     </tr>
                   ))}
                 </tbody>

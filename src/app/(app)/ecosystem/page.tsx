@@ -4,7 +4,6 @@ import { useState } from 'react'
 import { motion } from 'framer-motion'
 import { toast } from 'sonner'
 import { useStore } from '@/stores/store'
-import { BUSINESSES } from '@/lib/constants'
 import PageTransition from '@/components/PageTransition'
 import { StaggerContainer, StaggerItem } from '@/components/Stagger'
 
@@ -38,6 +37,7 @@ const NODE_POSITIONS: Record<string, { x: number; y: number }> = {
 }
 
 export default function EcosystemPage() {
+  const { businesses } = useStore()
   const [selected, setSelected] = useState<Connection | null>(null)
 
   const activeCount = CONNECTIONS.filter((c) => c.active).length
@@ -97,7 +97,7 @@ export default function EcosystemPage() {
                 )
               })}
               {/* Nodes */}
-              {BUSINESSES.map((biz) => {
+              {businesses.map((biz) => {
                 const pos = NODE_POSITIONS[biz.id]
                 if (!pos) return null
                 const cx = pos.x * 4
@@ -137,7 +137,7 @@ export default function EcosystemPage() {
               </motion.button>
             </div>
             <p className="text-sm font-semibold text-[var(--text)]">
-              {BUSINESSES.find((b) => b.id === selected.from)?.name} &rarr; {BUSINESSES.find((b) => b.id === selected.to)?.name}
+              {businesses.find((b) => b.id === selected.from)?.name} &rarr; {businesses.find((b) => b.id === selected.to)?.name}
             </p>
             <p className="text-xs text-[var(--text-dim)] mt-1">{selected.label}</p>
             {selected.recommendation && (
@@ -152,8 +152,8 @@ export default function EcosystemPage() {
             <span className="label text-[10px] tracking-widest text-[var(--text-dim)]">ALL CONNECTIONS</span>
             <div className="mt-3 space-y-2">
               {CONNECTIONS.map((conn, i) => {
-                const fromBiz = BUSINESSES.find((b) => b.id === conn.from)
-                const toBiz = BUSINESSES.find((b) => b.id === conn.to)
+                const fromBiz = businesses.find((b) => b.id === conn.from)
+                const toBiz = businesses.find((b) => b.id === conn.to)
                 return (
                   <motion.div
                     key={i}

@@ -3,11 +3,11 @@
 import { motion } from 'framer-motion'
 import { toast } from 'sonner'
 import Link from 'next/link'
-import { BUSINESSES } from '@/lib/constants'
+import { useStore } from '@/stores/store'
 import PageTransition from '@/components/PageTransition'
 import { StaggerContainer, StaggerItem } from '@/components/Stagger'
 
-const biz = BUSINESSES.find((b) => b.id === 'madison')!
+const STATUS_LABELS: Record<string, string> = { active_healthy: 'Active', active_slow: 'Slow', active_prerevenue: 'Pre-Revenue', dormant: 'Dormant', backburner: 'Backburner', idea: 'Idea' }
 
 const MONETIZATION = [
   { channel: 'Brand Deals', status: 'Not started', statusColor: 'bg-[var(--text-dim)]/15 text-[var(--text-dim)]' },
@@ -29,6 +29,13 @@ const CONTENT_IDEAS = [
 const DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
 
 export default function MadisonClarkPage() {
+  const { businesses } = useStore()
+  const biz = businesses.find(b => b.type === 'content' || b.name.toLowerCase().includes('madison'))
+
+  if (!biz) return (
+    <PageTransition><div className="p-4 md:p-7 max-w-[960px] mx-auto"><p className="text-[var(--text-dim)]">No Madison Clark business found. Add businesses in Settings or re-run onboarding.</p></div></PageTransition>
+  )
+
   return (
     <PageTransition>
       <div className="p-4 md:p-7 max-w-[960px] mx-auto">
@@ -37,7 +44,7 @@ export default function MadisonClarkPage() {
           <div className="flex items-center gap-3">
             <h1 className="text-[22px] font-bold tracking-tight text-[var(--text)]">{biz.name.toUpperCase()}</h1>
             <span className="text-[10px] font-mono uppercase tracking-[2px] text-purple-500 px-2.5 py-0.5 rounded-full bg-purple-500/15">
-              {biz.statusLabel}
+              {STATUS_LABELS[biz.status] || biz.status}
             </span>
           </div>
           <motion.div whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }}>

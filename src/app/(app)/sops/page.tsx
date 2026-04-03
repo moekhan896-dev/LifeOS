@@ -4,7 +4,6 @@ import { useState } from 'react'
 import { motion } from 'framer-motion'
 import { toast } from 'sonner'
 import { useStore, type SOP } from '@/stores/store'
-import { BUSINESSES } from '@/lib/constants'
 import PageTransition from '@/components/PageTransition'
 import { StaggerContainer, StaggerItem } from '@/components/Stagger'
 
@@ -15,7 +14,7 @@ const STATUS_STYLES: Record<string, { bg: string; label: string }> = {
 }
 
 export default function SopsPage() {
-  const { sops, addSop, updateSop } = useStore()
+  const { sops, businesses, addSop, updateSop } = useStore()
   const [newTitle, setNewTitle] = useState('')
   const [newBiz, setNewBiz] = useState('agency')
   const [expandedId, setExpandedId] = useState<string | null>(null)
@@ -67,7 +66,7 @@ export default function SopsPage() {
                 onChange={(e) => setNewBiz(e.target.value)}
                 className="rounded-lg border border-[var(--border)] bg-[var(--bg)] px-2 py-2 text-xs text-[var(--text)] outline-none"
               >
-                {BUSINESSES.map((b) => (
+                {businesses.map((b) => (
                   <option key={b.id} value={b.id}>{b.name}</option>
                 ))}
               </select>
@@ -95,7 +94,7 @@ export default function SopsPage() {
         <div className="space-y-2">
           {sops.map((sop) => {
             const expanded = expandedId === sop.id
-            const biz = BUSINESSES.find((b) => b.id === sop.businessId)
+            const biz = businesses.find((b) => b.id === sop.businessId)
             const st = STATUS_STYLES[sop.status]
             return (
               <StaggerItem key={sop.id}>

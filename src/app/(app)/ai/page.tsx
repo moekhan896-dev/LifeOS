@@ -48,22 +48,22 @@ function renderMarkdown(text: string) {
 }
 
 function buildContextSnapshot(state: ReturnType<typeof useStore.getState>) {
-  const snap = state.financialSnapshots[state.financialSnapshots.length - 1]
   const activeCommitments = state.commitments.filter(c => !c.fulfilled)
   const recentTasks = state.tasks.slice(-10)
   const activeStreaks = state.streaks
 
+  // Compute financials from businesses, clients, revenue/expense entries
+  const totalRevenue = state.revenueEntries.reduce((s, r) => s + r.amount, 0)
+  const totalExpenses = state.expenseEntries.reduce((s, e) => s + e.amount, 0)
+  const bizSummary = state.businesses.map(b => `${b.name}: $${b.monthlyRevenue.toLocaleString()}/mo`).join(', ')
+
   return `=== ART OS - BUSINESS CONTEXT SNAPSHOT ===
 Date: ${new Date().toLocaleDateString()}
 
---- FINANCIALS (Latest Month) ---
-Agency Gross: $${snap?.agencyGross?.toLocaleString() ?? 'N/A'}
-Agency Net: $${snap?.agencyNet?.toLocaleString() ?? 'N/A'}
-Plumbing Revenue: $${snap?.plumbingRevenue?.toLocaleString() ?? 'N/A'}
-Plumbing Cut (40%): $${snap?.plumbingCut?.toLocaleString() ?? 'N/A'}
-Airbnb Net: $${snap?.airbnbNet?.toLocaleString() ?? 'N/A'}
-Total Take-Home: $${snap?.totalTakeHome?.toLocaleString() ?? 'N/A'}
-Total Expenses: $${snap?.totalExpenses?.toLocaleString() ?? 'N/A'}
+--- FINANCIALS (Computed) ---
+Businesses: ${bizSummary || 'N/A'}
+Total Logged Revenue: $${totalRevenue.toLocaleString()}
+Total Logged Expenses: $${totalExpenses.toLocaleString()}
 
 --- BUSINESS UNITS ---
 1. Arbaaz Digital (Agency): $26K gross, $15.3K net, 6 clients, AWS = 69% of revenue
@@ -104,7 +104,7 @@ function AIPageInner() {
 
   const {
     aiMessages, addAiMessage, clearAiMessages,
-    tasks, commitments, streaks, financialSnapshots, pipeline, sprints, level, xp
+    businesses, clients, tasks, commitments, streaks, pipeline, sprints, level, xp
   } = useStore()
 
   const [input, setInput] = useState('')
@@ -190,7 +190,6 @@ function AIPageInner() {
     setTimeout(() => setCopied(false), 2000)
   }
 
-  const snap = financialSnapshots[financialSnapshots.length - 1]
   const activeCommitments = commitments.filter(c => !c.fulfilled)
   const recentTasks = tasks.slice(-5)
   const noMessages = aiMessages.length === 0

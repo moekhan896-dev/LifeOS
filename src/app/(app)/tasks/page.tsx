@@ -2,7 +2,7 @@
 
 import { useState, useMemo, useRef, useEffect } from 'react'
 import { useStore, type Task, type Priority } from '@/stores/store'
-import { BUSINESSES, TAGS, XP_VALUES, PRIORITY_COLORS } from '@/lib/constants'
+import { TAGS, XP_VALUES, PRIORITY_COLORS } from '@/lib/constants'
 import TaskItem from '@/components/TaskItem'
 import PageTransition from '@/components/PageTransition'
 import { StaggerContainer, StaggerItem } from '@/components/Stagger'
@@ -97,7 +97,7 @@ function SortableTask({ task }: { task: Task }) {
 }
 
 export default function TasksPage() {
-  const { tasks, addTask, toggleTask, deleteTask } = useStore()
+  const { tasks, businesses, addTask, toggleTask, deleteTask } = useStore()
   const [search, setSearch] = useState('')
   const [filterBusiness, setFilterBusiness] = useState<string>('all')
   const [filterPriority, setFilterPriority] = useState<string>('all')
@@ -106,7 +106,7 @@ export default function TasksPage() {
   const [inlineInputs, setInlineInputs] = useState<Record<string, string>>({})
   const [showQuickAdd, setShowQuickAdd] = useState(false)
   const [quickText, setQuickText] = useState('')
-  const [quickBusiness, setQuickBusiness] = useState<string>(BUSINESSES[0].id)
+  const [quickBusiness, setQuickBusiness] = useState<string>(businesses[0]?.id ?? '')
   const quickRef = useRef<HTMLInputElement>(null)
 
   const sensors = useSensors(
@@ -132,13 +132,13 @@ export default function TasksPage() {
 
   const grouped = useMemo(() => {
     const map: Record<string, Task[]> = {}
-    for (const b of BUSINESSES) map[b.id] = []
+    for (const b of businesses) map[b.id] = []
     for (const t of filtered) {
       if (!map[t.businessId]) map[t.businessId] = []
       map[t.businessId].push(t)
     }
     return map
-  }, [filtered])
+  }, [filtered, businesses])
 
   const totalTasks = tasks.length
   const doneTasks = tasks.filter((t) => t.done).length
@@ -236,7 +236,7 @@ export default function TasksPage() {
               />
               <div className="h-4 w-px bg-[var(--border)]" />
 
-              {[{ id: 'all', name: 'All' }, ...BUSINESSES].map((b) => (
+              {[{ id: 'all', name: 'All' }, ...businesses].map((b) => (
                 <button
                   key={b.id}
                   onClick={() => setFilterBusiness(b.id)}
@@ -280,7 +280,7 @@ export default function TasksPage() {
 
         {/* Grouped tasks */}
         <div className="space-y-3">
-          {BUSINESSES.map((biz) => {
+          {businesses.map((biz) => {
             const bizTasks = grouped[biz.id] || []
             if (filterBusiness !== 'all' && filterBusiness !== biz.id) return null
             const isCollapsed = collapsed[biz.id]
@@ -401,7 +401,7 @@ export default function TasksPage() {
                   onChange={(e) => setQuickBusiness(e.target.value)}
                   className="w-full bg-[var(--surface2)] border border-[var(--border)] rounded-lg px-3 py-2 text-xs text-[var(--text)] outline-none"
                 >
-                  {BUSINESSES.map((b) => (
+                  {businesses.map((b) => (
                     <option key={b.id} value={b.id}>{b.name}</option>
                   ))}
                 </select>

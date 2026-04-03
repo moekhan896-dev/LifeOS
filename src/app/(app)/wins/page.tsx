@@ -4,7 +4,6 @@ import { useState } from 'react'
 import { motion } from 'framer-motion'
 import { toast } from 'sonner'
 import { useStore } from '@/stores/store'
-import { BUSINESSES } from '@/lib/constants'
 import PageTransition from '@/components/PageTransition'
 import { StaggerContainer, StaggerItem } from '@/components/Stagger'
 
@@ -15,7 +14,7 @@ function fmt(n: number) {
 }
 
 export default function WinsPage() {
-  const { wins, addWin } = useStore()
+  const { wins, businesses, addWin } = useStore()
   const [title, setTitle] = useState('')
   const [dollarValue, setDollarValue] = useState('')
   const [businessId, setBusinessId] = useState('agency')
@@ -100,7 +99,7 @@ export default function WinsPage() {
                   onChange={(e) => setBusinessId(e.target.value)}
                   className="rounded-lg border border-[var(--border)] bg-[var(--bg)] px-2 py-2 text-xs text-[var(--text)] outline-none"
                 >
-                  {BUSINESSES.map((b) => (
+                  {businesses.map((b) => (
                     <option key={b.id} value={b.id}>{b.name}</option>
                   ))}
                 </select>
@@ -129,7 +128,7 @@ export default function WinsPage() {
         {/* Wins list */}
         <div className="space-y-2">
           {sortedWins.map((win) => {
-            const biz = BUSINESSES.find((b) => b.id === win.businessId)
+            const biz = businesses.find((b) => b.id === win.businessId)
             return (
               <StaggerItem key={win.id}>
                 <motion.div

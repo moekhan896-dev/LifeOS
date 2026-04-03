@@ -5,8 +5,7 @@ import Link from 'next/link'
 import { motion } from 'framer-motion'
 import { toast } from 'sonner'
 import { AreaChart, Area, ResponsiveContainer, Tooltip, XAxis, BarChart, Bar, PieChart, Pie, Cell } from 'recharts'
-import { useStore } from '@/stores/store'
-import { CLIENTS, GMB_PROFILES } from '@/lib/constants'
+import { useStore, getClientNet, getAgencyTotals, getDailyScore } from '@/stores/store'
 import PageTransition from '@/components/PageTransition'
 
 /* ── Constants ── */
@@ -74,19 +73,10 @@ function formatDate() {
   return new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })
 }
 
-function daysUntilTarget() {
-  const target = new Date('2026-10-01')
-  return Math.max(0, Math.ceil((target.getTime() - new Date().getTime()) / 86400000))
-}
-
 const sparkData = (base: number, variance: number) =>
   Array.from({ length: 7 }, (_, i) => ({ v: base + Math.sin(i * 1.2) * variance + i * variance * 0.1 }))
 
-const revenueData = Array.from({ length: 30 }, (_, i) => ({
-  day: `D${i + 1}`,
-  agency: 400 + Math.sin(i * 0.5) * 150 + i * 5,
-  plumbing: 300 + Math.cos(i * 0.7) * 100 + i * 8,
-}))
+const flatSparkData = () => Array.from({ length: 7 }, () => ({ v: 0 }))
 
 /* ── Animation helpers ── */
 
@@ -135,7 +125,11 @@ function ProgressRing({ value, max, size, color }: { value: number; max: number;
 /* ── Main ── */
 
 export default function DashboardPage() {
-  const { tasks, insights, todayHealth, streaks, addTask, toggleTask, togglePrayer } = useStore()
+  const {
+    businesses, clients, tasks, insights, todayHealth, streaks, gmbProfiles,
+    addTask, toggleTask, togglePrayer, incomeTarget, targetDate, revenueEntries, expenseEntries,
+    userName,
+  } = useStore()
   const [newTaskText, setNewTaskText] = useState('')
   const [chartRange, setChartRange] = useState<'week' | 'month'>('month')
 
@@ -150,21 +144,43 @@ export default function DashboardPage() {
   const incompleteTasks = [...tasks].filter(t => !t.done).sort((a, b) => priorityOrder[a.priority] - priorityOrder[b.priority])
   const theOneThing = incompleteTasks[0]
 
-  const clientTotals = CLIENTS.reduce((acc, c) => ({
-    gross: acc.gross + c.gross, adSpend: acc.adSpend + c.adSpend, stripe: acc.stripe + c.stripe, net: acc.net + c.net,
-  }), { gross: 0, adSpend: 0, stripe: 0, net: 0 })
+  // ── Real data from store ──
+  const agencyTotals = getAgencyTotals(clients)
+  const plumbingBiz = businesses.find(b => b.name.toLowerCase().includes('plumb'))
+  const plumbingRevenue = plumbingBiz?.monthlyRevenue || 0
+  const airbnbBiz = businesses.find(b => b.name.toLowerCase().includes('airbnb'))
+  const airbnbRevenue = airbnbBiz?.monthlyRevenue || 0
+  const totalExpenses = expenseEntries.filter(e => e.recurring).reduce((s, e) => s + e.amount, 0)
+  const netTakeHome = agencyTotals.net + plumbingRevenue + airbnbRevenue - totalExpenses
+  const maxClientNet = clients.length > 0 ? Math.max(...clients.filter(c => c.active).map(c => getClientNet(c))) : 0
+  const totalGmbCalls = gmbProfiles.reduce((s, g) => s + g.callsPerMonth, 0)
+  const dailyScore = getDailyScore(todayHealth, tasksDoneToday)
 
-  const maxClientNet = Math.max(...CLIENTS.map(c => c.net))
-  const coiTotal = COST_OF_INACTION.reduce((s, c) => s + c.amount, 0)
-  const totalGmbCalls = GMB_PROFILES.reduce((s, g) => s + g.calls, 0)
-
-  const prayerScore = (prayersDone / 5) * 35
-  const healthScore = (todayHealth.gym ? 15 : 0) + (todayHealth.energyDrinks === 0 ? 10 : 0)
-  const productivityScore = Math.min(40, tasksDoneToday * 8)
-  const dailyScore = Math.round(prayerScore + healthScore + productivityScore)
-
+  // ── Income target ──
+  function daysUntilTarget() {
+    if (!targetDate) return 0
+    return Math.max(0, Math.ceil((new Date(targetDate).getTime() - new Date().getTime()) / 86400000))
+  }
   const remaining = daysUntilTarget()
-  const progressPercent = (15000 / 50000) * 100
+  const currentIncome = agencyTotals.net + plumbingRevenue + airbnbRevenue
+  const progressPercent = incomeTarget > 0 ? Math.min(100, (currentIncome / incomeTarget) * 100) : 0
+
+  // ── Revenue chart data from revenueEntries ──
+  const hasRevenueData = revenueEntries.length > 0
+  const revenueData = hasRevenueData
+    ? (() => {
+        const last30 = Array.from({ length: 30 }, (_, i) => {
+          const d = new Date(); d.setDate(d.getDate() - 29 + i)
+          const ds = d.toISOString().split('T')[0]
+          const agencyRev = revenueEntries.filter(r => r.date === ds && clients.some(c => c.businessId === r.businessId)).reduce((s, r) => s + r.amount, 0)
+          const plumbRev = revenueEntries.filter(r => r.date === ds && r.businessId === plumbingBiz?.id).reduce((s, r) => s + r.amount, 0)
+          return { day: `D${i + 1}`, agency: agencyRev, plumbing: plumbRev }
+        })
+        return last30
+      })()
+    : Array.from({ length: 30 }, (_, i) => ({ day: `D${i + 1}`, agency: 0, plumbing: 0 }))
+
+  const coiTotal = COST_OF_INACTION.reduce((s, c) => s + c.amount, 0)
 
   const activeInsights = insights
     .filter(i => !i.snoozedUntil || new Date(i.snoozedUntil) < new Date())
@@ -192,7 +208,7 @@ export default function DashboardPage() {
           <div className="flex items-center justify-between">
             <div>
               <h1 style={{ fontSize: 28, fontWeight: 600 }} className="text-[var(--text)]">
-                {getGreeting()}, Art
+                {getGreeting()}, {userName || 'Art'}
               </h1>
               <p className="text-[12px] text-[var(--text-mid)] italic mt-0.5">{motiveLine}</p>
             </div>
@@ -226,7 +242,10 @@ export default function DashboardPage() {
               ) : (
                 <div>
                   <p className="text-[20px] font-semibold text-[var(--text)] mt-3">Your plate is clear.</p>
-                  <Link href="/ai" className="inline-block mt-2 text-[12px] text-[var(--accent)] hover:underline">Ask AI what to focus on &rarr;</Link>
+                  <div className="flex items-center justify-center gap-3 mt-2">
+                    <Link href="/ai" className="text-[12px] text-[var(--accent)] hover:underline">Ask AI what to focus on &rarr;</Link>
+                    <Link href="/tasks" className="text-[12px] text-[var(--text-mid)] hover:underline">Add a task &rarr;</Link>
+                  </div>
                 </div>
               )}
             </div>
@@ -234,9 +253,33 @@ export default function DashboardPage() {
 
           {/* ── 3. FOUR METRIC CARDS ── */}
           {([
-            { label: 'NET TAKE-HOME', value: '$15,268', sub: 'March 2026', color: 'var(--accent)', emoji: '💰', data: sparkData(15000, 800) },
-            { label: 'AGENCY MRR', value: '$15,269', sub: '6 clients active', color: 'var(--cyan)', emoji: '⬡', data: sparkData(15000, 600) },
-            { label: 'PLUMBING REV', value: '~$18K', sub: '9 GMB profiles', color: 'var(--amber)', emoji: '🔧', data: sparkData(18000, 2000) },
+            {
+              label: 'NET TAKE-HOME',
+              value: `$${netTakeHome > 0 ? Math.round(netTakeHome).toLocaleString() : '0'}`,
+              sub: new Date().toLocaleDateString('en-US', { month: 'long', year: 'numeric' }),
+              color: 'var(--accent)',
+              emoji: '💰',
+              data: revenueEntries.length > 0 ? sparkData(netTakeHome, netTakeHome * 0.05) : flatSparkData(),
+              hasData: netTakeHome > 0,
+            },
+            {
+              label: 'AGENCY MRR',
+              value: `$${agencyTotals.net > 0 ? Math.round(agencyTotals.net).toLocaleString() : '0'}`,
+              sub: `${agencyTotals.count} client${agencyTotals.count !== 1 ? 's' : ''} active`,
+              color: 'var(--cyan)',
+              emoji: '⬡',
+              data: clients.length > 0 ? sparkData(agencyTotals.net, agencyTotals.net * 0.04) : flatSparkData(),
+              hasData: clients.length > 0,
+            },
+            {
+              label: 'PLUMBING REV',
+              value: plumbingRevenue > 0 ? `$${(plumbingRevenue / 1000).toFixed(0)}K` : '$0',
+              sub: `${gmbProfiles.length} GMB profile${gmbProfiles.length !== 1 ? 's' : ''}`,
+              color: 'var(--amber)',
+              emoji: '🔧',
+              data: plumbingRevenue > 0 ? sparkData(plumbingRevenue, plumbingRevenue * 0.1) : flatSparkData(),
+              hasData: plumbingRevenue > 0,
+            },
           ] as const).map((m, i) => (
             <motion.div
               key={m.label}
@@ -252,17 +295,23 @@ export default function DashboardPage() {
               <div className="data mt-2" style={{ fontSize: 36, fontWeight: 700, color: m.color }}>{m.value}</div>
               <p className="text-[12px] text-[var(--text-mid)]">{m.sub}</p>
               <div className="mt-2">
-                <ResponsiveContainer width={120} height={40}>
-                  <AreaChart data={m.data}>
-                    <defs>
-                      <linearGradient id={`spark-${i}`} x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="0%" stopColor={m.color} stopOpacity={0.4} />
-                        <stop offset="100%" stopColor={m.color} stopOpacity={0} />
-                      </linearGradient>
-                    </defs>
-                    <Area type="monotone" dataKey="v" stroke={m.color} strokeWidth={1.5} fill={`url(#spark-${i})`} />
-                  </AreaChart>
-                </ResponsiveContainer>
+                {m.hasData ? (
+                  <ResponsiveContainer width={120} height={40}>
+                    <AreaChart data={m.data}>
+                      <defs>
+                        <linearGradient id={`spark-${i}`} x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="0%" stopColor={m.color} stopOpacity={0.4} />
+                          <stop offset="100%" stopColor={m.color} stopOpacity={0} />
+                        </linearGradient>
+                      </defs>
+                      <Area type="monotone" dataKey="v" stroke={m.color} strokeWidth={1.5} fill={`url(#spark-${i})`} />
+                    </AreaChart>
+                  </ResponsiveContainer>
+                ) : (
+                  <div className="h-[40px] flex items-center">
+                    <span className="text-[10px] text-[var(--text-dim)] italic">Start tracking</span>
+                  </div>
+                )}
               </div>
             </motion.div>
           ))}
@@ -297,24 +346,33 @@ export default function DashboardPage() {
                 ))}
               </div>
             </div>
-            <ResponsiveContainer width="100%" height={220}>
-              <AreaChart data={chartData}>
-                <defs>
-                  <linearGradient id="agencyGrad" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor="var(--cyan)" stopOpacity={0.3} />
-                    <stop offset="100%" stopColor="var(--cyan)" stopOpacity={0} />
-                  </linearGradient>
-                  <linearGradient id="plumbingGrad" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor="var(--amber)" stopOpacity={0.3} />
-                    <stop offset="100%" stopColor="var(--amber)" stopOpacity={0} />
-                  </linearGradient>
-                </defs>
-                <XAxis dataKey="day" tick={{ fill: 'var(--text-dim)', fontSize: 10 }} axisLine={false} tickLine={false} />
-                <Tooltip content={<ChartTooltip />} />
-                <Area type="monotone" dataKey="agency" stroke="var(--cyan)" strokeWidth={2} fill="url(#agencyGrad)" />
-                <Area type="monotone" dataKey="plumbing" stroke="var(--amber)" strokeWidth={2} fill="url(#plumbingGrad)" />
-              </AreaChart>
-            </ResponsiveContainer>
+            {hasRevenueData ? (
+              <ResponsiveContainer width="100%" height={220}>
+                <AreaChart data={chartData}>
+                  <defs>
+                    <linearGradient id="agencyGrad" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stopColor="var(--cyan)" stopOpacity={0.3} />
+                      <stop offset="100%" stopColor="var(--cyan)" stopOpacity={0} />
+                    </linearGradient>
+                    <linearGradient id="plumbingGrad" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stopColor="var(--amber)" stopOpacity={0.3} />
+                      <stop offset="100%" stopColor="var(--amber)" stopOpacity={0} />
+                    </linearGradient>
+                  </defs>
+                  <XAxis dataKey="day" tick={{ fill: 'var(--text-dim)', fontSize: 10 }} axisLine={false} tickLine={false} />
+                  <Tooltip content={<ChartTooltip />} />
+                  <Area type="monotone" dataKey="agency" stroke="var(--cyan)" strokeWidth={2} fill="url(#agencyGrad)" />
+                  <Area type="monotone" dataKey="plumbing" stroke="var(--amber)" strokeWidth={2} fill="url(#plumbingGrad)" />
+                </AreaChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="flex items-center justify-center h-[220px]">
+                <div className="text-center">
+                  <p className="text-[12px] text-[var(--text-dim)]">No revenue entries yet.</p>
+                  <Link href="/financials" className="text-[11px] text-[var(--accent)] hover:underline mt-1 inline-block">Start tracking on Financials &rarr;</Link>
+                </div>
+              </div>
+            )}
           </motion.div>
 
           {/* ── 5. PRAYER TRACKER ── */}
@@ -410,8 +468,10 @@ export default function DashboardPage() {
 
           {/* ── 8. DAYS REMAINING ── */}
           <motion.div className="card rounded-[16px] p-5" style={{ gridColumn: 'span 4' }} {...cardAnim(0.32)}>
-            <div className="gradient-text data" style={{ fontSize: 48, fontWeight: 700 }}>{remaining}</div>
-            <p className="text-[14px] text-[var(--text-mid)]">days to $50K/mo</p>
+            <div className="gradient-text data" style={{ fontSize: 48, fontWeight: 700 }}>{remaining || '—'}</div>
+            <p className="text-[14px] text-[var(--text-mid)]">
+              {targetDate ? `days to $${(incomeTarget / 1000).toFixed(0)}K/mo` : 'Set a target date in Settings'}
+            </p>
             <div className="mt-4">
               <div className="w-full h-2 rounded-full bg-[var(--surface2)] overflow-hidden">
                 <motion.div
@@ -423,8 +483,8 @@ export default function DashboardPage() {
                 />
               </div>
               <div className="flex justify-between mt-1">
-                <span className="data text-[10px] text-[var(--text-dim)]">$15K</span>
-                <span className="data text-[10px] text-[var(--text-dim)]">$50K</span>
+                <span className="data text-[10px] text-[var(--text-dim)]">${currentIncome > 0 ? `${(currentIncome / 1000).toFixed(0)}K` : '0'}</span>
+                <span className="data text-[10px] text-[var(--text-dim)]">${(incomeTarget / 1000).toFixed(0)}K</span>
               </div>
             </div>
           </motion.div>
@@ -453,8 +513,11 @@ export default function DashboardPage() {
                 </motion.div>
               )) : (
                 <div className="text-center py-6">
-                  <p className="text-[12px] text-[var(--text-dim)]">Your plate is clear.</p>
-                  <Link href="/ai" className="text-[11px] text-[var(--accent)] hover:underline mt-1 inline-block">Ask AI &rarr;</Link>
+                  <p className="text-[12px] text-[var(--text-dim)]">Your plate is clear. Add a task or ask the AI.</p>
+                  <div className="flex items-center justify-center gap-3 mt-2">
+                    <Link href="/tasks" className="text-[11px] text-[var(--accent)] hover:underline">Tasks &rarr;</Link>
+                    <Link href="/ai" className="text-[11px] text-[var(--accent)] hover:underline">Ask AI &rarr;</Link>
+                  </div>
                 </div>
               )}
             </div>
@@ -471,45 +534,54 @@ export default function DashboardPage() {
             <div className="flex items-center justify-between mb-3">
               <span className="label text-[10px] uppercase tracking-wider text-[var(--text-dim)]">CLIENT REVENUE</span>
               <span className="data text-[11px] font-semibold px-2 py-0.5 rounded-full" style={{ background: 'color-mix(in srgb, var(--accent) 15%, transparent)', color: 'var(--accent)' }}>
-                ${clientTotals.net.toLocaleString()}/mo
+                ${Math.round(agencyTotals.net).toLocaleString()}/mo
               </span>
             </div>
-            <table className="w-full text-[12px]">
-              <thead>
-                <tr className="border-b border-[var(--border)]">
-                  {['Client', 'Gross', 'Ad Spend', 'Net'].map(h => (
-                    <th key={h} className="label text-[10px] text-[var(--text-dim)] text-left px-2 py-1.5 font-medium">{h}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {CLIENTS.map((c, i) => (
-                  <motion.tr key={c.name} className="border-b border-[var(--border)] last:border-0 cursor-default"
-                    whileHover={{ backgroundColor: 'var(--surface2)' }}
-                  >
-                    <td className="px-2 py-1.5 text-[var(--text)] font-medium">
-                      <span className="inline-block w-2 h-2 rounded-full mr-2" style={{
-                        backgroundColor: i === 0 ? 'var(--rose)' : i < 3 ? 'var(--accent)' : 'var(--text-dim)',
-                      }} />
-                      {c.name}
-                      {i === 0 && <span className="ml-1.5 text-[9px] font-bold px-1.5 py-0.5 rounded bg-[var(--rose)]/15 text-[var(--rose)]">69% RISK</span>}
-                    </td>
-                    <td className="data px-2 py-1.5 text-[var(--text-mid)]">${c.gross.toLocaleString()}</td>
-                    <td className="data px-2 py-1.5 text-[var(--text-mid)]">{c.adSpend > 0 ? `$${c.adSpend.toLocaleString()}` : '—'}</td>
-                    <td className="data px-2 py-1.5 text-[var(--accent)] font-semibold relative">
-                      <div className="absolute inset-0 rounded-r-[4px] opacity-10" style={{ width: `${(c.net / maxClientNet) * 100}%`, background: 'var(--accent)' }} />
-                      <span className="relative">${c.net.toLocaleString()}</span>
-                    </td>
-                  </motion.tr>
-                ))}
-                <tr className="bg-[var(--surface2)]">
-                  <td className="px-2 py-1.5 font-bold text-[var(--text)]">TOTAL</td>
-                  <td className="data px-2 py-1.5 font-bold text-[var(--text)]">${clientTotals.gross.toLocaleString()}</td>
-                  <td className="data px-2 py-1.5 font-bold text-[var(--text)]">${clientTotals.adSpend.toLocaleString()}</td>
-                  <td className="data px-2 py-1.5 font-bold text-[var(--accent)]">${clientTotals.net.toLocaleString()}</td>
-                </tr>
-              </tbody>
-            </table>
+            {clients.filter(c => c.active).length > 0 ? (
+              <table className="w-full text-[12px]">
+                <thead>
+                  <tr className="border-b border-[var(--border)]">
+                    {['Client', 'Gross', 'Ad Spend', 'Net'].map(h => (
+                      <th key={h} className="label text-[10px] text-[var(--text-dim)] text-left px-2 py-1.5 font-medium">{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {clients.filter(c => c.active).map((c, i) => {
+                    const net = getClientNet(c)
+                    return (
+                      <motion.tr key={c.id} className="border-b border-[var(--border)] last:border-0 cursor-default"
+                        whileHover={{ backgroundColor: 'var(--surface2)' }}
+                      >
+                        <td className="px-2 py-1.5 text-[var(--text)] font-medium">
+                          <span className="inline-block w-2 h-2 rounded-full mr-2" style={{
+                            backgroundColor: i === 0 ? 'var(--accent)' : 'var(--text-dim)',
+                          }} />
+                          {c.name}
+                        </td>
+                        <td className="data px-2 py-1.5 text-[var(--text-mid)]">${c.grossMonthly.toLocaleString()}</td>
+                        <td className="data px-2 py-1.5 text-[var(--text-mid)]">{c.adSpend > 0 ? `$${c.adSpend.toLocaleString()}` : '—'}</td>
+                        <td className="data px-2 py-1.5 text-[var(--accent)] font-semibold relative">
+                          <div className="absolute inset-0 rounded-r-[4px] opacity-10" style={{ width: `${maxClientNet > 0 ? (net / maxClientNet) * 100 : 0}%`, background: 'var(--accent)' }} />
+                          <span className="relative">${Math.round(net).toLocaleString()}</span>
+                        </td>
+                      </motion.tr>
+                    )
+                  })}
+                  <tr className="bg-[var(--surface2)]">
+                    <td className="px-2 py-1.5 font-bold text-[var(--text)]">TOTAL</td>
+                    <td className="data px-2 py-1.5 font-bold text-[var(--text)]">${Math.round(agencyTotals.gross).toLocaleString()}</td>
+                    <td className="data px-2 py-1.5 font-bold text-[var(--text)]">${Math.round(agencyTotals.adSpend).toLocaleString()}</td>
+                    <td className="data px-2 py-1.5 font-bold text-[var(--accent)]">${Math.round(agencyTotals.net).toLocaleString()}</td>
+                  </tr>
+                </tbody>
+              </table>
+            ) : (
+              <div className="text-center py-8">
+                <p className="text-[12px] text-[var(--text-dim)]">No clients yet. Add them on the Agency page.</p>
+                <Link href="/business/agency" className="text-[11px] text-[var(--accent)] hover:underline mt-1 inline-block">Go to Agency &rarr;</Link>
+              </div>
+            )}
           </motion.div>
 
           {/* ── 11. PLUMBING GMB GRID ── */}
@@ -520,21 +592,28 @@ export default function DashboardPage() {
                 {totalGmbCalls} calls/mo
               </span>
             </div>
-            <div className="grid grid-cols-3 gap-2">
-              {GMB_PROFILES.map(g => (
-                <motion.div key={g.city} className="bg-[var(--surface2)] rounded-[12px] p-3 relative overflow-hidden"
-                  whileHover={{ y: -2, scale: 1.02 }}
-                  style={{ borderTop: `3px solid ${GMB_TOP_BORDER[g.status] || 'var(--border)'}` }}
-                >
-                  <div className="text-[13px] font-semibold text-[var(--text)]">{g.city}</div>
-                  <div className="mt-1.5 space-y-0.5 text-[11px] text-[var(--text-mid)]">
-                    <div>⭐ {g.reviews}</div>
-                    <div>📞 {g.calls}/mo</div>
-                  </div>
-                  <span className="data text-[10px] font-bold mt-1.5 inline-block px-1.5 py-0.5 rounded bg-[var(--surface)] text-[var(--text-dim)]">{g.rank}</span>
-                </motion.div>
-              ))}
-            </div>
+            {gmbProfiles.length > 0 ? (
+              <div className="grid grid-cols-3 gap-2">
+                {gmbProfiles.map(g => (
+                  <motion.div key={g.id} className="bg-[var(--surface2)] rounded-[12px] p-3 relative overflow-hidden"
+                    whileHover={{ y: -2, scale: 1.02 }}
+                    style={{ borderTop: `3px solid ${GMB_TOP_BORDER[g.status] || 'var(--border)'}` }}
+                  >
+                    <div className="text-[13px] font-semibold text-[var(--text)]">{g.city}</div>
+                    <div className="mt-1.5 space-y-0.5 text-[11px] text-[var(--text-mid)]">
+                      <div>⭐ {g.reviewCount}</div>
+                      <div>📞 {g.callsPerMonth}/mo</div>
+                    </div>
+                    <span className="data text-[10px] font-bold mt-1.5 inline-block px-1.5 py-0.5 rounded bg-[var(--surface)] text-[var(--text-dim)]">{g.ranking}</span>
+                  </motion.div>
+                ))}
+              </div>
+            ) : (
+              <div className="text-center py-8">
+                <p className="text-[12px] text-[var(--text-dim)]">No GMB profiles yet. Add them on the Plumbing page.</p>
+                <Link href="/business/plumbing" className="text-[11px] text-[var(--accent)] hover:underline mt-1 inline-block">Go to Plumbing &rarr;</Link>
+              </div>
+            )}
           </motion.div>
 
           {/* ── 12. INSIGHTS ROW ── */}
@@ -565,7 +644,8 @@ export default function DashboardPage() {
                 )
               }) : (
                 <div className="card p-5 rounded-[12px] text-center w-full">
-                  <p className="text-[12px] text-[var(--text-dim)]">No insights yet. They generate daily at 6 AM.</p>
+                  <p className="text-[12px] text-[var(--text-dim)]">Connect your AI key in Settings to enable daily insights.</p>
+                  <Link href="/settings" className="text-[11px] text-[var(--accent)] hover:underline mt-1 inline-block">Settings &rarr;</Link>
                 </div>
               )}
             </div>

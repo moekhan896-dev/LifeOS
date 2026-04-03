@@ -2,13 +2,20 @@
 
 import { motion } from 'framer-motion'
 import { toast } from 'sonner'
-import { BUSINESSES } from '@/lib/constants'
+import { useStore } from '@/stores/store'
 import PageTransition from '@/components/PageTransition'
 import { StaggerContainer, StaggerItem } from '@/components/Stagger'
 
-const biz = BUSINESSES.find((b) => b.id === 'airbnb')!
+const STATUS_LABELS: Record<string, string> = { active_healthy: 'Active', active_slow: 'Slow', active_prerevenue: 'Pre-Revenue', dormant: 'Dormant', backburner: 'Backburner', idea: 'Idea' }
 
 export default function AirbnbPage() {
+  const { businesses } = useStore()
+  const biz = businesses.find(b => b.type === 'real_estate' || b.name.toLowerCase().includes('airbnb'))
+
+  if (!biz) return (
+    <PageTransition><div className="p-4 md:p-7 max-w-[960px] mx-auto"><p className="text-[var(--text-dim)]">No Airbnb business found. Add businesses in Settings or re-run onboarding.</p></div></PageTransition>
+  )
+
   return (
     <PageTransition>
       <div className="p-4 md:p-7 max-w-[960px] mx-auto">
@@ -16,7 +23,7 @@ export default function AirbnbPage() {
         <div className="flex items-center gap-3 mb-6">
           <h1 className="text-[22px] font-bold tracking-tight text-[var(--text)]">{biz.name.toUpperCase()}</h1>
           <span className="text-[10px] font-mono uppercase tracking-[2px] text-blue-500 px-2.5 py-0.5 rounded-full bg-blue-500/15">
-            {biz.statusLabel}
+            {STATUS_LABELS[biz.status] || biz.status}
           </span>
         </div>
 

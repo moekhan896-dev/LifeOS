@@ -8,37 +8,6 @@ export const XP_PER_LEVEL = 500
 // Daily score weights
 export const SCORE_WEIGHTS = { prayer: 0.35, health: 0.25, productivity: 0.40 }
 
-// Business data
-export const BUSINESSES = [
-  { id: 'agency', name: 'SEO Agency (Rysen)', icon: '⬡', color: '#10b981', status: 'active', statusLabel: 'Healthy' },
-  { id: 'plumbing', name: 'Honest Plumbers', icon: '⬡', color: '#06b6d4', status: 'active', statusLabel: 'Slow' },
-  { id: 'madison', name: 'Madison Clark', icon: '⬡', color: '#ec4899', status: 'active', statusLabel: 'Pre-Revenue' },
-  { id: 'moggley', name: 'Moggley App', icon: '⬡', color: '#8b5cf6', status: 'active', statusLabel: 'Pre-Revenue' },
-  { id: 'brand', name: 'Personal Brand', icon: '⬡', color: '#f59e0b', status: 'dormant', statusLabel: 'Dormant' },
-  { id: 'airbnb', name: 'Airbnb FL', icon: '⬡', color: '#3b82f6', status: 'active', statusLabel: 'Low-Maintenance' },
-] as const
-
-export const CLIENTS = [
-  { name: 'AWS Law Firm', gross: 18000, adSpend: 10000, stripe: 540, net: 7460, service: 'GMB + ADS', meeting: 'Every 2 weeks' },
-  { name: 'Slim Dental', gross: 2400, adSpend: 0, stripe: 72, net: 2328, service: 'SEO', meeting: 'Weekly' },
-  { name: 'Rock Remson Law', gross: 1700, adSpend: 0, stripe: 51, net: 1649, service: 'GMB SEO', meeting: 'None' },
-  { name: 'Gravix Security', gross: 1500, adSpend: 0, stripe: 45, net: 1455, service: 'GMB SEO', meeting: 'None' },
-  { name: 'Tyler Family Law', gross: 1450, adSpend: 0, stripe: 43.5, net: 1406.5, service: 'GMB SEO', meeting: 'Monthly' },
-  { name: 'Eric (Plumbing)', gross: 1000, adSpend: 0, stripe: 30, net: 970, service: 'SEO', meeting: 'None' },
-]
-
-export const GMB_PROFILES = [
-  { city: 'Ann Arbor', reviews: 52, calls: 31, status: 'strong', rank: '#4' },
-  { city: 'Dearborn', reviews: 47, calls: 28, status: 'strong', rank: '#3' },
-  { city: 'Farmington Hills', reviews: 38, calls: 22, status: 'strong', rank: '#5' },
-  { city: 'Canton', reviews: 25, calls: 14, status: 'medium', rank: '#7' },
-  { city: 'Birmingham', reviews: 21, calls: 11, status: 'medium', rank: '#8' },
-  { city: 'Bloomfield', reviews: 18, calls: 9, status: 'medium', rank: '#9' },
-  { city: 'Livonia', reviews: 3, calls: 2, status: 'new', rank: '—' },
-  { city: 'Southgate', reviews: 2, calls: 1, status: 'new', rank: '—' },
-  { city: 'Ypsilanti', reviews: 1, calls: 0, status: 'new', rank: '—' },
-]
-
 export const FIXED_COSTS = [
   { name: 'C8 Corvette', amount: 1250 },
   { name: 'Mercedes-AMG GLE', amount: 575 },
@@ -79,3 +48,28 @@ export const AUDIENCE_ASSETS = [
   { name: 'Madison Clark', followers: 16000, platform: 'Instagram', status: 'active', daysSincePost: 0 },
   { name: 'TikTok', followers: 1500, platform: 'TikTok', status: 'dormant', daysSincePost: 30 },
 ]
+
+// ── Reference arrays for forms/UI ──
+
+export const BUSINESS_TYPES = [
+  { value: 'agency', label: 'Agency' },
+  { value: 'service', label: 'Service Business' },
+  { value: 'app', label: 'App / SaaS' },
+  { value: 'content', label: 'Content / Media' },
+  { value: 'real_estate', label: 'Real Estate' },
+  { value: 'coaching', label: 'Coaching' },
+  { value: 'other', label: 'Other' },
+]
+
+export const BUSINESS_STATUSES = [
+  { value: 'active_healthy', label: 'Active - Healthy' },
+  { value: 'active_slow', label: 'Active - Slow' },
+  { value: 'active_prerevenue', label: 'Active - Pre-Revenue' },
+  { value: 'dormant', label: 'Dormant' },
+  { value: 'backburner', label: 'Backburner' },
+  { value: 'idea', label: 'Idea' },
+]
+
+export const COLOR_SWATCHES = ['#10b981', '#06b6d4', '#f59e0b', '#ef4444', '#8b5cf6', '#3b82f6', '#ec4899', '#eab308']
+
+export const MEETING_FREQUENCIES = ['Weekly', 'Biweekly', 'Monthly', 'As needed', 'None']

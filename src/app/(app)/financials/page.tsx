@@ -1,8 +1,8 @@
 'use client'
 
 import { useState } from 'react'
-import { useStore } from '@/stores/store'
-import { FIXED_COSTS, CLIENTS } from '@/lib/constants'
+import { useStore, getAgencyTotals, getClientNet } from '@/stores/store'
+import { FIXED_COSTS } from '@/lib/constants'
 import PageTransition from '@/components/PageTransition'
 import { StaggerContainer, StaggerItem } from '@/components/Stagger'
 import { motion, AnimatePresence } from 'framer-motion'

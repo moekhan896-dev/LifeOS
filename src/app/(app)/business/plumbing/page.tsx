@@ -3,15 +3,13 @@
 import { motion } from 'framer-motion'
 import { toast } from 'sonner'
 import { useStore } from '@/stores/store'
-import { GMB_PROFILES, BUSINESSES, DRIVER_STATUS_COLORS } from '@/lib/constants'
+import { DRIVER_STATUS_COLORS } from '@/lib/constants'
 import Link from 'next/link'
 import PageTransition from '@/components/PageTransition'
 import { StaggerContainer, StaggerItem } from '@/components/Stagger'
 import { BarChart, Bar, ResponsiveContainer, XAxis, Tooltip } from 'recharts'
 
-const callsPerGMB = GMB_PROFILES.map(p => ({ city: p.city.split(',')[0].split(' ')[0], calls: p.calls }))
-
-const biz = BUSINESSES.find((b) => b.id === 'plumbing')!
+const STATUS_LABELS: Record<string, string> = { active_healthy: 'Active', active_slow: 'Slow', active_prerevenue: 'Pre-Revenue', dormant: 'Dormant', backburner: 'Backburner', idea: 'Idea' }
 
 const STATUS_COLORS: Record<string, string> = {
   strong: 'bg-[var(--accent)]/15 text-[var(--accent)]',
@@ -38,12 +36,20 @@ const currentCalls = 1.5
 const targetCalls = 4.5
 
 export default function PlumbingPage() {
-  const { drivers } = useStore()
-  const storeDrivers = drivers.filter((d) => d.businessId === 'plumbing')
+  const { businesses, gmbProfiles, drivers } = useStore()
+  const biz = businesses.find(b => b.type === 'service' || b.name.toLowerCase().includes('plumb'))
+  const plumbingGmbs = gmbProfiles.filter(g => g.businessId === biz?.id)
+  const callsPerGMB = plumbingGmbs.map(p => ({ city: p.city.split(',')[0].split(' ')[0], calls: p.callsPerMonth }))
+
+  const storeDrivers = drivers.filter((d) => d.businessId === biz?.id)
   const displayDrivers = storeDrivers.length > 0 ? storeDrivers : null
 
-  const totalReviews = GMB_PROFILES.reduce((s, p) => s + p.reviews, 0)
-  const totalCalls = GMB_PROFILES.reduce((s, p) => s + p.calls, 0)
+  const totalReviews = plumbingGmbs.reduce((s, p) => s + p.reviewCount, 0)
+  const totalCalls = plumbingGmbs.reduce((s, p) => s + p.callsPerMonth, 0)
+
+  if (!biz) return (
+    <PageTransition><div className="p-4 md:p-7 max-w-[960px] mx-auto"><p className="text-[var(--text-dim)]">No plumbing business found. Add businesses in Settings or re-run onboarding.</p></div></PageTransition>
+  )
 
   return (
     <PageTransition>
@@ -53,7 +59,7 @@ export default function PlumbingPage() {
           <div className="flex items-center gap-3">
             <h1 className="text-[22px] font-bold tracking-tight text-[var(--text)]">{biz.name.toUpperCase()}</h1>
             <span className="text-[10px] font-mono uppercase tracking-[2px] text-amber-500 px-2.5 py-0.5 rounded-full bg-amber-500/15">
-              {biz.statusLabel}
+              {STATUS_LABELS[biz.status] || biz.status}
             </span>
           </div>
           <motion.div whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }}>
@@ -103,18 +109,18 @@ export default function PlumbingPage() {
           {/* GMB Profiles */}
           <StaggerItem>
             <motion.div whileHover={{ y: -1, boxShadow: '0 8px 24px rgba(0,0,0,0.12)' }} className="card p-3 mb-5">
-              <h2 className="text-[10px] font-mono uppercase tracking-[2px] text-[var(--text-dim)] mb-3">GMB Profiles ({GMB_PROFILES.length})</h2>
+              <h2 className="text-[10px] font-mono uppercase tracking-[2px] text-[var(--text-dim)] mb-3">GMB Profiles ({plumbingGmbs.length})</h2>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
-                {GMB_PROFILES.map((p) => (
+                {plumbingGmbs.map((p) => (
                   <motion.div key={p.city} whileHover={{ scale: 1.02, y: -1, boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }} className="bg-[var(--surface2)] rounded-[12px] p-3">
                     <div className="flex items-center justify-between mb-2">
                       <p className="text-[14px] font-semibold text-[var(--text)]">{p.city}</p>
                       <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full ${STATUS_COLORS[p.status]}`}>{p.status}</span>
                     </div>
                     <div className="grid grid-cols-3 gap-2 text-[12px]">
-                      <div><p className="text-[10px] font-mono uppercase tracking-[2px] text-[var(--text-dim)]">Reviews</p><p className="data text-[var(--text)]">{p.reviews}</p></div>
-                      <div><p className="text-[10px] font-mono uppercase tracking-[2px] text-[var(--text-dim)]">Calls/mo</p><p className="data text-[var(--text)]">{p.calls}</p></div>
-                      <div><p className="text-[10px] font-mono uppercase tracking-[2px] text-[var(--text-dim)]">Rank</p><p className="data text-[var(--text)]">{p.rank}</p></div>
+                      <div><p className="text-[10px] font-mono uppercase tracking-[2px] text-[var(--text-dim)]">Reviews</p><p className="data text-[var(--text)]">{p.reviewCount}</p></div>
+                      <div><p className="text-[10px] font-mono uppercase tracking-[2px] text-[var(--text-dim)]">Calls/mo</p><p className="data text-[var(--text)]">{p.callsPerMonth}</p></div>
+                      <div><p className="text-[10px] font-mono uppercase tracking-[2px] text-[var(--text-dim)]">Rank</p><p className="data text-[var(--text)]">{p.ranking}</p></div>
                     </div>
                   </motion.div>
                 ))}

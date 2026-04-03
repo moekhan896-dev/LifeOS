@@ -3,7 +3,7 @@
 import { useState, useRef, useEffect } from 'react'
 import { motion, AnimatePresence, useMotionValue, useTransform } from 'framer-motion'
 import { useStore, type Task } from '@/stores/store'
-import { BUSINESSES, PRIORITY_COLORS } from '@/lib/constants'
+import { PRIORITY_COLORS } from '@/lib/constants'
 import { toast } from 'sonner'
 
 const BORDER_COLORS: Record<string, string> = {
@@ -18,7 +18,7 @@ interface TaskItemProps {
 }
 
 export default function TaskItem({ task }: TaskItemProps) {
-  const { toggleTask, deleteTask, updateTask } = useStore()
+  const { toggleTask, deleteTask, updateTask, businesses } = useStore()
   const [showXp, setShowXp] = useState(false)
   const [editing, setEditing] = useState(false)
   const [editText, setEditText] = useState(task.text)
@@ -29,7 +29,7 @@ export default function TaskItem({ task }: TaskItemProps) {
   const bgColor = useTransform(x, (v) => (v > 0 ? 'rgba(16,185,129,0.25)' : 'rgba(239,68,68,0.25)'))
 
   const pColors = PRIORITY_COLORS[task.priority]
-  const business = BUSINESSES.find((b) => b.id === task.businessId)
+  const business = businesses.find((b) => b.id === task.businessId)
 
   useEffect(() => {
     if (editing && inputRef.current) inputRef.current.focus()

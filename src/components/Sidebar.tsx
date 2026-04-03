@@ -3,24 +3,12 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useStore } from '@/stores/store'
-import { BUSINESSES } from '@/lib/constants'
 
-const REVENUE_LABELS: Record<string, string> = {
-  agency: '$26K',
-  plumbing: '~$18K',
-  madison: '$16K',
-  moggley: '$0',
-  brand: 'Dormant',
-  airbnb: '$1K',
-}
-
-const BUSINESS_ROUTES: Record<string, string> = {
-  agency: '/business/agency',
-  plumbing: '/business/plumbing',
-  madison: '/business/madison-clark',
-  moggley: '/business/moggley',
-  brand: '/business/personal-brand',
-  airbnb: '/business/airbnb',
+function getRevenueLabel(b: { monthlyRevenue: number; status: string }) {
+  if (b.status === 'dormant' || b.status === 'backburner') return 'Dormant'
+  if (b.monthlyRevenue === 0) return '$0'
+  if (b.monthlyRevenue < 1000) return `$${b.monthlyRevenue}`
+  return `$${(b.monthlyRevenue / 1000).toFixed(0)}K`
 }
 
 const OPS_LINKS = [
@@ -42,13 +30,14 @@ const SYSTEM_LINKS = [
   { href: '/commitments', label: 'Commitments' },
   { href: '/net-worth', label: 'Net Worth' },
   { href: '/ecosystem', label: 'Ecosystem' },
+  { href: '/settings', label: 'Settings', icon: '\u2699' },
 ]
 
 export default function Sidebar() {
   const pathname = usePathname()
   const {
     theme, toggleTheme, sidebarOpen, toggleSidebar,
-    tasks, insights, xp, level, todayHealth,
+    tasks, insights, xp, level, todayHealth, businesses,
   } = useStore()
 
   const undoneCount = tasks.filter((t) => !t.done).length
@@ -193,10 +182,11 @@ export default function Sidebar() {
         <div>
           <div className="section-label px-4 mb-1.5">BUSINESSES</div>
           <div className="space-y-0.5">
-            {BUSINESSES.map((b) => {
-              const active = isActive(BUSINESS_ROUTES[b.id])
+            {businesses.map((b) => {
+              const href = `/business/${b.id}`
+              const active = isActive(href)
               return (
-                <Link key={b.id} href={BUSINESS_ROUTES[b.id]} onClick={closeMobileIfNeeded} className="block">
+                <Link key={b.id} href={href} onClick={closeMobileIfNeeded} className="block">
                   <motion.div
                     className={`relative flex items-center gap-2.5 px-3 py-[7px] text-[13px] font-medium rounded-lg mx-1.5 transition-colors ${
                       active
@@ -219,7 +209,7 @@ export default function Sidebar() {
                     />
                     <span className="flex-1 truncate">{b.name}</span>
                     <span className="data text-[10px] text-[var(--color-text-dim)] font-medium">
-                      {REVENUE_LABELS[b.id]}
+                      {getRevenueLabel(b)}
                     </span>
                   </motion.div>
                 </Link>

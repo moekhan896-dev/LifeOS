@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useStore, type DriverStatus, type RevenueDriver } from '@/stores/store'
-import { BUSINESSES, DRIVER_STATUSES, DRIVER_STATUS_COLORS } from '@/lib/constants'
+import { DRIVER_STATUSES, DRIVER_STATUS_COLORS } from '@/lib/constants'
 import PageTransition from '@/components/PageTransition'
 import { StaggerContainer, StaggerItem } from '@/components/Stagger'
 import { motion, AnimatePresence } from 'framer-motion'
@@ -28,7 +28,7 @@ const SEED_DRIVERS: Omit<RevenueDriver, 'id'>[] = [
 ]
 
 export default function RevenueDriversPage() {
-  const { drivers, updateDriverStatus, addDriver } = useStore()
+  const { businesses, drivers, updateDriverStatus, addDriver } = useStore()
   const [filter, setFilter] = useState<DriverStatus | 'ALL'>('ALL')
   const [newDrivers, setNewDrivers] = useState<Record<string, string>>({})
 
@@ -83,7 +83,7 @@ export default function RevenueDriversPage() {
 
         {/* Business sections */}
         <StaggerContainer className="space-y-4">
-          {BUSINESSES.map((biz) => {
+          {businesses.map((biz) => {
             const bizDrivers = filtered.filter((d) => d.businessId === biz.id)
             if (filter !== 'ALL' && bizDrivers.length === 0) return null
             return (

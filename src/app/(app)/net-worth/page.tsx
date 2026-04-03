@@ -1,8 +1,7 @@
 'use client'
 
 import { motion } from 'framer-motion'
-import { useStore } from '@/stores/store'
-import { CLIENTS } from '@/lib/constants'
+import { useStore, getAgencyTotals } from '@/stores/store'
 import PageTransition from '@/components/PageTransition'
 import { StaggerContainer, StaggerItem } from '@/components/Stagger'
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts'

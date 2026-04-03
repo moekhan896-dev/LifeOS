@@ -5,7 +5,6 @@ import { useRouter } from 'next/navigation'
 import { Command } from 'cmdk'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useStore } from '@/stores/store'
-import { BUSINESSES } from '@/lib/constants'
 
 const PAGES = [
   { name: 'Dashboard', href: '/dashboard', icon: '◆' },
@@ -29,7 +28,7 @@ const PAGES = [
 export default function CommandPalette() {
   const [open, setOpen] = useState(false)
   const router = useRouter()
-  const { tasks, addTask } = useStore()
+  const { tasks, businesses, addTask } = useStore()
 
   useEffect(() => {
     const down = (e: KeyboardEvent) => {
@@ -95,11 +94,11 @@ export default function CommandPalette() {
                 </Command.Group>
 
                 <Command.Group heading={<span className="label text-[10px] px-2">BUSINESSES</span>}>
-                  {BUSINESSES.map((b) => (
+                  {businesses.map((b) => (
                     <Command.Item
                       key={b.id}
                       value={`${b.name} ${b.id}`}
-                      onSelect={() => go(`/business/${b.id === 'madison' ? 'madison-clark' : b.id === 'brand' ? 'personal-brand' : b.id}`)}
+                      onSelect={() => go(`/business/${b.id}`)}
                       className="flex items-center gap-3 px-3 py-2 rounded-lg text-[13px] text-[var(--color-text-mid)] cursor-pointer transition-colors data-[selected]:bg-[var(--color-surface2)] data-[selected]:text-[var(--color-text)]"
                     >
                       <span className="w-2 h-2 rounded-full" style={{ backgroundColor: b.color }} />

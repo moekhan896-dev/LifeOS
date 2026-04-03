@@ -4,7 +4,7 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { motion } from 'framer-motion'
 import { useStore } from '@/stores/store'
-import { BUSINESSES, TAGS, XP_VALUES } from '@/lib/constants'
+import { TAGS, XP_VALUES } from '@/lib/constants'
 import type { Priority } from '@/stores/store'
 import { toast } from 'sonner'
 
@@ -12,7 +12,7 @@ export default function CommandInput() {
   const [value, setValue] = useState('')
   const [focused, setFocused] = useState(false)
   const router = useRouter()
-  const { addTask } = useStore()
+  const { addTask, businesses } = useStore()
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
@@ -38,7 +38,7 @@ export default function CommandInput() {
     else if (lower.includes('!high') || lower.includes('urgent')) priority = 'high'
     else if (lower.includes('!low')) priority = 'low'
 
-    for (const b of BUSINESSES) {
+    for (const b of businesses) {
       if (lower.includes(b.id) || lower.includes(b.name.toLowerCase())) {
         businessId = b.id
         break
