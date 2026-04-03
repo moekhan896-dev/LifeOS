@@ -230,23 +230,36 @@ export default function DashboardPage() {
         </motion.div>
 
         {/* ── BENTO GRID ── */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(12, 1fr)', gap: 16 }} className="max-md:!flex max-md:!flex-col max-md:!gap-4">
+        <div className="grid grid-cols-12 gap-4">
 
           {/* ── 2. THE ONE THING ── */}
-          <motion.div className="gradient-border" style={{ gridColumn: 'span 12' }} {...cardAnim(0.05)}>
-            <div className="bg-[var(--surface)] rounded-[14px] p-6 text-center">
-              <span className="label text-[var(--accent)] text-[10px] uppercase tracking-wider font-semibold">THE ONE THING</span>
-              <p className="text-[12px] text-[var(--text-mid)] mt-1">If you do only one thing today, do this.</p>
-              {theOneThing ? (
-                <p className="text-[20px] font-semibold text-[var(--text)] mt-3">{theOneThing.text}</p>
-              ) : (
-                <div>
-                  <p className="text-[20px] font-semibold text-[var(--text)] mt-3">Your plate is clear.</p>
-                  <div className="flex items-center justify-center gap-3 mt-2">
-                    <Link href="/ai" className="text-[12px] text-[var(--accent)] hover:underline">Ask AI what to focus on &rarr;</Link>
-                    <Link href="/tasks" className="text-[12px] text-[var(--text-mid)] hover:underline">Add a task &rarr;</Link>
+          <motion.div className="gradient-border col-span-12" {...cardAnim(0.05)}>
+            <div className="bg-[var(--surface)] rounded-[16px] p-6 flex items-center justify-between">
+              <div className="flex-1 text-center">
+                <span className="text-[10px] font-mono uppercase tracking-[2px] text-[var(--accent)] font-semibold">THE ONE THING</span>
+                <p className="text-[12px] text-[var(--text-mid)] mt-1">If you do only one thing today, do this.</p>
+                {theOneThing ? (
+                  <p className="text-[20px] font-semibold text-[var(--text)] mt-3">{theOneThing.text}</p>
+                ) : (
+                  <div>
+                    <p className="text-[20px] font-semibold text-[var(--text)] mt-3">Your plate is clear.</p>
+                    <div className="flex items-center justify-center gap-3 mt-2">
+                      <Link href="/ai" className="text-[12px] text-[var(--accent)] hover:underline">Ask AI what to focus on &rarr;</Link>
+                      <Link href="/tasks" className="text-[12px] text-[var(--text-mid)] hover:underline">Add a task &rarr;</Link>
+                    </div>
                   </div>
-                </div>
+                )}
+              </div>
+              {theOneThing && (
+                <motion.button
+                  onClick={() => { toggleTask(theOneThing.id); toast.success('Done! +XP earned') }}
+                  className="ml-4 px-4 py-2 rounded-[10px] text-[13px] font-semibold flex-shrink-0 transition-colors"
+                  style={{ background: 'color-mix(in srgb, var(--accent) 15%, transparent)', color: 'var(--accent)' }}
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                >
+                  &#10003; Done
+                </motion.button>
               )}
             </div>
           </motion.div>
@@ -283,13 +296,12 @@ export default function DashboardPage() {
           ] as const).map((m, i) => (
             <motion.div
               key={m.label}
-              className="card rounded-[16px] p-5"
-              style={{ gridColumn: 'span 3' }}
+              className="card rounded-[16px] p-5 col-span-12 md:col-span-3"
               {...cardAnim(0.08 + i * 0.04)}
               whileHover={{ y: -3, scale: 1.01 }}
             >
               <div className="flex items-start justify-between">
-                <span className="label text-[10px] uppercase tracking-wider text-[var(--text-dim)]" style={{ fontFamily: 'var(--font-mono, monospace)' }}>{m.label}</span>
+                <span className="text-[10px] font-mono uppercase tracking-[2px] text-[var(--text-dim)]">{m.label}</span>
                 <div className="w-6 h-6 rounded-full flex items-center justify-center text-[12px]" style={{ background: `color-mix(in srgb, ${m.color} 20%, transparent)` }}>{m.emoji}</div>
               </div>
               <div className="data mt-2" style={{ fontSize: 36, fontWeight: 700, color: m.color }}>{m.value}</div>
@@ -317,9 +329,9 @@ export default function DashboardPage() {
           ))}
 
           {/* Daily Score card with ring */}
-          <motion.div className="card rounded-[16px] p-5" style={{ gridColumn: 'span 3' }} {...cardAnim(0.2)} whileHover={{ y: -3, scale: 1.01 }}>
+          <motion.div className="card rounded-[16px] p-5 col-span-12 md:col-span-3" {...cardAnim(0.2)} whileHover={{ y: -3, scale: 1.01 }}>
             <div className="flex items-start justify-between">
-              <span className="label text-[10px] uppercase tracking-wider text-[var(--text-dim)]" style={{ fontFamily: 'var(--font-mono, monospace)' }}>DAILY SCORE</span>
+              <span className="text-[10px] font-mono uppercase tracking-[2px] text-[var(--text-dim)]">DAILY SCORE</span>
               <div className="w-6 h-6 rounded-full flex items-center justify-center text-[12px]" style={{ background: 'color-mix(in srgb, var(--accent) 20%, transparent)' }}>⚡</div>
             </div>
             <div className="data mt-2" style={{ fontSize: 36, fontWeight: 700, color: 'var(--accent)' }}>{dailyScore}<span className="text-[16px] text-[var(--text-dim)]">/100</span></div>
@@ -331,9 +343,9 @@ export default function DashboardPage() {
           </motion.div>
 
           {/* ── 4. REVENUE CHART ── */}
-          <motion.div className="card rounded-[16px] p-5" style={{ gridColumn: 'span 5', gridRow: 'span 2' }} {...cardAnim(0.22)}>
+          <motion.div className="card rounded-[16px] p-5 col-span-12 md:col-span-4" {...cardAnim(0.22)}>
             <div className="flex items-center justify-between mb-3">
-              <span className="label text-[10px] uppercase tracking-wider text-[var(--text-dim)]">REVENUE TREND</span>
+              <span className="text-[10px] font-mono uppercase tracking-[2px] text-[var(--text-dim)]">REVENUE TREND</span>
               <div className="flex gap-1">
                 {(['week', 'month'] as const).map(r => (
                   <button key={r} onClick={() => setChartRange(r)}
@@ -377,11 +389,11 @@ export default function DashboardPage() {
 
           {/* ── 5. PRAYER TRACKER ── */}
           <motion.div
-            className="card-sacred rounded-[16px] p-5"
-            style={{ gridColumn: 'span 4', background: 'linear-gradient(135deg, color-mix(in srgb, var(--gold) 5%, var(--surface)), var(--surface))' }}
+            className="card-sacred rounded-[16px] p-5 col-span-12 md:col-span-4"
+            style={{ background: 'linear-gradient(135deg, color-mix(in srgb, var(--gold) 5%, var(--surface)), var(--surface))' }}
             {...cardAnim(0.25)}
           >
-            <span className="label text-[10px] uppercase tracking-wider font-semibold text-[var(--gold)]">SALAH</span>
+            <span className="text-[10px] font-mono uppercase tracking-[2px] font-semibold text-[var(--gold)]">SALAH</span>
             <div className="flex gap-2 mt-3">
               {PRAYER_KEYS.map(p => {
                 const done = todayHealth.prayers[p]
@@ -416,8 +428,8 @@ export default function DashboardPage() {
           </motion.div>
 
           {/* ── 6. STREAKS GRID ── */}
-          <motion.div className="card rounded-[16px] p-4" style={{ gridColumn: 'span 3' }} {...cardAnim(0.28)}>
-            <span className="label text-[10px] uppercase tracking-wider text-[var(--text-dim)]">STREAKS</span>
+          <motion.div className="card rounded-[16px] p-5 col-span-12 md:col-span-4" {...cardAnim(0.28)}>
+            <span className="text-[10px] font-mono uppercase tracking-[2px] text-[var(--text-dim)]">STREAKS</span>
             <div className="mt-3 space-y-3">
               {streaks.map(s => {
                 const meta = STREAK_META[s.habit] || { label: s.habit, emoji: '🔥', color: 'var(--text-mid)' }
@@ -444,11 +456,11 @@ export default function DashboardPage() {
 
           {/* ── 7. COST OF INACTION ── */}
           <motion.div
-            className="card-urgent rounded-[16px] p-5"
-            style={{ gridColumn: 'span 4', background: 'linear-gradient(135deg, color-mix(in srgb, var(--rose) 5%, var(--surface)), var(--surface))' }}
+            className="card-urgent rounded-[16px] p-5 col-span-12 md:col-span-5"
+            style={{ background: 'linear-gradient(135deg, color-mix(in srgb, var(--rose) 5%, var(--surface)), var(--surface))' }}
             {...cardAnim(0.3)}
           >
-            <span className="label text-[10px] uppercase tracking-wider font-semibold text-[var(--rose)]">COST OF INACTION</span>
+            <span className="text-[10px] font-mono uppercase tracking-[2px] font-semibold text-[var(--rose)]">COST OF INACTION</span>
             <div className="mt-3 space-y-2">
               {COST_OF_INACTION.map(item => (
                 <div key={item.label} className="flex items-center justify-between">
@@ -466,73 +478,80 @@ export default function DashboardPage() {
             <Link href="/ai" className="text-[11px] text-[var(--rose)] hover:underline mt-2 inline-block opacity-70">How to reduce this &rarr;</Link>
           </motion.div>
 
-          {/* ── 8. DAYS REMAINING ── */}
-          <motion.div className="card rounded-[16px] p-5" style={{ gridColumn: 'span 4' }} {...cardAnim(0.32)}>
-            <div className="gradient-text data" style={{ fontSize: 48, fontWeight: 700 }}>{remaining || '—'}</div>
-            <p className="text-[14px] text-[var(--text-mid)]">
-              {targetDate ? `days to $${(incomeTarget / 1000).toFixed(0)}K/mo` : 'Set a target date in Settings'}
-            </p>
-            <div className="mt-4">
-              <div className="w-full h-2 rounded-full bg-[var(--surface2)] overflow-hidden">
-                <motion.div
-                  className="h-full rounded-full"
-                  style={{ background: 'linear-gradient(90deg, var(--accent), var(--cyan))' }}
-                  initial={{ width: 0 }}
-                  animate={{ width: `${progressPercent}%` }}
-                  transition={{ duration: 1, delay: 0.4 }}
-                />
-              </div>
-              <div className="flex justify-between mt-1">
-                <span className="data text-[10px] text-[var(--text-dim)]">${currentIncome > 0 ? `${(currentIncome / 1000).toFixed(0)}K` : '0'}</span>
-                <span className="data text-[10px] text-[var(--text-dim)]">${(incomeTarget / 1000).toFixed(0)}K</span>
-              </div>
-            </div>
-          </motion.div>
-
-          {/* ── 9. TODAY'S TASKS ── */}
-          <motion.div className="card rounded-[16px] p-5" style={{ gridColumn: 'span 4', gridRow: 'span 2' }} {...cardAnim(0.34)}>
-            <div className="flex items-center justify-between mb-3">
-              <span className="label text-[10px] uppercase tracking-wider text-[var(--text-dim)]">TODAY&apos;S TASKS</span>
-              <span className="data text-[11px] font-semibold px-2 py-0.5 rounded-full" style={{ background: 'color-mix(in srgb, var(--accent) 15%, transparent)', color: 'var(--accent)' }}>
-                {tasksDoneToday}/{tasks.length}
-              </span>
-            </div>
-            <div className="space-y-1.5 max-h-[280px] overflow-y-auto pr-1" style={{ scrollbarWidth: 'none' }}>
-              {incompleteTasks.length > 0 ? incompleteTasks.slice(0, 12).map(task => (
-                <motion.div key={task.id} className="flex items-center gap-2 py-1.5 px-2 rounded-[8px] hover:bg-[var(--surface2)] transition-colors"
-                  style={{ borderLeft: `3px solid ${PRIORITY_BORDER[task.priority] || 'var(--border)'}` }}
-                >
-                  <motion.button
-                    onClick={() => { toggleTask(task.id); toast.success('+XP earned') }}
-                    className="w-4 h-4 rounded-[4px] border-2 flex-shrink-0 flex items-center justify-center"
-                    style={{ borderColor: PRIORITY_BORDER[task.priority] }}
-                    whileTap={{ scale: 0.85 }}
-                  />
-                  <span className="text-[12px] text-[var(--text)] truncate">{task.text}</span>
-                  {task.tag && <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-[var(--surface2)] text-[var(--text-dim)] flex-shrink-0">{task.tag}</span>}
-                </motion.div>
-              )) : (
-                <div className="text-center py-6">
-                  <p className="text-[12px] text-[var(--text-dim)]">Your plate is clear. Add a task or ask the AI.</p>
-                  <div className="flex items-center justify-center gap-3 mt-2">
-                    <Link href="/tasks" className="text-[11px] text-[var(--accent)] hover:underline">Tasks &rarr;</Link>
-                    <Link href="/ai" className="text-[11px] text-[var(--accent)] hover:underline">Ask AI &rarr;</Link>
+          {/* ── 8+9. DAYS REMAINING + TODAY'S TASKS ── */}
+          <motion.div className="card rounded-[16px] p-5 col-span-12 md:col-span-7" {...cardAnim(0.32)}>
+            <div className="grid grid-cols-1 md:grid-cols-7 gap-4">
+              {/* Days Remaining half */}
+              <div className="md:col-span-3">
+                <span className="text-[10px] font-mono uppercase tracking-[2px] text-[var(--text-dim)] mb-3 block">DAYS REMAINING</span>
+                <div className="gradient-text data" style={{ fontSize: 48, fontWeight: 700 }}>{remaining || '—'}</div>
+                <p className="text-[14px] text-[var(--text-mid)]">
+                  {targetDate ? `days to $${(incomeTarget / 1000).toFixed(0)}K/mo` : 'Set a target date in Settings'}
+                </p>
+                <div className="mt-4">
+                  <div className="w-full h-2 rounded-full bg-[var(--surface2)] overflow-hidden">
+                    <motion.div
+                      className="h-full rounded-full"
+                      style={{ background: 'linear-gradient(90deg, var(--accent), var(--cyan))' }}
+                      initial={{ width: 0 }}
+                      animate={{ width: `${progressPercent}%` }}
+                      transition={{ duration: 1, delay: 0.4 }}
+                    />
+                  </div>
+                  <div className="flex justify-between mt-1">
+                    <span className="data text-[10px] text-[var(--text-dim)]">${currentIncome > 0 ? `${(currentIncome / 1000).toFixed(0)}K` : '0'}</span>
+                    <span className="data text-[10px] text-[var(--text-dim)]">${(incomeTarget / 1000).toFixed(0)}K</span>
                   </div>
                 </div>
-              )}
+              </div>
+              {/* Divider */}
+              <div className="hidden md:block md:col-span-0 w-px bg-[var(--border)] mx-auto" />
+              {/* Today's Tasks half */}
+              <div className="md:col-span-4 border-t md:border-t-0 md:border-l border-[var(--border)] pt-4 md:pt-0 md:pl-4">
+                <div className="flex items-center justify-between mb-3">
+                  <span className="text-[10px] font-mono uppercase tracking-[2px] text-[var(--text-dim)]">TODAY&apos;S TASKS</span>
+                  <span className="data text-[11px] font-semibold px-2 py-0.5 rounded-full" style={{ background: 'color-mix(in srgb, var(--accent) 15%, transparent)', color: 'var(--accent)' }}>
+                    {tasksDoneToday}/{tasks.length}
+                  </span>
+                </div>
+                <div className="space-y-1.5 max-h-[280px] overflow-y-auto pr-1" style={{ scrollbarWidth: 'none' }}>
+                  {incompleteTasks.length > 0 ? incompleteTasks.slice(0, 8).map(task => (
+                    <motion.div key={task.id} className="flex items-center gap-2 py-1.5 px-2 rounded-[8px] hover:bg-[var(--surface2)] transition-colors"
+                      style={{ borderLeft: `3px solid ${PRIORITY_BORDER[task.priority] || 'var(--border)'}` }}
+                    >
+                      <motion.button
+                        onClick={() => { toggleTask(task.id); toast.success('+XP earned') }}
+                        className="w-4 h-4 rounded-[4px] border-2 flex-shrink-0 flex items-center justify-center"
+                        style={{ borderColor: PRIORITY_BORDER[task.priority] }}
+                        whileTap={{ scale: 0.85 }}
+                      />
+                      <span className="text-[12px] text-[var(--text)] truncate">{task.text}</span>
+                      {task.tag && <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-[var(--surface2)] text-[var(--text-dim)] flex-shrink-0">{task.tag}</span>}
+                    </motion.div>
+                  )) : (
+                    <div className="text-center py-6">
+                      <p className="text-[12px] text-[var(--text-dim)]">Your plate is clear. Add a task or ask the AI.</p>
+                      <div className="flex items-center justify-center gap-3 mt-2">
+                        <Link href="/tasks" className="text-[11px] text-[var(--accent)] hover:underline">Tasks &rarr;</Link>
+                        <Link href="/ai" className="text-[11px] text-[var(--accent)] hover:underline">Ask AI &rarr;</Link>
+                      </div>
+                    </div>
+                  )}
+                </div>
+                <form onSubmit={handleAddTask} className="mt-3">
+                  <input type="text" value={newTaskText} onChange={e => setNewTaskText(e.target.value)}
+                    placeholder="+ Add a task..."
+                    className="w-full bg-[var(--surface2)] border border-[var(--border)] rounded-[10px] px-3 py-2 text-[12px] text-[var(--text)] placeholder:text-[var(--text-dim)] outline-none focus:border-[var(--accent)] transition-colors"
+                  />
+                </form>
+              </div>
             </div>
-            <form onSubmit={handleAddTask} className="mt-3">
-              <input type="text" value={newTaskText} onChange={e => setNewTaskText(e.target.value)}
-                placeholder="+ Add a task..."
-                className="w-full bg-[var(--surface2)] border border-[var(--border)] rounded-[10px] px-3 py-2 text-[12px] text-[var(--text)] placeholder:text-[var(--text-dim)] outline-none focus:border-[var(--accent)] transition-colors"
-              />
-            </form>
           </motion.div>
 
           {/* ── 10. CLIENT TABLE ── */}
-          <motion.div className="card rounded-[16px] p-5 overflow-x-auto" style={{ gridColumn: 'span 6' }} {...cardAnim(0.36)}>
+          <motion.div className="card rounded-[16px] p-5 overflow-x-auto col-span-12 md:col-span-6" {...cardAnim(0.36)}>
             <div className="flex items-center justify-between mb-3">
-              <span className="label text-[10px] uppercase tracking-wider text-[var(--text-dim)]">CLIENT REVENUE</span>
+              <span className="text-[10px] font-mono uppercase tracking-[2px] text-[var(--text-dim)]">CLIENT REVENUE</span>
               <span className="data text-[11px] font-semibold px-2 py-0.5 rounded-full" style={{ background: 'color-mix(in srgb, var(--accent) 15%, transparent)', color: 'var(--accent)' }}>
                 ${Math.round(agencyTotals.net).toLocaleString()}/mo
               </span>
@@ -585,9 +604,9 @@ export default function DashboardPage() {
           </motion.div>
 
           {/* ── 11. PLUMBING GMB GRID ── */}
-          <motion.div className="card rounded-[16px] p-5" style={{ gridColumn: 'span 6' }} {...cardAnim(0.38)}>
+          <motion.div className="card rounded-[16px] p-5 col-span-12 md:col-span-6" {...cardAnim(0.38)}>
             <div className="flex items-center justify-between mb-3">
-              <span className="label text-[10px] uppercase tracking-wider text-[var(--text-dim)]">PLUMBING GMBS</span>
+              <span className="text-[10px] font-mono uppercase tracking-[2px] text-[var(--text-dim)]">PLUMBING GMBS</span>
               <span className="data text-[11px] font-semibold px-2 py-0.5 rounded-full" style={{ background: 'color-mix(in srgb, var(--cyan) 15%, transparent)', color: 'var(--cyan)' }}>
                 {totalGmbCalls} calls/mo
               </span>
@@ -617,9 +636,9 @@ export default function DashboardPage() {
           </motion.div>
 
           {/* ── 12. INSIGHTS ROW ── */}
-          <motion.div style={{ gridColumn: 'span 12' }} {...cardAnim(0.4)}>
+          <motion.div className="col-span-12" {...cardAnim(0.4)}>
             <div className="flex items-center justify-between mb-2">
-              <span className="label text-[10px] uppercase tracking-wider text-[var(--text-dim)]">INSIGHTS</span>
+              <span className="text-[10px] font-mono uppercase tracking-[2px] text-[var(--text-dim)]">INSIGHTS</span>
               <Link href="/ai" className="text-[11px] text-[var(--accent)] hover:underline">View all &rarr;</Link>
             </div>
             <div className="flex gap-3 overflow-x-auto pb-2" style={{ scrollbarWidth: 'none' }}>
@@ -651,20 +670,20 @@ export default function DashboardPage() {
             </div>
           </motion.div>
 
-          {/* ── 13. COMMAND INPUT ── */}
-          <motion.div style={{ gridColumn: 'span 12' }} {...cardAnim(0.42)}>
-            <div className="glass rounded-[16px] p-3 flex items-center gap-3">
-              <button className="w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0" style={{ background: 'linear-gradient(135deg, var(--accent), var(--cyan))' }}>
-                <span className="text-[14px]">🎤</span>
-              </button>
-              <input type="text" placeholder="Quick update or ask AI..."
-                className="flex-1 bg-transparent text-[13px] text-[var(--text)] placeholder:text-[var(--text-dim)] outline-none"
-              />
-              <span className="text-[11px] text-[var(--text-dim)] flex-shrink-0">↵</span>
-            </div>
-          </motion.div>
-
         </div>{/* end bento grid */}
+
+        {/* ── 13. COMMAND INPUT (sticky, outside grid) ── */}
+        <motion.div className="sticky bottom-4 z-30 mt-6" {...cardAnim(0.42)}>
+          <div className="glass rounded-[16px] p-3 flex items-center gap-3">
+            <button className="w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0" style={{ background: 'linear-gradient(135deg, var(--accent), var(--cyan))' }}>
+              <span className="text-[14px]">🎤</span>
+            </button>
+            <input type="text" placeholder="Quick update or ask AI..."
+              className="flex-1 bg-transparent text-[13px] text-[var(--text)] placeholder:text-[var(--text-dim)] outline-none"
+            />
+            <span className="text-[11px] text-[var(--text-dim)] flex-shrink-0">↵</span>
+          </div>
+        </motion.div>
       </div>
     </PageTransition>
   )

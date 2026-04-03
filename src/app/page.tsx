@@ -33,8 +33,9 @@ const SUGGESTED_CLIENTS = [
   { name: 'Eric (Plumbing)', grossMonthly: 1000, adSpend: 0, serviceType: 'SEO', meetingFrequency: 'None' },
 ]
 
-const inputCls = 'w-full bg-[#0e1018] border border-[#1e2338] rounded-[12px] text-sm py-3 px-4 text-white placeholder-gray-500 focus:outline-none focus:border-emerald-500/50 transition-colors'
-const btnPrimary = 'bg-gradient-to-r from-emerald-600 to-emerald-500 text-white font-medium rounded-[12px] px-8 py-3 cursor-pointer select-none'
+const inputCls = 'w-full bg-[#0e1018] border border-[#1e2338] rounded-[14px] text-[15px] py-[14px] px-[18px] text-white placeholder-[#4a5278] focus:outline-none focus:border-emerald-500/50 focus:ring-1 focus:ring-emerald-500/20 transition-all duration-200'
+const btnPrimary = 'bg-gradient-to-br from-[#10b981] to-[#059669] text-white font-semibold rounded-[14px] px-9 py-[14px] cursor-pointer select-none text-[15px] hover:shadow-[0_8px_30px_rgba(16,185,129,0.25)] transition-all duration-200'
+const labelCls = 'block text-[11px] font-mono uppercase tracking-[2px] text-[#8892b0] mb-1.5'
 
 function sixMonthsFromNow() {
   const d = new Date()
@@ -95,9 +96,9 @@ function Confetti() {
 // ── Toggle switch ──
 function Toggle({ on, onToggle, label }: { on: boolean; onToggle: () => void; label: string }) {
   return (
-    <button onClick={onToggle} className="flex items-center gap-3 w-full py-2 text-left">
+    <button onClick={onToggle} className="flex items-center gap-3 w-full py-3.5 border-b border-[#1e2338]/50 text-left">
       <motion.div
-        className={`relative w-12 h-6 rounded-full flex-shrink-0 ${on ? 'bg-emerald-600' : 'bg-[#1e2338]'}`}
+        className={`relative w-11 h-6 rounded-full flex-shrink-0 ${on ? 'bg-emerald-600' : 'bg-[#1e2338]'}`}
         transition={{ duration: 0.2 }}
       >
         <motion.div
@@ -347,13 +348,14 @@ function OnboardingWizard() {
               animate={{ opacity: [0.3, 0.6, 0.3] }}
               transition={{ duration: 3, repeat: Infinity, ease: 'easeInOut' }}
             />
-            <h1 className="font-mono text-[48px] font-bold tracking-[8px] text-[#10b981] relative z-10">ART OS</h1>
-            <p className="mt-4 text-[18px] text-gray-400 font-light relative z-10 text-center max-w-md">Your businesses. Your health. Your life. One system.</p>
+            <h1 className="data text-[56px] font-extrabold tracking-[12px] text-[#10b981] relative z-10">ART OS</h1>
+            <div className="w-32 h-1 bg-emerald-500/30 blur-xl mx-auto" />
+            <p className="text-[18px] font-light text-[#8892b0] mt-6 relative z-10 text-center max-w-md">Your businesses. Your health. Your life. One system.</p>
             <motion.button
               whileHover={{ scale: 1.03 }}
               whileTap={{ scale: 0.98 }}
               onClick={next}
-              className={`${btnPrimary} mt-10 relative z-10`}
+              className={`${btnPrimary} mt-12 relative z-10`}
             >
               Set up my OS →
             </motion.button>
@@ -368,27 +370,28 @@ function OnboardingWizard() {
           <motion.div key="s1" variants={slideVariants} initial="enter" animate="center" exit="exit" transition={slideTrans} className="min-h-screen flex items-center justify-center p-6">
             <div className="max-w-lg w-full space-y-6">
               <h2 className="text-[28px] font-semibold text-white">Let&apos;s start with you.</h2>
+              <p className="text-[14px] text-[#8892b0] mt-2">The basics so your OS knows who it&apos;s working for.</p>
               <div className="space-y-4">
                 <div>
-                  <label className="text-xs text-gray-400 mb-1 block">Name</label>
+                  <label className={labelCls}>YOUR NAME</label>
                   <input value={name} onChange={e => setName(e.target.value)} className={inputCls} placeholder="Your name" />
                 </div>
                 <div>
-                  <label className="text-xs text-gray-400 mb-1 block">Location</label>
+                  <label className={labelCls}>LOCATION</label>
                   <input value={location} onChange={e => setLocation(e.target.value)} className={inputCls} placeholder="City, State" />
                 </div>
                 <div>
-                  <label className="text-xs text-gray-400 mb-1 block">Wake up time</label>
+                  <label className={labelCls}>WAKE UP TIME</label>
                   <input type="time" value={wakeUp} onChange={e => setWakeUp(e.target.value)} className={inputCls} />
                 </div>
                 <div>
-                  <label className="text-xs text-gray-400 mb-1 block">Monthly income target</label>
-                  <p className="text-3xl font-bold text-emerald-400 mb-2">${income.toLocaleString()}</p>
-                  <input type="range" min={10000} max={200000} step={5000} value={income} onChange={e => setIncome(Number(e.target.value))} className="w-full accent-emerald-500" />
+                  <label className={labelCls}>MONTHLY INCOME TARGET</label>
+                  <p className="text-[32px] font-mono font-bold text-emerald-400 mb-2">${income.toLocaleString()}/mo</p>
+                  <input type="range" min={10000} max={200000} step={5000} value={income} onChange={e => setIncome(Number(e.target.value))} className="w-full h-2 rounded-full bg-[#1e2338] appearance-none [&::-webkit-slider-thumb]:w-5 [&::-webkit-slider-thumb]:h-5 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-emerald-500 [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:cursor-pointer" />
                   <div className="flex justify-between text-xs text-gray-500 mt-1"><span>$10K</span><span>$200K</span></div>
                 </div>
                 <div>
-                  <label className="text-xs text-gray-400 mb-1 block">Target date</label>
+                  <label className={labelCls}>TARGET DATE</label>
                   <input type="date" value={targetDate} onChange={e => setTargetDate(e.target.value)} className={inputCls} />
                 </div>
               </div>
@@ -408,12 +411,12 @@ function OnboardingWizard() {
           <motion.div key="s2" variants={slideVariants} initial="enter" animate="center" exit="exit" transition={slideTrans} className="min-h-screen flex items-center justify-center p-6">
             <div className="max-w-md w-full text-center space-y-6">
               <h2 className="text-[28px] font-semibold text-white">Set Your PIN</h2>
-              <p className="text-gray-400 text-sm">Keep your data private.</p>
+              <p className="text-[14px] text-[#8892b0]">Keep your data private.</p>
 
               <div>
-                <p className="text-xs text-gray-500 mb-3">{pinPhase === 'set' ? 'Choose a 4-digit PIN' : 'Confirm your PIN'}</p>
+                <p className="text-xs text-gray-500 mb-3">{pinPhase === 'set' ? 'Choose a 4-digit PIN' : 'Confirm your code'}</p>
                 <motion.div
-                  className="flex justify-center gap-3"
+                  className="flex justify-center gap-4"
                   animate={pinError ? { x: [0, -10, 10, -10, 0] } : {}}
                   transition={{ duration: 0.4 }}
                 >
@@ -426,7 +429,7 @@ function OnboardingWizard() {
                       value={d}
                       onChange={e => handlePinInput(pinPhase, i, e.target.value)}
                       onKeyDown={e => handlePinKeyDown(pinPhase, i, e)}
-                      className="w-[72px] h-[72px] text-center text-2xl font-bold bg-[#0e1018] border border-[#1e2338] rounded-[12px] text-white focus:outline-none focus:border-emerald-500/50 transition-colors"
+                      className="w-16 h-20 bg-[#0e1018] border-2 border-[#1e2338] rounded-[16px] text-center font-mono text-[28px] font-bold text-white focus:border-emerald-500 focus:outline-none transition-all duration-200"
                     />
                   ))}
                 </motion.div>
@@ -450,6 +453,7 @@ function OnboardingWizard() {
           <motion.div key="s3" variants={slideVariants} initial="enter" animate="center" exit="exit" transition={slideTrans} className="min-h-screen flex items-center justify-center p-6">
             <div className="max-w-2xl w-full space-y-6">
               <h2 className="text-[28px] font-semibold text-white">Tell me about your businesses.</h2>
+              <p className="text-[14px] text-[#8892b0] mt-2">Add the ones that are yours.</p>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 {SUGGESTED_BUSINESSES.map((biz, i) => {
                   const added = addedBiz.has(i)
@@ -458,15 +462,15 @@ function OnboardingWizard() {
                       key={i}
                       initial={{ opacity: 0, y: 20 }}
                       animate={{ opacity: 1, y: 0 }}
-                      transition={{ delay: i * 0.04, ease: [0.22, 1, 0.36, 1] as const }}
-                      className={`card p-4 flex items-center justify-between border ${added ? 'border-emerald-500/50' : 'border-[#1e2338]'} rounded-[16px]`}
+                      transition={{ delay: i * 0.06, ease: [0.22, 1, 0.36, 1] as const }}
+                      className={`bg-[#0e1018] border ${added ? 'border-emerald-500/30 bg-emerald-500/5' : 'border-[#1e2338]'} rounded-[16px] p-4 flex items-center gap-3.5 transition-all duration-200`}
                     >
-                      <div className="flex items-center gap-3">
-                        <span className="text-xl" style={{ color: biz.color }}>{biz.icon}</span>
-                        <div>
-                          <p className="text-sm font-medium text-white">{biz.name}</p>
-                          <p className="text-xs text-gray-500">{biz.status.replace(/_/g, ' ')} &middot; ${biz.monthlyRevenue.toLocaleString()}/mo</p>
-                        </div>
+                      <div className="w-10 h-10 rounded-full flex items-center justify-center text-lg" style={{ backgroundColor: `${biz.color}22` }}>
+                        <span>{biz.icon}</span>
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-[14px] font-semibold text-white">{biz.name}</p>
+                        <p className="text-[12px] text-[#8892b0]">{biz.status.replace(/_/g, ' ')} &middot; ${biz.monthlyRevenue.toLocaleString()}/mo</p>
                       </div>
                       <button
                         onClick={() => {
@@ -474,7 +478,7 @@ function OnboardingWizard() {
                           if (added) n.delete(i); else n.add(i)
                           setAddedBiz(n)
                         }}
-                        className={`text-xs px-3 py-1.5 rounded-lg font-medium transition-colors ${added ? 'bg-emerald-500/20 text-emerald-400' : 'bg-[#1e2338] text-gray-300 hover:bg-[#2a3050]'}`}
+                        className={`text-[12px] px-4 py-1.5 rounded-lg font-medium transition-colors ${added ? 'text-emerald-400 bg-emerald-500/10 border border-emerald-500/30' : 'border border-emerald-500/30 text-emerald-400'}`}
                       >
                         {added ? '✓ Added' : 'Add'}
                       </button>
@@ -540,32 +544,32 @@ function OnboardingWizard() {
               <div className="space-y-3">
                 {SUGGESTED_CLIENTS.map((client, i) => {
                   const added = addedClients.has(i)
-                  const net = client.grossMonthly - client.adSpend - client.grossMonthly * 0.03
                   return (
                     <motion.div
                       key={i}
                       initial={{ opacity: 0, y: 20 }}
                       animate={{ opacity: 1, y: 0 }}
-                      transition={{ delay: i * 0.04, ease: [0.22, 1, 0.36, 1] as const }}
-                      className={`card p-4 flex items-center justify-between border ${added ? 'border-emerald-500/50' : 'border-[#1e2338]'} rounded-[16px]`}
+                      transition={{ delay: i * 0.06, ease: [0.22, 1, 0.36, 1] as const }}
+                      className={`bg-[#0e1018] border ${added ? 'border-emerald-500/30 bg-emerald-500/5' : 'border-[#1e2338]'} rounded-[16px] p-4 flex items-center justify-between transition-all duration-200`}
                     >
                       <div>
-                        <p className="text-sm font-medium text-white">{client.name}</p>
-                        <p className="text-xs text-gray-500">
-                          ${client.grossMonthly.toLocaleString()} gross &middot; ${client.adSpend.toLocaleString()} ads &middot; <span className="text-emerald-400">${Math.round(net).toLocaleString()} net</span>
-                        </p>
-                        <p className="text-xs text-gray-600">{client.serviceType} &middot; {client.meetingFrequency}</p>
+                        <p className="text-[14px] font-semibold text-white">{client.name}</p>
+                        <p className="text-[12px] text-[#8892b0]">{client.serviceType} &middot; {client.meetingFrequency}</p>
+                        {client.adSpend > 0 && <p className="text-[12px] text-rose-400">Ad spend: ${client.adSpend.toLocaleString()}</p>}
                       </div>
-                      <button
-                        onClick={() => {
-                          const n = new Set(addedClients)
-                          if (added) n.delete(i); else n.add(i)
-                          setAddedClients(n)
-                        }}
-                        className={`text-xs px-3 py-1.5 rounded-lg font-medium transition-colors ${added ? 'bg-emerald-500/20 text-emerald-400' : 'bg-[#1e2338] text-gray-300 hover:bg-[#2a3050]'}`}
-                      >
-                        {added ? '✓ Added' : 'Add'}
-                      </button>
+                      <div className="flex items-center gap-3">
+                        <span className="font-mono text-[14px] text-emerald-400">${client.grossMonthly.toLocaleString()}/mo</span>
+                        <button
+                          onClick={() => {
+                            const n = new Set(addedClients)
+                            if (added) n.delete(i); else n.add(i)
+                            setAddedClients(n)
+                          }}
+                          className={`text-[12px] px-4 py-1.5 rounded-lg font-medium transition-colors ${added ? 'text-emerald-400 bg-emerald-500/10 border border-emerald-500/30' : 'border border-emerald-500/30 text-emerald-400'}`}
+                        >
+                          {added ? '✓ Added' : 'Add'}
+                        </button>
+                      </div>
                     </motion.div>
                   )
                 })}
@@ -606,8 +610,8 @@ function OnboardingWizard() {
               )}
 
               {addedClients.size > 0 && (
-                <div className="card p-3 rounded-[12px] text-center">
-                  <p className="text-sm text-gray-400">Running total: <span className="text-emerald-400 font-semibold">
+                <div className="bg-[#0e1018] border border-[#1e2338] rounded-[12px] p-3 text-center">
+                  <p className="font-mono text-[14px] text-[#8892b0]">Running total: <span className="text-emerald-400 font-semibold">
                     ${SUGGESTED_CLIENTS.filter((_, i) => addedClients.has(i)).reduce((s, c) => s + c.grossMonthly, 0).toLocaleString()}/mo gross
                   </span></p>
                 </div>
@@ -629,15 +633,18 @@ function OnboardingWizard() {
           <motion.div key="s5" variants={slideVariants} initial="enter" animate="center" exit="exit" transition={slideTrans} className="min-h-screen flex items-center justify-center p-6">
             <div className="max-w-lg w-full space-y-6">
               <h2 className="text-[28px] font-semibold text-white">Connect Your Tools</h2>
-              <p className="text-gray-400 text-sm">Let&apos;s connect your data sources.</p>
 
               <div className="space-y-4">
                 {/* Anthropic */}
-                <div className="card p-4 rounded-[16px] space-y-3">
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm font-medium text-white">🧠 Anthropic API</span>
-                    {aiTestResult === 'pass' && <span className="text-emerald-400 text-sm">✅ Connected</span>}
-                    {aiTestResult === 'fail' && <span className="text-red-400 text-sm">❌ Failed</span>}
+                <div className="bg-[#0e1018] border border-[#1e2338] rounded-[16px] p-5 space-y-3">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-full bg-purple-500/20 flex items-center justify-center text-lg">🧠</div>
+                    <div className="flex-1">
+                      <p className="text-[15px] font-semibold text-white">Anthropic API</p>
+                      <p className="text-[12px] text-[#8892b0]">Powers your AI strategist</p>
+                    </div>
+                    {aiTestResult === 'pass' && <span className="text-emerald-400 text-sm">Connected</span>}
+                    {aiTestResult === 'fail' && <span className="text-red-400 text-sm">Failed</span>}
                   </div>
                   <input value={anthropicKey} onChange={e => setAnthropicKey(e.target.value)} placeholder="sk-ant-..." className={inputCls} type="password" />
                   <button onClick={testAi} disabled={!anthropicKey || aiTestResult === 'loading'} className="text-xs text-emerald-400 hover:text-emerald-300 disabled:text-gray-600 transition-colors">
@@ -646,19 +653,25 @@ function OnboardingWizard() {
                 </div>
 
                 {/* Stripe */}
-                <div className="card p-4 rounded-[16px] space-y-3">
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm font-medium text-white">💳 Stripe</span>
-                    <span className="text-xs text-gray-600">Coming soon — enter for later</span>
+                <div className="bg-[#0e1018] border border-[#1e2338] rounded-[16px] p-5 space-y-3">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-full bg-blue-500/20 flex items-center justify-center text-lg">💳</div>
+                    <div className="flex-1">
+                      <p className="text-[15px] font-semibold text-white">Stripe</p>
+                      <p className="text-[12px] text-[#8892b0]">Coming soon — enter for later</p>
+                    </div>
                   </div>
                   <input value={stripeKey} onChange={e => setStripeKey(e.target.value)} placeholder="sk_live_..." className={inputCls} type="password" />
                 </div>
 
                 {/* Plaid */}
-                <div className="card p-4 rounded-[16px] opacity-50">
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm font-medium text-white">🏦 Plaid</span>
-                    <span className="text-xs text-gray-600">Coming soon</span>
+                <div className="bg-[#0e1018] border border-[#1e2338] rounded-[16px] p-5 opacity-50">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-full bg-green-500/20 flex items-center justify-center text-lg">🏦</div>
+                    <div className="flex-1">
+                      <p className="text-[15px] font-semibold text-white">Plaid</p>
+                      <p className="text-[12px] text-[#8892b0]">Coming soon</p>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -666,7 +679,7 @@ function OnboardingWizard() {
               <div className="flex justify-between pt-4">
                 <button onClick={prev} className="text-gray-400 text-sm hover:text-white transition-colors">&larr; Back</button>
                 <div className="flex gap-3 items-center">
-                  <button onClick={() => { setStep(s => s + 1) }} className="text-gray-400 text-sm hover:text-white transition-colors">Skip for now</button>
+                  <button onClick={() => { setStep(s => s + 1) }} className="text-[13px] text-[#8892b0] hover:text-white transition-colors">Skip all &rarr;</button>
                   <motion.button whileHover={{ scale: 1.03 }} onClick={() => { store.updateProfile({ anthropicKey, stripeKey }); next() }} className={btnPrimary}>Next &rarr;</motion.button>
                 </div>
               </div>
@@ -722,24 +735,41 @@ function OnboardingWizard() {
               </motion.div>
 
               <div className="space-y-3 text-left max-w-md mx-auto">
+                {/* User bubble */}
+                <motion.div
+                  initial={{ opacity: 0, x: 20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ delay: 0.2, ease: [0.22, 1, 0.36, 1] as const }}
+                  className="bg-[#1a1f2e] rounded-[16px] rounded-br-[4px] px-4 py-3 text-[14px] text-white ml-auto max-w-[80%]"
+                >
+                  I want to start a new SaaS idea I had...
+                </motion.div>
+                {/* AI bubbles */}
                 {[
                   "You're doing it again. You have 3 proven channels sitting stale...",
-                  "$700 avg ticket × 4 calls/day = $61,600/mo. The gap is lead flow.",
+                  "$700 avg ticket x 4 calls/day = $61,600/mo. The gap is lead flow.",
                   "Before we discuss this new idea — have you restarted cold email?",
                 ].map((msg, i) => (
                   <motion.div
                     key={i}
                     initial={{ opacity: 0, x: -20 }}
                     animate={{ opacity: 1, x: 0 }}
-                    transition={{ delay: 0.3 + i * 0.2, ease: [0.22, 1, 0.36, 1] as const }}
-                    className="card p-3 rounded-[12px] text-sm text-gray-300 border-l-2 border-emerald-500/50"
+                    transition={{ delay: 0.4 + i * 0.2, ease: [0.22, 1, 0.36, 1] as const }}
+                    className="bg-gradient-to-br from-purple-500/8 to-cyan-500/8 border border-cyan-500/15 rounded-[16px] rounded-bl-[4px] px-4 py-3 text-[14px] text-[#c4cde0]"
                   >
                     {msg}
                   </motion.div>
                 ))}
               </div>
 
-              <p className="text-sm text-gray-400 italic">I&apos;ll be direct with you. I&apos;ll call out when you&apos;re spreading thin.</p>
+              <div className="space-y-2 text-left max-w-md mx-auto">
+                {['Calls out shiny-object syndrome', 'Tracks your actual revenue gaps', 'Prioritizes what moves the needle'].map((feat, i) => (
+                  <div key={i} className="flex items-center gap-2">
+                    <span className="text-emerald-400">&#10003;</span>
+                    <span className="text-[14px] text-[#c4cde0]">{feat}</span>
+                  </div>
+                ))}
+              </div>
 
               <div className="flex items-center justify-center gap-2 text-xs">
                 <span className={`w-2 h-2 rounded-full ${anthropicKey ? 'bg-emerald-500' : 'bg-gray-600'}`} />
@@ -762,19 +792,47 @@ function OnboardingWizard() {
           <motion.div key="s8" variants={slideVariants} initial="enter" animate="center" exit="exit" transition={slideTrans} className="min-h-screen flex items-center justify-center p-6 relative">
             <Confetti />
             <div className="max-w-lg w-full text-center space-y-6 relative z-10">
-              <h2 className="text-4xl font-bold bg-gradient-to-r from-emerald-400 to-cyan-400 bg-clip-text text-transparent">ART OS is ready.</h2>
-              <p className="text-gray-400">
+              <h2 className="text-[36px] font-bold gradient-text">ART OS is ready.</h2>
+              <p className="font-mono text-[14px] text-[#8892b0]">
                 {addedBizCount} business{addedBizCount !== 1 ? 'es' : ''} &middot; {addedClientCount} client{addedClientCount !== 1 ? 's' : ''} &middot; ${totalMRR.toLocaleString()} MRR
               </p>
               <motion.button
                 whileHover={{ scale: 1.03 }}
                 whileTap={{ scale: 0.98 }}
                 onClick={() => {
+                  // Seed GMB profiles for plumbing businesses
+                  const plumbBiz = store.businesses.find(b => b.type === 'service')
+                  if (plumbBiz) {
+                    const gmbs = [
+                      { city: 'Ann Arbor', reviewCount: 52, callsPerMonth: 31, ranking: '#4', status: 'strong' as const },
+                      { city: 'Dearborn', reviewCount: 47, callsPerMonth: 28, ranking: '#3', status: 'strong' as const },
+                      { city: 'Farmington Hills', reviewCount: 38, callsPerMonth: 22, ranking: '#5', status: 'strong' as const },
+                      { city: 'Canton', reviewCount: 25, callsPerMonth: 14, ranking: '#7', status: 'medium' as const },
+                      { city: 'Birmingham', reviewCount: 21, callsPerMonth: 11, ranking: '#8', status: 'medium' as const },
+                      { city: 'Bloomfield', reviewCount: 18, callsPerMonth: 9, ranking: '#9', status: 'medium' as const },
+                      { city: 'Livonia', reviewCount: 3, callsPerMonth: 2, ranking: '—', status: 'new' as const },
+                      { city: 'Southgate', reviewCount: 2, callsPerMonth: 1, ranking: '—', status: 'new' as const },
+                      { city: 'Ypsilanti', reviewCount: 1, callsPerMonth: 0, ranking: '—', status: 'new' as const },
+                    ]
+                    gmbs.forEach(g => store.addGmbProfile({ ...g, businessId: plumbBiz.id, hasAddress: false }))
+                  }
+                  // Seed starter tasks for each business
+                  store.businesses.forEach(biz => {
+                    if (biz.type === 'agency') {
+                      store.addTask({ businessId: biz.id, text: 'Restart cold email — 200/day to UMich alumni', tag: 'OUTBOUND', priority: 'crit', done: false, xpValue: 50 })
+                      store.addTask({ businessId: biz.id, text: 'SEO your own 3 GMBs for inbound leads', tag: 'SEO', priority: 'high', done: false, xpValue: 30 })
+                      store.addTask({ businessId: biz.id, text: 'Document SOPs for client onboarding', tag: 'EXIT', priority: 'med', done: false, xpValue: 20 })
+                    }
+                    if (biz.type === 'service') {
+                      store.addTask({ businessId: biz.id, text: 'Sign office lease for GMB addresses', tag: 'CRITICAL', priority: 'crit', done: false, xpValue: 50 })
+                      store.addTask({ businessId: biz.id, text: 'Set up real review request system', tag: 'SEO', priority: 'high', done: false, xpValue: 30 })
+                    }
+                  })
                   store.completeOnboarding()
                   store.setAuthenticated(true)
                   router.push('/dashboard')
                 }}
-                className={`${btnPrimary} text-lg px-10 py-4`}
+                className={`${btnPrimary} text-[16px] font-bold py-4 px-12`}
               >
                 Enter ART OS &rarr;
               </motion.button>
@@ -788,7 +846,7 @@ function OnboardingWizard() {
   }
 
   return (
-    <div className="min-h-screen bg-[#080a10] text-white" style={{ background: 'radial-gradient(ellipse at center, rgba(16,185,129,0.04) 0%, #080a10 70%)' }}>
+    <div className="min-h-screen bg-[#080a10] text-white" style={{ background: 'radial-gradient(ellipse at center, rgba(16,185,129,0.06) 0%, #07080d 70%)' }}>
       {/* Progress bar */}
       {step > 0 && (
         <div className="fixed top-0 left-0 right-0 z-50 h-1 bg-[#1e2338]">
@@ -810,12 +868,8 @@ function OnboardingWizard() {
 // Main Page
 // ══════════════════════════════════════════
 export default function Page() {
-  const { authenticated, onboardingComplete, seedDefaultData } = useStore()
+  const { authenticated, onboardingComplete } = useStore()
   const router = useRouter()
-
-  useEffect(() => {
-    seedDefaultData()
-  }, [seedDefaultData])
 
   useEffect(() => {
     if (authenticated) router.push('/dashboard')

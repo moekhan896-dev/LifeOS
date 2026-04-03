@@ -1,28 +1,11 @@
 'use client'
 
-import { useState, useMemo, useRef, useEffect } from 'react'
+import { useState, useMemo } from 'react'
+import { motion, AnimatePresence } from 'framer-motion'
+import { toast } from 'sonner'
 import { useStore, type Task, type Priority } from '@/stores/store'
 import { TAGS, XP_VALUES, PRIORITY_COLORS } from '@/lib/constants'
-import TaskItem from '@/components/TaskItem'
 import PageTransition from '@/components/PageTransition'
-import { StaggerContainer, StaggerItem } from '@/components/Stagger'
-import { motion, AnimatePresence } from 'framer-motion'
-import {
-  DndContext,
-  closestCenter,
-  useSensor,
-  useSensors,
-  PointerSensor,
-  KeyboardSensor,
-  type DragEndEvent,
-} from '@dnd-kit/core'
-import {
-  SortableContext,
-  useSortable,
-  verticalListSortingStrategy,
-} from '@dnd-kit/sortable'
-import { CSS } from '@dnd-kit/utilities'
-import { toast } from 'sonner'
 
 const PRIORITY_ORDER: Priority[] = ['crit', 'high', 'med', 'low']
 
@@ -56,73 +39,62 @@ function parseTaskInput(text: string): { text: string; priority: Priority; tag: 
   return { text: cleaned, priority, tag }
 }
 
-/* ── Sortable wrapper ── */
-function SortableTask({ task }: { task: Task }) {
-  const {
-    attributes,
-    listeners,
-    setNodeRef,
-    transform,
-    transition,
-    isDragging,
-  } = useSortable({ id: task.id })
+const PRIORITY_BAR_COLORS: Record<Priority, string> = {
+  crit: 'bg-rose-500',
+  high: 'bg-amber-500',
+  med: 'bg-blue-500',
+  low: 'bg-slate-600',
+}
 
-  const style = {
-    transform: CSS.Transform.toString(transform),
-    transition,
-  }
-
-  return (
-    <motion.div
-      ref={setNodeRef}
-      style={style}
-      {...attributes}
-      {...listeners}
-      layout
-      initial={{ opacity: 0, y: 8 }}
-      animate={{
-        opacity: isDragging ? 0.5 : 1,
-        y: 0,
-        scale: isDragging ? 1.02 : 1,
-        boxShadow: isDragging
-          ? '0 8px 24px rgba(0,0,0,0.25)'
-          : '0 0px 0px rgba(0,0,0,0)',
-      }}
-      exit={{ opacity: 0, height: 0, marginBottom: 0, overflow: 'hidden' }}
-      transition={{ duration: 0.2, ease: [0.25, 0.1, 0.25, 1] }}
-    >
-      <TaskItem task={task} />
-    </motion.div>
-  )
+const PRIORITY_PILL: Record<Priority, string> = {
+  crit: 'bg-rose-500/15 text-rose-400',
+  high: 'bg-amber-500/15 text-amber-400',
+  med: 'bg-blue-500/15 text-blue-400',
+  low: 'bg-slate-500/15 text-slate-400',
 }
 
 export default function TasksPage() {
-  const { tasks, businesses, addTask, toggleTask, deleteTask } = useStore()
+  const { tasks, businesses, addTask, toggleTask, deleteTask, updateTask } = useStore()
+
   const [search, setSearch] = useState('')
   const [filterBusiness, setFilterBusiness] = useState<string>('all')
   const [filterPriority, setFilterPriority] = useState<string>('all')
   const [filterTag, setFilterTag] = useState<string>('all')
-  const [collapsed, setCollapsed] = useState<Record<string, boolean>>({})
-  const [inlineInputs, setInlineInputs] = useState<Record<string, string>>({})
-  const [showQuickAdd, setShowQuickAdd] = useState(false)
-  const [quickText, setQuickText] = useState('')
-  const [quickBusiness, setQuickBusiness] = useState<string>(businesses[0]?.id ?? '')
-  const quickRef = useRef<HTMLInputElement>(null)
 
-  const sensors = useSensors(
-    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
-    useSensor(KeyboardSensor)
-  )
+  // New task flow
+  const [showNewTask, setShowNewTask] = useState(false)
+  const [newText, setNewText] = useState('')
+  const [newBusiness, setNewBusiness] = useState<string>('')
+  const [newPriority, setNewPriority] = useState<Priority>('med')
+  const [newTag, setNewTag] = useState<string>('')
 
-  useEffect(() => {
-    if (showQuickAdd) quickRef.current?.focus()
-  }, [showQuickAdd])
+  // Inline edit
+  const [editingId, setEditingId] = useState<string | null>(null)
+  const [editText, setEditText] = useState('')
 
+  // Completed section
+  const [showCompleted, setShowCompleted] = useState(false)
+
+  // XP animation
+  const [xpAnimId, setXpAnimId] = useState<string | null>(null)
+
+  // Stats
+  const totalTasks = tasks.length
+  const doneTasks = tasks.filter((t) => t.done).length
+  const todayStr = new Date().toISOString().split('T')[0]
+  const weekAgo = new Date(Date.now() - 7 * 86400000).toISOString()
+  const todayUndone = tasks.filter((t) => !t.done && t.createdAt.startsWith(todayStr)).length
+  const thisWeekCount = tasks.filter((t) => t.createdAt >= weekAgo).length
+  const completionPct = totalTasks > 0 ? Math.round((doneTasks / totalTasks) * 100) : 0
+  const doneToday = tasks.filter((t) => t.done && t.completedAt?.startsWith(todayStr))
+  const xpToday = doneToday.reduce((s, t) => s + t.xpValue, 0)
+
+  // Filtering
   const filtered = useMemo(() => {
     let result = tasks
     if (search) {
       const q = search.toLowerCase()
-      result = result.filter((t) => t.text.toLowerCase().includes(q) || t.tag.toLowerCase().includes(q))
+      result = result.filter((t) => t.text.toLowerCase().includes(q))
     }
     if (filterBusiness !== 'all') result = result.filter((t) => t.businessId === filterBusiness)
     if (filterPriority !== 'all') result = result.filter((t) => t.priority === filterPriority)
@@ -130,297 +102,405 @@ export default function TasksPage() {
     return result
   }, [tasks, search, filterBusiness, filterPriority, filterTag])
 
-  const grouped = useMemo(() => {
-    const map: Record<string, Task[]> = {}
-    for (const b of businesses) map[b.id] = []
-    for (const t of filtered) {
-      if (!map[t.businessId]) map[t.businessId] = []
-      map[t.businessId].push(t)
+  const incompleteTasks = useMemo(() => sortTasks(filtered.filter((t) => !t.done)), [filtered])
+  const completedTasks = useMemo(() => filtered.filter((t) => t.done).sort((a, b) =>
+    new Date(b.completedAt || b.createdAt).getTime() - new Date(a.completedAt || a.createdAt).getTime()
+  ), [filtered])
+
+  const handleNewTask = () => {
+    const raw = newText.trim()
+    if (!raw) return
+    const parsed = parseTaskInput(raw)
+    const priority = newPriority !== 'med' ? newPriority : parsed.priority
+    const tag = newTag || parsed.tag
+    const businessId = newBusiness || businesses[0]?.id || ''
+    addTask({ businessId, text: parsed.text, priority, tag, done: false, xpValue: XP_VALUES[priority] })
+    setNewText('')
+    setNewPriority('med')
+    setNewTag('')
+    setNewBusiness('')
+    setShowNewTask(false)
+    toast.success('Task added')
+  }
+
+  const handleToggle = (task: Task) => {
+    toggleTask(task.id)
+    if (!task.done) {
+      setXpAnimId(task.id)
+      setTimeout(() => setXpAnimId(null), 800)
+      toast.success(`Task completed · +${task.xpValue} XP`)
     }
-    return map
-  }, [filtered, businesses])
-
-  const totalTasks = tasks.length
-  const doneTasks = tasks.filter((t) => t.done).length
-  const completionPct = totalTasks > 0 ? Math.round((doneTasks / totalTasks) * 100) : 0
-
-  const todayStr = new Date().toISOString().split('T')[0]
-  const weekAgo = new Date(Date.now() - 7 * 86400000).toISOString()
-  const tasksToday = tasks.filter((t) => t.createdAt.startsWith(todayStr)).length
-  const tasksThisWeek = tasks.filter((t) => t.createdAt >= weekAgo).length
-  const doneToday = tasks.filter((t) => t.done && t.completedAt?.startsWith(todayStr))
-  const xpToday = doneToday.reduce((s, t) => s + t.xpValue, 0)
-
-  const toggle = (id: string) => setCollapsed((p) => ({ ...p, [id]: !p[id] }))
-
-  const handleInlineAdd = (businessId: string) => {
-    const raw = inlineInputs[businessId]?.trim()
-    if (!raw) return
-    const { text, priority, tag } = parseTaskInput(raw)
-    if (!text) return
-    addTask({ businessId, text, priority, tag, done: false, xpValue: XP_VALUES[priority] })
-    setInlineInputs((p) => ({ ...p, [businessId]: '' }))
-    toast.success('Task added')
   }
 
-  const handleQuickAdd = () => {
-    const raw = quickText.trim()
-    if (!raw) return
-    const { text, priority, tag } = parseTaskInput(raw)
-    if (!text) return
-    addTask({ businessId: quickBusiness, text, priority, tag, done: false, xpValue: XP_VALUES[priority] })
-    setQuickText('')
-    setShowQuickAdd(false)
-    toast.success('Task added')
+  const handleInlineEdit = (task: Task) => {
+    setEditingId(task.id)
+    setEditText(task.text)
   }
 
-  const handleDragEnd = (_event: DragEndEvent) => {
-    // Priority-based sorting is the source of truth.
-    // Drag gives visual lift/feedback but snaps back on release.
+  const saveInlineEdit = (id: string) => {
+    if (editText.trim()) {
+      updateTask(id, { text: editText.trim() })
+    }
+    setEditingId(null)
   }
+
+  const getBusiness = (id: string) => businesses.find((b) => b.id === id)
 
   const stats = [
-    { label: 'Today', value: tasksToday },
-    { label: 'This Week', value: tasksThisWeek },
-    { label: 'Done Rate', value: `${completionPct}%` },
-    { label: 'XP Today', value: `+${xpToday}` },
+    { label: 'TODAY', value: todayUndone, color: 'text-white' },
+    { label: 'THIS WEEK', value: thisWeekCount, color: 'text-white' },
+    { label: 'DONE RATE', value: `${completionPct}%`, color: completionPct > 50 ? 'text-emerald-400' : 'text-amber-400' },
+    { label: 'XP TODAY', value: `+${xpToday}`, color: 'text-purple-400' },
   ]
+
+  const renderTaskCard = (task: Task, index: number) => {
+    const biz = getBusiness(task.businessId)
+    const isEditing = editingId === task.id
+
+    return (
+      <motion.div
+        key={task.id}
+        layout
+        initial={{ opacity: 0, y: 12 }}
+        animate={{ opacity: 1, y: 0 }}
+        exit={{ opacity: 0, height: 0, marginBottom: 0, overflow: 'hidden' }}
+        transition={{ duration: 0.2, delay: index * 0.04, ease: [0.25, 0.1, 0.25, 1] }}
+        className="group bg-[#0e1018] border border-[#1e2338] rounded-[14px] px-[18px] py-[14px] mb-2 flex items-center gap-[14px] hover:border-[#2d3450] hover:bg-[#111520] hover:-translate-y-[1px] hover:shadow-lg transition-all duration-150 relative"
+      >
+        {/* Priority bar */}
+        <div className={`w-1 h-10 rounded-full flex-shrink-0 ${PRIORITY_BAR_COLORS[task.priority]}`} />
+
+        {/* Checkbox */}
+        <motion.button
+          whileTap={{ scale: 0.85 }}
+          onClick={() => handleToggle(task)}
+          className={`w-5 h-5 rounded-full border-2 flex-shrink-0 flex items-center justify-center transition-colors ${
+            task.done
+              ? 'bg-emerald-500 border-emerald-500'
+              : 'border-[#2d3450] bg-transparent hover:border-emerald-500'
+          }`}
+        >
+          {task.done && (
+            <motion.svg
+              width="10" height="10" viewBox="0 0 12 12" fill="none"
+              initial={{ pathLength: 0 }}
+              animate={{ pathLength: 1 }}
+              transition={{ duration: 0.2 }}
+            >
+              <motion.path
+                d="M2 6L5 9L10 3"
+                stroke="white"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                initial={{ pathLength: 0 }}
+                animate={{ pathLength: 1 }}
+                transition={{ duration: 0.2 }}
+              />
+            </motion.svg>
+          )}
+        </motion.button>
+
+        {/* Content */}
+        <div className="flex-1 min-w-0">
+          {isEditing ? (
+            <input
+              autoFocus
+              value={editText}
+              onChange={(e) => setEditText(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') saveInlineEdit(task.id)
+                if (e.key === 'Escape') setEditingId(null)
+              }}
+              onBlur={() => saveInlineEdit(task.id)}
+              className="w-full bg-transparent text-[14px] font-medium text-white outline-none border-b border-emerald-500/40 pb-0.5"
+            />
+          ) : (
+            <p
+              onClick={() => !task.done && handleInlineEdit(task)}
+              className={`text-[14px] font-medium text-white truncate cursor-text ${
+                task.done ? 'opacity-40 line-through' : ''
+              }`}
+            >
+              {task.text}
+            </p>
+          )}
+          <div className="flex items-center gap-2 mt-1.5">
+            <span className={`text-[9px] font-mono uppercase rounded-md px-2 py-0.5 ${PRIORITY_PILL[task.priority]}`}>
+              {task.priority}
+            </span>
+            {task.tag && (
+              <span className="text-[9px] font-mono uppercase rounded-md px-2 py-0.5 bg-cyan-500/15 text-cyan-400">
+                {task.tag}
+              </span>
+            )}
+            {biz && (
+              <span className="flex items-center gap-1.5 text-[11px] text-[#8892b0]">
+                <span className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ backgroundColor: biz.color }} />
+                {biz.name}
+              </span>
+            )}
+          </div>
+        </div>
+
+        {/* Delete button */}
+        <button
+          onClick={() => deleteTask(task.id)}
+          className="w-8 h-8 rounded-lg flex items-center justify-center opacity-0 group-hover:opacity-100 hover:bg-[#1a1f2e] text-rose-400 transition-all flex-shrink-0"
+        >
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+            <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
+          </svg>
+        </button>
+
+        {/* XP animation */}
+        <AnimatePresence>
+          {xpAnimId === task.id && (
+            <motion.span
+              initial={{ opacity: 1, y: 0 }}
+              animate={{ opacity: 0, y: -30 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.7 }}
+              className="absolute right-12 top-2 text-emerald-400 text-[12px] font-mono font-bold pointer-events-none"
+            >
+              +{task.xpValue} XP
+            </motion.span>
+          )}
+        </AnimatePresence>
+      </motion.div>
+    )
+  }
 
   return (
     <PageTransition>
       <div className="p-6 max-w-5xl mx-auto space-y-5">
+
         {/* Header */}
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="label text-2xl tracking-widest">TASKS</h1>
-            <p className="text-[var(--text-dim)] text-xs mt-1">{totalTasks} total &middot; {doneTasks} done</p>
+            <h1 className="text-[24px] font-semibold text-white">Tasks</h1>
+            <p className="text-[13px] text-[#8892b0]">{totalTasks} total &middot; {doneTasks} done</p>
           </div>
-          <div className="flex items-center gap-3">
-            <div className="w-40 h-2 rounded-full bg-[var(--surface2)] overflow-hidden">
-              <motion.div
-                className="h-full rounded-full bg-[var(--accent)]"
-                initial={{ width: 0 }}
-                animate={{ width: `${completionPct}%` }}
-                transition={{ duration: 0.6, ease: 'easeOut' }}
-              />
-            </div>
-            <span className="data text-sm text-[var(--accent)]">{completionPct}%</span>
-          </div>
+          <motion.button
+            whileHover={{ scale: 1.03 }}
+            whileTap={{ scale: 0.97 }}
+            onClick={() => {
+              setNewBusiness(businesses[0]?.id || '')
+              setShowNewTask(true)
+            }}
+            className="bg-gradient-to-r from-emerald-500 to-emerald-600 text-white rounded-[12px] px-5 py-2.5 text-[13px] font-semibold"
+          >
+            + New Task
+          </motion.button>
         </div>
 
-        {/* Stats bar */}
-        <StaggerContainer className="grid grid-cols-4 gap-2">
-          {stats.map((s) => (
-            <StaggerItem key={s.label}>
-              <motion.div
-                whileHover={{ y: -2 }}
-                transition={{ duration: 0.15 }}
-                className="bg-[var(--surface)] border border-[var(--border)] rounded-[10px] px-3 py-2 text-center cursor-default"
-              >
-                <p className="label text-[10px] tracking-wider text-[var(--text-dim)]">{s.label}</p>
-                <p className="data text-lg font-semibold text-[var(--text)]">{s.value}</p>
-              </motion.div>
-            </StaggerItem>
-          ))}
-        </StaggerContainer>
-
-        {/* Filters */}
-        <StaggerContainer>
-          <StaggerItem>
-            <div className="flex flex-wrap items-center gap-1.5 bg-[var(--surface)] border border-[var(--border)] rounded-[10px] p-2.5">
-              <input
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                placeholder="Search tasks..."
-                className="bg-transparent border border-[var(--border)] rounded-lg px-2.5 py-1 text-xs text-[var(--text)] placeholder:text-[var(--text-dim)] outline-none focus:border-[var(--accent)] w-40 transition-colors"
-              />
-              <div className="h-4 w-px bg-[var(--border)]" />
-
-              {[{ id: 'all', name: 'All' }, ...businesses].map((b) => (
-                <button
-                  key={b.id}
-                  onClick={() => setFilterBusiness(b.id)}
-                  className={`text-[11px] px-2 py-0.5 rounded-lg border transition-all ${
-                    filterBusiness === b.id
-                      ? 'bg-[var(--accent)]/15 border-[var(--accent)]/40 text-[var(--accent)]'
-                      : 'border-transparent text-[var(--text-dim)] hover:text-[var(--text)]'
-                  }`}
-                >
-                  {'color' in b && <span className="inline-block w-1.5 h-1.5 rounded-full mr-1" style={{ backgroundColor: (b as any).color }} />}
-                  {b.name}
-                </button>
-              ))}
-
-              <div className="h-4 w-px bg-[var(--border)]" />
-
-              <select
-                value={filterPriority}
-                onChange={(e) => setFilterPriority(e.target.value)}
-                className="bg-[var(--surface2)] border border-[var(--border)] rounded-lg px-2 py-0.5 text-[11px] text-[var(--text)] outline-none"
-              >
-                <option value="all">Priority</option>
-                {PRIORITY_ORDER.map((p) => (
-                  <option key={p} value={p}>{p.toUpperCase()}</option>
-                ))}
-              </select>
-
-              <select
-                value={filterTag}
-                onChange={(e) => setFilterTag(e.target.value)}
-                className="bg-[var(--surface2)] border border-[var(--border)] rounded-lg px-2 py-0.5 text-[11px] text-[var(--text)] outline-none"
-              >
-                <option value="all">Tag</option>
-                {TAGS.map((t) => (
-                  <option key={t} value={t}>{t}</option>
-                ))}
-              </select>
-            </div>
-          </StaggerItem>
-        </StaggerContainer>
-
-        {/* Grouped tasks */}
-        <div className="space-y-3">
-          {businesses.map((biz) => {
-            const bizTasks = grouped[biz.id] || []
-            if (filterBusiness !== 'all' && filterBusiness !== biz.id) return null
-            const isCollapsed = collapsed[biz.id]
-            const bizDone = bizTasks.filter((t) => t.done).length
-            const sorted = sortTasks(bizTasks)
-
-            return (
-              <motion.div
-                key={biz.id}
-                layout
-                className="bg-[var(--surface)] border border-[var(--border)] rounded-[10px] overflow-hidden"
-              >
-                {/* Section header */}
-                <button
-                  onClick={() => toggle(biz.id)}
-                  className="w-full flex items-center justify-between px-3 py-2 hover:bg-[var(--surface2)] transition-colors"
-                >
-                  <div className="flex items-center gap-2.5">
-                    <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: biz.color }} />
-                    <span className="label text-sm tracking-wide">{biz.name}</span>
-                    <span className="text-[10px] text-[var(--text-dim)] bg-[var(--surface2)] px-1.5 py-0.5 rounded-md">
-                      {bizDone}/{bizTasks.length}
-                    </span>
-                  </div>
-                  <motion.svg
-                    width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--text-dim)" strokeWidth="2" strokeLinecap="round"
-                    animate={{ rotate: isCollapsed ? -90 : 0 }}
-                    transition={{ duration: 0.2 }}
-                  >
-                    <polyline points="6 9 12 15 18 9" />
-                  </motion.svg>
-                </button>
-
-                {/* Task list */}
-                <AnimatePresence initial={false}>
-                  {!isCollapsed && (
-                    <motion.div
-                      initial={{ height: 0, opacity: 0 }}
-                      animate={{ height: 'auto', opacity: 1 }}
-                      exit={{ height: 0, opacity: 0 }}
-                      transition={{ duration: 0.25, ease: [0.25, 0.1, 0.25, 1] }}
-                      className="overflow-hidden"
-                    >
-                      <div className="px-2.5 pb-2.5 space-y-1">
-                        {bizTasks.length === 0 && (
-                          <p className="text-[11px] text-[var(--text-dim)] text-center py-3 italic">No tasks yet</p>
-                        )}
-                        <DndContext
-                          sensors={sensors}
-                          collisionDetection={closestCenter}
-                          onDragEnd={handleDragEnd}
-                        >
-                          <SortableContext
-                            items={sorted.map((t) => t.id)}
-                            strategy={verticalListSortingStrategy}
-                          >
-                            <AnimatePresence initial={false}>
-                              {sorted.map((task) => (
-                                <SortableTask key={task.id} task={task} />
-                              ))}
-                            </AnimatePresence>
-                          </SortableContext>
-                        </DndContext>
-
-                        {/* Inline add */}
-                        <div className="mt-1.5">
-                          <input
-                            value={inlineInputs[biz.id] || ''}
-                            onChange={(e) => setInlineInputs((p) => ({ ...p, [biz.id]: e.target.value }))}
-                            onKeyDown={(e) => e.key === 'Enter' && handleInlineAdd(biz.id)}
-                            placeholder="+ Add task... (!crit !high !low #TAG)"
-                            className="w-full bg-transparent border border-dashed border-[var(--border)] rounded-lg px-3 py-1.5 text-xs text-[var(--text)] placeholder:text-[var(--text-dim)]/50 outline-none focus:border-[var(--accent)] transition-colors"
-                          />
-                        </div>
-                      </div>
-                    </motion.div>
-                  )}
-                </AnimatePresence>
-              </motion.div>
-            )
-          })}
-        </div>
-
-        {/* FAB */}
-        <motion.button
-          onClick={() => setShowQuickAdd(true)}
-          whileHover={{ scale: 1.1 }}
-          whileTap={{ scale: 0.9 }}
-          className="fixed bottom-6 right-6 w-14 h-14 rounded-full bg-[var(--accent)] text-[var(--bg)] flex items-center justify-center shadow-lg shadow-[var(--accent)]/25 z-50"
-        >
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
-            <line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" />
-          </svg>
-        </motion.button>
-
-        {/* Quick Add Modal */}
-        <AnimatePresence>
-          {showQuickAdd && (
+        {/* Stats Row */}
+        <div className="grid grid-cols-4 gap-3">
+          {stats.map((s, i) => (
             <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              transition={{ duration: 0.15 }}
-              className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50"
-              onClick={() => setShowQuickAdd(false)}
+              key={s.label}
+              initial={{ opacity: 0, y: 12 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.25, delay: i * 0.05 }}
+              className="bg-[#0e1018] border border-[#1e2338] rounded-[14px] p-4"
             >
-              <motion.div
-                initial={{ opacity: 0, scale: 0.95 }}
-                animate={{ opacity: 1, scale: 1 }}
-                exit={{ opacity: 0, scale: 0.95 }}
-                transition={{ duration: 0.2, ease: [0.25, 0.1, 0.25, 1] }}
-                onClick={(e) => e.stopPropagation()}
-                className="bg-[var(--surface)] border border-[var(--border)] rounded-[10px] p-6 w-full max-w-md space-y-4"
+              <p className="text-[10px] font-mono uppercase tracking-[2px] text-[#4a5278]">{s.label}</p>
+              <p className={`text-[28px] font-mono font-bold ${s.color}`}>{s.value}</p>
+            </motion.div>
+          ))}
+        </div>
+
+        {/* Filter Bar */}
+        <div className="flex flex-wrap items-center gap-3">
+          {/* Search */}
+          <div className="relative">
+            <svg className="absolute left-3 top-1/2 -translate-y-1/2 text-[#4a5278]" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+              <circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" />
+            </svg>
+            <input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search tasks..."
+              className="w-64 bg-[#0e1018] border border-[#1e2338] rounded-[12px] pl-9 pr-3 py-2 text-[13px] text-white placeholder:text-[#4a5278] outline-none focus:border-[#2d3450] transition-colors"
+            />
+          </div>
+
+          {/* Business pills */}
+          <div className="flex flex-wrap items-center gap-1.5">
+            <button
+              onClick={() => setFilterBusiness('all')}
+              className={`rounded-full px-4 py-2 text-[12px] border transition-all ${
+                filterBusiness === 'all'
+                  ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
+                  : 'text-[#8892b0] border-transparent hover:bg-[#1a1f2e]'
+              }`}
+            >
+              All
+            </button>
+            {businesses.map((b) => (
+              <button
+                key={b.id}
+                onClick={() => setFilterBusiness(b.id)}
+                className={`rounded-full px-4 py-2 text-[12px] border transition-all flex items-center gap-1.5 ${
+                  filterBusiness === b.id
+                    ? `border-opacity-20 bg-opacity-10`
+                    : 'text-[#8892b0] border-transparent hover:bg-[#1a1f2e]'
+                }`}
+                style={filterBusiness === b.id ? {
+                  backgroundColor: `${b.color}15`,
+                  color: b.color,
+                  borderColor: `${b.color}33`,
+                } : undefined}
               >
-                <h2 className="label text-lg tracking-wider">QUICK ADD</h2>
-                <select
-                  value={quickBusiness}
-                  onChange={(e) => setQuickBusiness(e.target.value)}
-                  className="w-full bg-[var(--surface2)] border border-[var(--border)] rounded-lg px-3 py-2 text-xs text-[var(--text)] outline-none"
-                >
-                  {businesses.map((b) => (
-                    <option key={b.id} value={b.id}>{b.name}</option>
-                  ))}
-                </select>
+                <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: b.color }} />
+                {b.name}
+              </button>
+            ))}
+          </div>
+
+          {/* Priority dropdown */}
+          <select
+            value={filterPriority}
+            onChange={(e) => setFilterPriority(e.target.value)}
+            className="bg-[#0e1018] border border-[#1e2338] rounded-[10px] px-3 py-2 text-[12px] text-white outline-none"
+          >
+            <option value="all">Priority</option>
+            {PRIORITY_ORDER.map((p) => (
+              <option key={p} value={p}>{p.toUpperCase()}</option>
+            ))}
+          </select>
+
+          {/* Tag dropdown */}
+          <select
+            value={filterTag}
+            onChange={(e) => setFilterTag(e.target.value)}
+            className="bg-[#0e1018] border border-[#1e2338] rounded-[10px] px-3 py-2 text-[12px] text-white outline-none"
+          >
+            <option value="all">Tag</option>
+            {TAGS.map((t) => (
+              <option key={t} value={t}>{t}</option>
+            ))}
+          </select>
+        </div>
+
+        {/* Task List */}
+        <div>
+          <AnimatePresence initial={false}>
+            {/* New Task Card */}
+            {showNewTask && (
+              <motion.div
+                initial={{ y: -20, opacity: 0 }}
+                animate={{ y: 0, opacity: 1 }}
+                exit={{ y: -20, opacity: 0 }}
+                transition={{ duration: 0.2, ease: [0.25, 0.1, 0.25, 1] }}
+                className="bg-[#0e1018] border border-emerald-500/20 rounded-[14px] px-[18px] py-[14px] mb-2"
+              >
                 <input
-                  ref={quickRef}
-                  value={quickText}
-                  onChange={(e) => setQuickText(e.target.value)}
-                  onKeyDown={(e) => e.key === 'Enter' && handleQuickAdd()}
-                  placeholder="Task description... (!crit !high !low #TAG)"
-                  className="w-full bg-transparent border border-[var(--border)] rounded-lg px-3 py-2 text-sm text-[var(--text)] placeholder:text-[var(--text-dim)] outline-none focus:border-[var(--accent)] transition-colors"
+                  autoFocus
+                  value={newText}
+                  onChange={(e) => setNewText(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') handleNewTask()
+                    if (e.key === 'Escape') setShowNewTask(false)
+                  }}
+                  placeholder="What needs to get done?"
+                  className="w-full bg-transparent text-[14px] font-medium text-white placeholder:text-[#4a5278] outline-none mb-3"
                 />
-                <div className="flex gap-2 justify-end">
-                  <button onClick={() => setShowQuickAdd(false)} className="px-4 py-1.5 text-xs text-[var(--text-dim)] hover:text-[var(--text)] transition-colors">Cancel</button>
-                  <button onClick={handleQuickAdd} className="px-4 py-1.5 text-xs bg-[var(--accent)] text-[var(--bg)] rounded-lg font-semibold hover:brightness-110 transition-all">Add Task</button>
+                <div className="flex items-center gap-2 flex-wrap">
+                  {/* Business dropdown */}
+                  <select
+                    value={newBusiness}
+                    onChange={(e) => setNewBusiness(e.target.value)}
+                    className="bg-[#0e1018] border border-[#1e2338] rounded-[10px] px-3 py-1.5 text-[12px] text-white outline-none"
+                  >
+                    {businesses.map((b) => (
+                      <option key={b.id} value={b.id}>{b.name}</option>
+                    ))}
+                  </select>
+
+                  {/* Priority toggle buttons */}
+                  {PRIORITY_ORDER.map((p) => (
+                    <button
+                      key={p}
+                      onClick={() => setNewPriority(p)}
+                      className={`text-[11px] font-mono uppercase rounded-md px-3 py-1.5 border transition-all ${
+                        newPriority === p
+                          ? PRIORITY_PILL[p] + ' border-current/20'
+                          : 'text-[#8892b0] border-[#1e2338] hover:bg-[#1a1f2e]'
+                      }`}
+                    >
+                      {p}
+                    </button>
+                  ))}
+
+                  {/* Tag dropdown */}
+                  <select
+                    value={newTag}
+                    onChange={(e) => setNewTag(e.target.value)}
+                    className="bg-[#0e1018] border border-[#1e2338] rounded-[10px] px-3 py-1.5 text-[12px] text-white outline-none"
+                  >
+                    <option value="">No tag</option>
+                    {TAGS.map((t) => (
+                      <option key={t} value={t}>{t}</option>
+                    ))}
+                  </select>
                 </div>
               </motion.div>
-            </motion.div>
+            )}
+
+            {/* Incomplete tasks */}
+            {incompleteTasks.map((task, i) => renderTaskCard(task, i))}
+          </AnimatePresence>
+
+          {/* Empty state */}
+          {incompleteTasks.length === 0 && !showNewTask && (
+            <p className="text-center text-[13px] text-[#4a5278] py-8">No tasks to show</p>
           )}
-        </AnimatePresence>
+        </div>
+
+        {/* Completed Section */}
+        {completedTasks.length > 0 && (
+          <div>
+            <button
+              onClick={() => setShowCompleted(!showCompleted)}
+              className="flex items-center gap-2 text-[13px] text-[#8892b0] hover:text-white transition-colors mb-2"
+            >
+              <motion.svg
+                width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"
+                animate={{ rotate: showCompleted ? 0 : -90 }}
+                transition={{ duration: 0.2 }}
+              >
+                <polyline points="6 9 12 15 18 9" />
+              </motion.svg>
+              Completed ({completedTasks.length})
+            </button>
+
+            <AnimatePresence>
+              {showCompleted && (
+                <motion.div
+                  initial={{ height: 0, opacity: 0 }}
+                  animate={{ height: 'auto', opacity: 1 }}
+                  exit={{ height: 0, opacity: 0 }}
+                  transition={{ duration: 0.25, ease: [0.25, 0.1, 0.25, 1] }}
+                  className="overflow-hidden"
+                >
+                  <div className="opacity-50">
+                    {completedTasks.map((task, i) => renderTaskCard(task, i))}
+                  </div>
+                  <button
+                    onClick={() => {
+                      completedTasks.forEach((t) => deleteTask(t.id))
+                      toast.success('Cleared completed tasks')
+                    }}
+                    className="text-[12px] text-rose-400 hover:text-rose-300 mt-2 transition-colors"
+                  >
+                    Clear completed
+                  </button>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
+        )}
       </div>
     </PageTransition>
   )

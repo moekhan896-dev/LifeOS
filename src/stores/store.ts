@@ -247,7 +247,7 @@ export const useStore = create<AppState>()(
 
       seedDefaultData: () => {
         const state = get()
-        if (state.businesses.length > 0) return
+        if (state.businesses.length > 0 || !state.onboardingComplete) return
         const ts = () => new Date().toISOString()
         const id = () => Math.random().toString(36).slice(2, 10) + Date.now().toString(36) + Math.random().toString(36).slice(2, 5)
         const agencyId = id(), plumbingId = id(), madisonId = id(), moggleyId = id(), brandId = id(), airbnbId = id()
