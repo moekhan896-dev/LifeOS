@@ -1,0 +1,26 @@
+'use client'
+
+import { Toaster } from 'sonner'
+
+export default function Providers({ children }: { children: React.ReactNode }) {
+  return (
+    <>
+      {children}
+      <Toaster
+        position="bottom-right"
+        toastOptions={{
+          style: {
+            background: 'var(--color-surface)',
+            border: '1px solid var(--color-border)',
+            color: 'var(--color-text)',
+            fontFamily: 'var(--font-sans)',
+            fontSize: '13px',
+            borderRadius: '10px',
+            boxShadow: '0 8px 32px rgba(0,0,0,0.3)',
+          },
+        }}
+        gap={8}
+      />
+    </>
+  )
+}

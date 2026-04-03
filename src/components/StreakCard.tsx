@@ -1,5 +1,7 @@
 'use client'
 
+import { motion, AnimatePresence } from 'framer-motion'
+
 interface StreakCardProps {
   habit: string
   streak: number
@@ -9,22 +11,44 @@ interface StreakCardProps {
 
 export default function StreakCard({ habit, streak, longest, icon }: StreakCardProps) {
   return (
-    <div
-      className={`bg-[var(--surface)] border rounded-[10px] p-4 transition-all duration-200 hover:scale-[1.02] ${
+    <motion.div
+      className={`bg-[var(--surface)] border rounded-[10px] p-4 ${
         streak > 0
           ? 'border-[var(--border-glow)] animate-pulse-border'
           : 'border-[var(--border)]'
       }`}
+      whileHover={{ scale: 1.02 }}
+      transition={{ type: 'spring', stiffness: 400, damping: 25 }}
     >
       <div className="flex items-start gap-3">
         <span className="text-xl">{icon}</span>
         <div className="flex-1 min-w-0">
           <div className="text-[13px] text-[var(--text)] font-medium truncate">
             {habit}
-            {streak > 7 && <span className="ml-1.5">🔥</span>}
+            <AnimatePresence>
+              {streak > 7 && (
+                <motion.span
+                  className="ml-1.5"
+                  initial={{ scale: 0, opacity: 0 }}
+                  animate={{ scale: 1, opacity: 1 }}
+                  exit={{ scale: 0, opacity: 0 }}
+                  transition={{ type: 'spring', stiffness: 500, damping: 15 }}
+                >
+                  🔥
+                </motion.span>
+              )}
+            </AnimatePresence>
           </div>
           <div className="flex items-baseline gap-1 mt-1">
-            <span className="data text-2xl font-bold text-[var(--accent)]">{streak}</span>
+            <motion.span
+              key={streak}
+              className="data text-2xl font-bold text-[var(--accent)]"
+              initial={{ y: -10, opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              transition={{ type: 'spring', stiffness: 300, damping: 20 }}
+            >
+              {streak}
+            </motion.span>
             <span className="data text-xs text-[var(--text-dim)]">days</span>
           </div>
           <div className="data text-[10px] text-[var(--text-dim)] mt-0.5">
@@ -32,6 +56,6 @@ export default function StreakCard({ habit, streak, longest, icon }: StreakCardP
           </div>
         </div>
       </div>
-    </div>
+    </motion.div>
   )
 }

@@ -4,23 +4,19 @@ import { useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { useStore } from '@/stores/store'
 import Sidebar from '@/components/Sidebar'
+import CommandPalette from '@/components/CommandPalette'
+import VoiceButton from '@/components/VoiceButton'
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const { authenticated, theme } = useStore()
   const router = useRouter()
 
   useEffect(() => {
-    if (!authenticated) {
-      router.replace('/')
-    }
+    if (!authenticated) router.replace('/')
   }, [authenticated, router])
 
   useEffect(() => {
-    if (theme === 'light') {
-      document.documentElement.classList.add('light')
-    } else {
-      document.documentElement.classList.remove('light')
-    }
+    document.documentElement.classList.toggle('light', theme === 'light')
   }, [theme])
 
   if (!authenticated) return null
@@ -28,9 +24,13 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   return (
     <div className="scanline flex min-h-screen">
       <Sidebar />
-      <main className="flex-1 ml-0 md:ml-[232px] min-h-screen overflow-auto">
-        {children}
+      <main className="flex-1 ml-0 md:ml-[220px] min-h-screen overflow-x-hidden">
+        <div className="p-4 md:p-5 max-w-[1200px] mx-auto">
+          {children}
+        </div>
       </main>
+      <CommandPalette />
+      <VoiceButton />
     </div>
   )
 }

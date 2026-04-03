@@ -4,6 +4,8 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useStore } from '@/stores/store'
 import { BUSINESSES } from '@/lib/constants'
+import { motion, AnimatePresence } from 'framer-motion'
+import { useState } from 'react'
 
 const REVENUE_LABELS: Record<string, string> = {
   agency: '$26K',
@@ -47,6 +49,7 @@ const SYSTEM_LINKS = [
 export default function Sidebar() {
   const pathname = usePathname()
   const { theme, toggleTheme, sidebarOpen, toggleSidebar, tasks, insights, xp, level, todayHealth } = useStore()
+  const [themeRotation, setThemeRotation] = useState(0)
 
   const undoneCount = tasks.filter((t) => !t.done).length
   const unratedCount = insights.filter((i) => !i.rating).length
@@ -66,33 +69,53 @@ export default function Sidebar() {
 
   const isActive = (href: string) => pathname === href || pathname?.startsWith(href + '/')
 
+  const handleThemeToggle = () => {
+    setThemeRotation((r) => r + 180)
+    toggleTheme()
+  }
+
   const navLink = (href: string, label: string, icon?: string, badge?: number) => (
     <Link
       key={href}
       href={href}
       onClick={() => { if (window.innerWidth < 768) toggleSidebar() }}
-      className={`flex items-center gap-2.5 px-3 py-1.5 rounded-lg text-[13px] transition-all duration-150 hover:bg-[var(--surface2)] group ${
-        isActive(href) ? 'bg-[var(--surface2)] text-[var(--accent)]' : 'text-[var(--text-mid)]'
-      }`}
+      className="block"
     >
-      {icon && <span className="w-4 text-center opacity-60 group-hover:opacity-100 transition-opacity">{icon}</span>}
-      <span className="flex-1">{label}</span>
-      {badge !== undefined && badge > 0 && (
-        <span className="data text-[10px] bg-[var(--accent)]/15 text-[var(--accent)] px-1.5 py-0.5 rounded-md min-w-[20px] text-center">
-          {badge}
-        </span>
-      )}
+      <motion.div
+        className={`relative flex items-center gap-2.5 px-3 py-1 rounded-lg text-[13px] group ${
+          isActive(href) ? 'text-[var(--accent)]' : 'text-[var(--text-mid)]'
+        }`}
+        whileHover={{ x: 2, backgroundColor: 'var(--color-surface2, rgba(255,255,255,0.06))' }}
+        transition={{ duration: 0.15, ease: 'easeOut' }}
+      >
+        {isActive(href) && (
+          <motion.div
+            layoutId="activeIndicator"
+            className="absolute left-0 top-1/2 -translate-y-1/2 w-[2px] h-4 rounded-full bg-[var(--accent)]"
+            transition={{ type: 'spring', stiffness: 350, damping: 30 }}
+          />
+        )}
+        {icon && <span className="w-4 text-center opacity-60 group-hover:opacity-100 transition-opacity">{icon}</span>}
+        <span className={`flex-1 ${isActive(href) ? 'font-medium' : ''}`}>{label}</span>
+        {badge !== undefined && badge > 0 && (
+          <span className="data text-[10px] bg-[var(--accent)]/15 text-[var(--accent)] px-1.5 py-0.5 rounded-md min-w-[20px] text-center">
+            {badge}
+          </span>
+        )}
+      </motion.div>
     </Link>
   )
 
   const sidebarContent = (
-    <div className="flex flex-col h-full bg-[var(--surface)] border-r border-[var(--border)] w-[232px] overflow-hidden">
+    <div className="flex flex-col h-full bg-[var(--surface)] border-r border-[var(--border)] w-[220px] overflow-hidden">
       {/* Header */}
-      <div className="flex items-center justify-between px-4 pt-4 pb-3">
+      <div className="flex items-center justify-between px-4 pt-4 pb-2">
         <Link href="/dashboard" className="text-[15px] font-bold tracking-widest text-[var(--text)]">ART OS</Link>
-        <button
-          onClick={toggleTheme}
-          className="w-7 h-7 flex items-center justify-center rounded-lg hover:bg-[var(--surface2)] text-[var(--text-mid)] transition-all duration-150 hover:scale-110"
+        <motion.button
+          onClick={handleThemeToggle}
+          className="w-7 h-7 flex items-center justify-center rounded-lg hover:bg-[var(--surface2)] text-[var(--text-mid)] transition-colors"
+          animate={{ rotate: themeRotation }}
+          transition={{ type: 'spring', stiffness: 200, damping: 15 }}
           title="Toggle theme"
         >
           {theme === 'dark' ? (
@@ -100,28 +123,34 @@ export default function Sidebar() {
           ) : (
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
           )}
-        </button>
+        </motion.button>
       </div>
 
       {/* AI Button */}
-      <div className="px-3 pb-3">
-        <Link
-          href="/ai"
-          className="block w-full text-center py-2 rounded-lg text-[12px] font-semibold tracking-wide text-[var(--text)] transition-all duration-200 hover:scale-[1.02]"
-          style={{
-            background: 'linear-gradient(var(--surface2), var(--surface2)) padding-box, linear-gradient(135deg, var(--accent), var(--cyan), var(--purple)) border-box',
-            border: '1px solid transparent',
-          }}
-        >
-          AI Strategist
+      <div className="px-3 pb-2">
+        <Link href="/ai" className="block">
+          <motion.div
+            className="w-full text-center py-2 rounded-lg text-[12px] font-semibold tracking-wide text-[var(--text)]"
+            style={{
+              background: 'linear-gradient(var(--surface2), var(--surface2)) padding-box, linear-gradient(135deg, var(--accent), var(--cyan), var(--purple)) border-box',
+              border: '1px solid transparent',
+            }}
+            whileHover={{
+              scale: 1.02,
+              boxShadow: '0 0 16px rgba(16, 185, 129, 0.2)',
+            }}
+            transition={{ duration: 0.2 }}
+          >
+            AI Strategist
+          </motion.div>
         </Link>
       </div>
 
       {/* Scrollable nav */}
-      <div className="flex-1 overflow-y-auto px-1.5 space-y-4 scrollbar-thin">
+      <div className="flex-1 overflow-y-auto px-1.5 space-y-3 scrollbar-thin">
         {/* Operations */}
         <div>
-          <div className="label text-[10px] text-[var(--text-dim)] px-3 mb-1.5">OPERATIONS</div>
+          <div className="label text-[10px] text-[var(--text-dim)] px-3 mb-1">OPERATIONS</div>
           <div className="space-y-0.5">
             {OPS_LINKS.map((l) => navLink(l.href, l.label, l.icon, l.badge ? badges[l.badge] : undefined))}
           </div>
@@ -129,20 +158,33 @@ export default function Sidebar() {
 
         {/* Businesses */}
         <div>
-          <div className="label text-[10px] text-[var(--text-dim)] px-3 mb-1.5">BUSINESSES</div>
+          <div className="label text-[10px] text-[var(--text-dim)] px-3 mb-1">BUSINESSES</div>
           <div className="space-y-0.5">
             {BUSINESSES.map((b) => (
               <Link
                 key={b.id}
                 href={BUSINESS_ROUTES[b.id]}
                 onClick={() => { if (window.innerWidth < 768) toggleSidebar() }}
-                className={`flex items-center gap-2.5 px-3 py-1.5 rounded-lg text-[13px] transition-all duration-150 hover:bg-[var(--surface2)] group ${
-                  isActive(BUSINESS_ROUTES[b.id]) ? 'bg-[var(--surface2)] text-[var(--accent)]' : 'text-[var(--text-mid)]'
-                }`}
+                className="block"
               >
-                <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: b.color }} />
-                <span className="flex-1 truncate">{b.name}</span>
-                <span className="data text-[10px] text-[var(--text-dim)]">{REVENUE_LABELS[b.id]}</span>
+                <motion.div
+                  className={`relative flex items-center gap-2.5 px-3 py-1 rounded-lg text-[13px] group ${
+                    isActive(BUSINESS_ROUTES[b.id]) ? 'text-[var(--accent)]' : 'text-[var(--text-mid)]'
+                  }`}
+                  whileHover={{ x: 2, backgroundColor: 'var(--color-surface2, rgba(255,255,255,0.06))' }}
+                  transition={{ duration: 0.15, ease: 'easeOut' }}
+                >
+                  {isActive(BUSINESS_ROUTES[b.id]) && (
+                    <motion.div
+                      layoutId="activeIndicatorBiz"
+                      className="absolute left-0 top-1/2 -translate-y-1/2 w-[2px] h-4 rounded-full bg-[var(--accent)]"
+                      transition={{ type: 'spring', stiffness: 350, damping: 30 }}
+                    />
+                  )}
+                  <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: b.color }} />
+                  <span className={`flex-1 truncate ${isActive(BUSINESS_ROUTES[b.id]) ? 'font-medium' : ''}`}>{b.name}</span>
+                  <span className="data text-[10px] text-[var(--text-dim)]">{REVENUE_LABELS[b.id]}</span>
+                </motion.div>
               </Link>
             ))}
           </div>
@@ -150,7 +192,7 @@ export default function Sidebar() {
 
         {/* System */}
         <div>
-          <div className="label text-[10px] text-[var(--text-dim)] px-3 mb-1.5">SYSTEM</div>
+          <div className="label text-[10px] text-[var(--text-dim)] px-3 mb-1">SYSTEM</div>
           <div className="space-y-0.5">
             {SYSTEM_LINKS.map((l) => navLink(l.href, l.label))}
           </div>
@@ -164,7 +206,15 @@ export default function Sidebar() {
           <span className="data text-[10px] text-[var(--text-dim)]">LVL {level}</span>
         </div>
         <div className="flex items-baseline gap-1">
-          <span className="data text-2xl font-bold text-[var(--text)]">{dailyScore}</span>
+          <motion.span
+            key={dailyScore}
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ type: 'spring', stiffness: 300, damping: 25 }}
+            className="data text-2xl font-bold text-[var(--text)]"
+          >
+            {dailyScore}
+          </motion.span>
           <span className="data text-sm text-[var(--text-dim)]">/100</span>
         </div>
         <div className="space-y-1">
@@ -173,11 +223,20 @@ export default function Sidebar() {
             <span className="data text-[10px] text-[var(--text-dim)]">{xpInLevel}/500</span>
           </div>
           <div className="h-1.5 bg-[var(--surface2)] rounded-full overflow-hidden">
-            <div
-              className="h-full bg-[var(--accent)] rounded-full transition-all duration-500"
-              style={{ width: `${xpPercent}%` }}
+            <motion.div
+              className="h-full bg-[var(--accent)] rounded-full"
+              initial={false}
+              animate={{ width: `${xpPercent}%` }}
+              transition={{ duration: 0.6, ease: 'easeOut' }}
             />
           </div>
+        </div>
+
+        {/* Cmd+K hint */}
+        <div className="flex justify-center pt-1">
+          <span className="text-[10px] text-[var(--text-dim)] bg-[var(--surface2)] px-2 py-0.5 rounded font-mono">
+            ⌘K
+          </span>
         </div>
       </div>
     </div>
@@ -198,15 +257,30 @@ export default function Sidebar() {
         {sidebarContent}
       </aside>
 
-      {/* Mobile drawer */}
-      {sidebarOpen && (
-        <>
-          <div className="md:hidden fixed inset-0 bg-black/60 z-40 backdrop-blur-sm" onClick={toggleSidebar} />
-          <aside className="md:hidden fixed inset-y-0 left-0 z-50 animate-slide-in">
-            {sidebarContent}
-          </aside>
-        </>
-      )}
+      {/* Mobile drawer with AnimatePresence */}
+      <AnimatePresence>
+        {sidebarOpen && (
+          <>
+            <motion.div
+              className="md:hidden fixed inset-0 bg-black/60 z-40 backdrop-blur-sm"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.2 }}
+              onClick={toggleSidebar}
+            />
+            <motion.aside
+              className="md:hidden fixed inset-y-0 left-0 z-50"
+              initial={{ x: '-100%' }}
+              animate={{ x: 0 }}
+              exit={{ x: '-100%' }}
+              transition={{ type: 'spring', stiffness: 300, damping: 30 }}
+            >
+              {sidebarContent}
+            </motion.aside>
+          </>
+        )}
+      </AnimatePresence>
     </>
   )
 }

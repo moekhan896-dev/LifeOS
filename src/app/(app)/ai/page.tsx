@@ -2,6 +2,8 @@
 
 import { useState, useRef, useEffect, useCallback, Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
+import { motion, AnimatePresence } from 'framer-motion'
+import { toast } from 'sonner'
 import { useStore } from '@/stores/store'
 
 const SUGGESTED_PROMPTS = [
@@ -91,6 +93,11 @@ Level ${state.level} | ${state.xp} XP
 `
 }
 
+const messageVariants = {
+  hidden: { opacity: 0, y: 12, scale: 0.97 },
+  visible: { opacity: 1, y: 0, scale: 1, transition: { duration: 0.25, ease: [0.25, 0.1, 0.25, 1] as const } },
+}
+
 function AIPageInner() {
   const searchParams = useSearchParams()
   const businessFilter = searchParams.get('business')
@@ -104,6 +111,7 @@ function AIPageInner() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [copied, setCopied] = useState(false)
+  const [inputFocused, setInputFocused] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
 
@@ -178,6 +186,7 @@ function AIPageInner() {
     const snap = buildContextSnapshot(useStore.getState())
     navigator.clipboard.writeText(snap)
     setCopied(true)
+    toast.success('Context copied to clipboard')
     setTimeout(() => setCopied(false), 2000)
   }
 
@@ -201,19 +210,26 @@ function AIPageInner() {
             </p>
           </div>
           {aiMessages.length > 0 && (
-            <button
-              onClick={clearAiMessages}
+            <motion.button
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+              onClick={() => { clearAiMessages(); toast('Chat cleared') }}
               className="text-xs text-text-dim hover:text-rose transition-colors px-3 py-1.5 rounded-lg border border-border hover:border-rose/30"
             >
               Clear Chat
-            </button>
+            </motion.button>
           )}
         </div>
 
         {/* Messages */}
         <div className="flex-1 overflow-y-auto px-4 md:px-6 py-4 space-y-3">
           {noMessages && !error && (
-            <div className="flex flex-col items-center justify-center h-full animate-in fade-in duration-500">
+            <motion.div
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.4 }}
+              className="flex flex-col items-center justify-center h-full"
+            >
               <div className="w-12 h-12 rounded-2xl bg-accent/10 border border-accent/20 flex items-center justify-center mb-4">
                 <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="text-accent">
                   <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" />
@@ -222,59 +238,90 @@ function AIPageInner() {
               <h2 className="text-text font-medium mb-1">What&apos;s on your mind?</h2>
               <p className="text-text-dim text-sm mb-6">Pick a prompt or type your own</p>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-w-xl w-full">
-                {SUGGESTED_PROMPTS.map((p) => (
-                  <button
+                {SUGGESTED_PROMPTS.map((p, i) => (
+                  <motion.button
                     key={p}
+                    initial={{ opacity: 0, y: 8 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: i * 0.04, duration: 0.25 }}
+                    whileHover={{ scale: 1.02, y: -1 }}
+                    whileTap={{ scale: 0.98 }}
                     onClick={() => sendMessage(p)}
                     className="text-left text-sm px-4 py-3 rounded-xl bg-surface2 border border-border hover:border-accent/40 hover:bg-surface3 text-text-mid hover:text-text transition-all duration-200"
                   >
                     {p}
-                  </button>
+                  </motion.button>
                 ))}
               </div>
-            </div>
+            </motion.div>
           )}
 
-          {aiMessages.map((msg) => (
-            <div
-              key={msg.id}
-              className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'} animate-in slide-in-from-bottom-2 duration-300`}
-            >
-              <div
-                className={`max-w-[85%] md:max-w-[75%] px-4 py-3 rounded-2xl text-sm leading-relaxed ${
-                  msg.role === 'user'
-                    ? 'bg-surface3 border border-border text-text rounded-br-md'
-                    : 'bg-surface2 border border-border text-text rounded-bl-md'
-                }`}
+          <AnimatePresence mode="popLayout">
+            {aiMessages.map((msg) => (
+              <motion.div
+                key={msg.id}
+                variants={messageVariants}
+                initial="hidden"
+                animate="visible"
+                layout
+                className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
               >
-                {msg.role === 'assistant' ? (
-                  <div className="space-y-0.5">{renderMarkdown(msg.content)}</div>
-                ) : (
-                  <div className="whitespace-pre-wrap">{msg.content}</div>
-                )}
-                <div className="text-[10px] text-text-dim mt-2 opacity-60">
-                  {new Date(msg.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                <div
+                  className={`max-w-[85%] md:max-w-[75%] px-4 py-3 rounded-2xl text-sm leading-relaxed ${
+                    msg.role === 'user'
+                      ? 'bg-surface3 border border-border text-text rounded-br-md'
+                      : 'bg-surface2 border border-border text-text rounded-bl-md'
+                  }`}
+                >
+                  {msg.role === 'assistant' ? (
+                    <div className="space-y-0.5">{renderMarkdown(msg.content)}</div>
+                  ) : (
+                    <div className="whitespace-pre-wrap">{msg.content}</div>
+                  )}
+                  <div className="text-[10px] text-text-dim mt-2 opacity-60">
+                    {new Date(msg.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                  </div>
                 </div>
-              </div>
-            </div>
-          ))}
+              </motion.div>
+            ))}
+          </AnimatePresence>
 
           {loading && (
-            <div className="flex justify-start animate-in fade-in duration-200">
+            <motion.div
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="flex justify-start"
+            >
               <div className="bg-surface2 border border-border px-4 py-3 rounded-2xl rounded-bl-md">
                 <div className="flex gap-1.5">
-                  <span className="w-2 h-2 bg-accent/60 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
-                  <span className="w-2 h-2 bg-accent/60 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
-                  <span className="w-2 h-2 bg-accent/60 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+                  <motion.span
+                    animate={{ y: [0, -4, 0] }}
+                    transition={{ duration: 0.5, repeat: Infinity, delay: 0 }}
+                    className="w-2 h-2 bg-accent/60 rounded-full"
+                  />
+                  <motion.span
+                    animate={{ y: [0, -4, 0] }}
+                    transition={{ duration: 0.5, repeat: Infinity, delay: 0.15 }}
+                    className="w-2 h-2 bg-accent/60 rounded-full"
+                  />
+                  <motion.span
+                    animate={{ y: [0, -4, 0] }}
+                    transition={{ duration: 0.5, repeat: Infinity, delay: 0.3 }}
+                    className="w-2 h-2 bg-accent/60 rounded-full"
+                  />
                 </div>
               </div>
-            </div>
+            </motion.div>
           )}
 
           {error && (
-            <div className="mx-auto max-w-lg bg-rose/10 border border-rose/20 rounded-xl px-4 py-3 text-sm text-rose">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              className="mx-auto max-w-lg bg-rose/10 border border-rose/20 rounded-xl px-4 py-3 text-sm text-rose"
+            >
               {error}
-            </div>
+            </motion.div>
           )}
 
           <div ref={messagesEndRef} />
@@ -282,17 +329,28 @@ function AIPageInner() {
 
         {/* Input */}
         <div className="px-4 md:px-6 pb-4 pt-2 border-t border-border shrink-0">
-          <div className="flex gap-2 items-end bg-surface2 border border-border rounded-2xl px-4 py-2 focus-within:border-accent/40 transition-colors">
+          <motion.div
+            animate={{
+              borderColor: inputFocused ? 'var(--accent)' : 'var(--border)',
+              boxShadow: inputFocused ? '0 0 0 2px rgba(var(--accent-rgb, 99, 102, 241), 0.1)' : '0 0 0 0px transparent',
+            }}
+            transition={{ duration: 0.2 }}
+            className="flex gap-2 items-end bg-surface2 border border-border rounded-2xl px-4 py-2"
+          >
             <textarea
               ref={textareaRef}
               value={input}
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={handleKeyDown}
+              onFocus={() => setInputFocused(true)}
+              onBlur={() => setInputFocused(false)}
               placeholder="Ask your AI co-founder anything..."
               rows={1}
               className="flex-1 bg-transparent text-sm text-text placeholder-text-dim resize-none outline-none py-1.5 max-h-40"
             />
-            <button
+            <motion.button
+              whileHover={{ scale: 1.08 }}
+              whileTap={{ scale: 0.92 }}
               onClick={() => sendMessage(input)}
               disabled={!input.trim() || loading}
               className="shrink-0 w-9 h-9 rounded-xl bg-accent hover:bg-accent/80 disabled:bg-surface3 disabled:text-text-dim text-bg flex items-center justify-center transition-all duration-200"
@@ -301,8 +359,8 @@ function AIPageInner() {
                 <line x1="22" y1="2" x2="11" y2="13" />
                 <polygon points="22 2 15 22 11 13 2 9 22 2" />
               </svg>
-            </button>
-          </div>
+            </motion.button>
+          </motion.div>
           <p className="text-[10px] text-text-dim mt-1.5 text-center opacity-50">Shift+Enter for new line</p>
         </div>
       </div>
@@ -327,14 +385,14 @@ function AIPageInner() {
                 { name: 'Personal Brand', detail: 'Dormant', sub: '', color: 'amber' },
                 { name: 'Airbnb', detail: '$1K net/mo', sub: '', color: 'blue' },
               ].map(b => (
-                <div key={b.name} className="bg-surface2 border border-border rounded-lg px-3 py-2">
+                <motion.div key={b.name} whileHover={{ x: 2 }} className="bg-surface2 border border-border rounded-lg px-3 py-2">
                   <div className="flex items-center gap-2">
                     <div className={`w-1.5 h-1.5 rounded-full bg-${b.color}`} />
                     <span className="text-text font-medium">{b.name}</span>
                   </div>
                   <p className="text-text-mid ml-3.5">{b.detail}</p>
                   {b.sub && <p className="text-text-dim ml-3.5">{b.sub}</p>}
-                </div>
+                </motion.div>
               ))}
             </div>
           </div>
@@ -383,7 +441,9 @@ function AIPageInner() {
           </div>
 
           {/* Copy Context Button */}
-          <button
+          <motion.button
+            whileHover={{ scale: 1.02 }}
+            whileTap={{ scale: 0.97 }}
             onClick={copyContext}
             className="w-full py-2.5 rounded-xl bg-surface3 border border-border hover:border-accent/40 text-text-mid hover:text-text text-xs font-medium transition-all duration-200 flex items-center justify-center gap-2"
           >
@@ -398,7 +458,7 @@ function AIPageInner() {
                 Copy Context to Claude.ai
               </>
             )}
-          </button>
+          </motion.button>
         </div>
       </div>
     </div>

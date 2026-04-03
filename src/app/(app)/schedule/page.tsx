@@ -2,6 +2,10 @@
 
 import { useState, useEffect, useMemo } from 'react'
 import { useStore, type ScheduleBlock } from '@/stores/store'
+import PageTransition from '@/components/PageTransition'
+import { StaggerContainer, StaggerItem } from '@/components/Stagger'
+import { motion, AnimatePresence } from 'framer-motion'
+import { toast } from 'sonner'
 
 const TYPE_COLORS: Record<ScheduleBlock['type'], string> = {
   prayer: '#eab308',
@@ -50,12 +54,6 @@ export default function SchedulePage() {
   const { todaySchedule, setSchedule, toggleScheduleBlock } = useStore()
   const [view, setView] = useState<'today' | 'week'>('today')
   const [now, setNow] = useState(new Date())
-  const [toast, setToast] = useState('')
-  const [animateIn, setAnimateIn] = useState(false)
-
-  useEffect(() => {
-    requestAnimationFrame(() => setAnimateIn(true))
-  }, [])
 
   // Load defaults if empty
   useEffect(() => {
@@ -73,11 +71,6 @@ export default function SchedulePage() {
   const currentMinutes = now.getHours() * 60 + now.getMinutes()
   const completedCount = todaySchedule.filter((b) => b.completed).length
 
-  const showToast = (msg: string) => {
-    setToast(msg)
-    setTimeout(() => setToast(''), 2500)
-  }
-
   // Position block on timeline
   const getBlockStyle = (block: ScheduleBlock) => {
     const startMin = timeToMinutes(block.time)
@@ -90,141 +83,163 @@ export default function SchedulePage() {
   }
 
   return (
-    <div className={`p-6 max-w-5xl mx-auto space-y-6 transition-all duration-500 ${animateIn ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-3'}`}>
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="label text-2xl tracking-widest">SCHEDULE</h1>
-          <p className="text-[var(--text-dim)] text-xs mt-1">
-            {now.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })} &middot; {completedCount}/{todaySchedule.length} completed
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
-          <div className="flex bg-[var(--surface)] border border-[var(--border)] rounded-[10px] overflow-hidden">
-            {(['today', 'week'] as const).map((v) => (
-              <button
-                key={v}
-                onClick={() => setView(v)}
-                className={`px-4 py-2 text-xs font-semibold tracking-wider transition-all ${
-                  view === v ? 'bg-[var(--accent)]/15 text-[var(--accent)]' : 'text-[var(--text-dim)] hover:text-[var(--text)]'
-                }`}
-              >
-                {v === 'today' ? 'TODAY' : 'WEEK'}
-              </button>
-            ))}
+    <PageTransition>
+      <div className="p-4 max-w-5xl mx-auto space-y-4">
+        {/* Header */}
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="label text-2xl tracking-widest">SCHEDULE</h1>
+            <p className="text-[var(--text-dim)] text-xs mt-1">
+              {now.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })} &middot; {completedCount}/{todaySchedule.length} completed
+            </p>
           </div>
-          <button
-            onClick={() => showToast('AI schedule generation coming soon')}
-            className="px-4 py-2 text-xs bg-[var(--accent)] text-[var(--bg)] rounded-[10px] font-semibold hover:brightness-110 transition-all"
-          >
-            Generate Schedule
-          </button>
-        </div>
-      </div>
-
-      {/* Today View */}
-      {view === 'today' && (
-        <div className="bg-[var(--surface)] border border-[var(--border)] rounded-[10px] p-4">
-          <div className="relative" style={{ height: '900px' }}>
-            {/* Hour lines */}
-            {HOURS.map((hour) => {
-              const pct = ((hour - 5) / 18) * 100
-              return (
-                <div key={hour} className="absolute left-0 right-0 flex items-start" style={{ top: `${pct}%` }}>
-                  <span className="text-[10px] text-[var(--text-dim)] w-14 -mt-1.5 text-right pr-3 select-none">{formatHour(hour)}</span>
-                  <div className="flex-1 border-t border-[var(--border)]/50" />
-                </div>
-              )
-            })}
-
-            {/* Current time indicator */}
-            {currentMinutes >= 300 && currentMinutes <= 1380 && (
-              <div
-                className="absolute left-14 right-0 flex items-center z-20 pointer-events-none"
-                style={{ top: `${((currentMinutes - 300) / 1080) * 100}%` }}
-              >
-                <div className="w-2.5 h-2.5 rounded-full bg-rose-500 -ml-1.5" />
-                <div className="flex-1 border-t-2 border-rose-500" />
-              </div>
-            )}
-
-            {/* Schedule blocks */}
-            <div className="absolute left-16 right-2 top-0 bottom-0">
-              {todaySchedule.map((block, i) => {
-                const style = getBlockStyle(block)
-                const typeClass = TYPE_BG[block.type]
-                return (
-                  <button
-                    key={i}
-                    onClick={() => toggleScheduleBlock(i)}
-                    className={`absolute left-0 right-0 rounded-lg border px-3 py-1.5 text-left transition-all hover:brightness-110 ${typeClass} ${
-                      block.completed ? 'opacity-50' : ''
-                    }`}
-                    style={{ top: style.top, height: style.height, minHeight: '28px' }}
-                  >
-                    <div className={`text-xs font-semibold ${block.completed ? 'line-through' : ''}`}>
-                      {block.title}
-                    </div>
-                    <div className="text-[10px] opacity-70">
-                      {block.time} &middot; {block.duration}min
-                    </div>
-                  </button>
-                )
-              })}
+          <div className="flex items-center gap-2">
+            <div className="glass flex rounded-[10px] overflow-hidden">
+              {(['today', 'week'] as const).map((v) => (
+                <motion.button
+                  key={v}
+                  onClick={() => setView(v)}
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
+                  className={`px-4 py-2 text-xs font-semibold tracking-wider transition-all ${
+                    view === v ? 'bg-[var(--accent)]/15 text-[var(--accent)]' : 'text-[var(--text-dim)] hover:text-[var(--text)]'
+                  }`}
+                >
+                  {v === 'today' ? 'TODAY' : 'WEEK'}
+                </motion.button>
+              ))}
             </div>
+            <motion.button
+              whileHover={{ scale: 1.03 }}
+              whileTap={{ scale: 0.97 }}
+              onClick={() => toast('AI schedule generation coming soon')}
+              className="px-4 py-2 text-xs bg-[var(--accent)] text-[var(--bg)] rounded-[10px] font-semibold hover:brightness-110 transition-all"
+            >
+              Generate Schedule
+            </motion.button>
           </div>
         </div>
-      )}
 
-      {/* Week View */}
-      {view === 'week' && (
-        <div className="bg-[var(--surface)] border border-[var(--border)] rounded-[10px] p-4">
-          <div className="grid grid-cols-7 gap-2">
-            {DAYS.map((day, di) => {
-              const isToday = di === (now.getDay() + 6) % 7
-              return (
-                <div key={day} className="space-y-1.5">
-                  <div className={`text-center text-[11px] font-semibold tracking-wider py-1.5 rounded-lg ${
-                    isToday ? 'bg-[var(--accent)]/15 text-[var(--accent)]' : 'text-[var(--text-dim)]'
-                  }`}>
-                    {day}
+        {/* Today View */}
+        <AnimatePresence mode="wait">
+          {view === 'today' && (
+            <motion.div
+              key="today"
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -8 }}
+              transition={{ duration: 0.2 }}
+              className="card p-3"
+            >
+              <div className="relative" style={{ height: '900px' }}>
+                {/* Hour lines */}
+                {HOURS.map((hour) => {
+                  const pct = ((hour - 5) / 18) * 100
+                  return (
+                    <div key={hour} className="absolute left-0 right-0 flex items-start" style={{ top: `${pct}%` }}>
+                      <span className="text-[10px] text-[var(--text-dim)] w-14 -mt-1.5 text-right pr-3 select-none">{formatHour(hour)}</span>
+                      <div className="flex-1 border-t border-[var(--border)]/50" />
+                    </div>
+                  )
+                })}
+
+                {/* Current time indicator */}
+                {currentMinutes >= 300 && currentMinutes <= 1380 && (
+                  <div
+                    className="absolute left-14 right-0 flex items-center z-20 pointer-events-none"
+                    style={{ top: `${((currentMinutes - 300) / 1080) * 100}%` }}
+                  >
+                    <div className="w-2.5 h-2.5 rounded-full bg-rose-500 -ml-1.5" />
+                    <div className="flex-1 border-t-2 border-rose-500" />
                   </div>
-                  <div className="space-y-1">
-                    {todaySchedule.map((block, bi) => (
-                      <div
-                        key={bi}
-                        className={`rounded-md border px-2 py-1 text-[10px] ${TYPE_BG[block.type]} ${
-                          isToday && block.completed ? 'opacity-50 line-through' : ''
+                )}
+
+                {/* Schedule blocks */}
+                <div className="absolute left-16 right-2 top-0 bottom-0">
+                  {todaySchedule.map((block, i) => {
+                    const style = getBlockStyle(block)
+                    const typeClass = TYPE_BG[block.type]
+                    return (
+                      <motion.button
+                        key={i}
+                        onClick={() => {
+                          toggleScheduleBlock(i)
+                          toast(block.completed ? `Unmarked "${block.title}"` : `Completed "${block.title}"`)
+                        }}
+                        whileHover={{ scale: 1.01, y: -1 }}
+                        whileTap={{ scale: 0.99 }}
+                        className={`absolute left-0 right-0 rounded-lg border px-3 py-1.5 text-left transition-all hover:brightness-110 ${typeClass} ${
+                          block.completed ? 'opacity-50' : ''
                         }`}
+                        style={{ top: style.top, height: style.height, minHeight: '28px' }}
                       >
-                        <span className="font-semibold">{block.time}</span>
-                        <span className="ml-1 opacity-80">{block.title}</span>
-                      </div>
-                    ))}
-                  </div>
+                        <div className={`text-xs font-semibold ${block.completed ? 'line-through' : ''}`}>
+                          {block.title}
+                        </div>
+                        <div className="text-[10px] opacity-70">
+                          {block.time} &middot; {block.duration}min
+                        </div>
+                      </motion.button>
+                    )
+                  })}
                 </div>
-              )
-            })}
-          </div>
-        </div>
-      )}
+              </div>
+            </motion.div>
+          )}
 
-      {/* Legend */}
-      <div className="flex items-center gap-4 justify-center">
-        {(Object.entries(TYPE_COLORS) as [ScheduleBlock['type'], string][]).map(([type, color]) => (
-          <div key={type} className="flex items-center gap-1.5">
-            <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: color }} />
-            <span className="text-[10px] text-[var(--text-dim)] capitalize">{type}</span>
-          </div>
-        ))}
+          {/* Week View */}
+          {view === 'week' && (
+            <motion.div
+              key="week"
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -8 }}
+              transition={{ duration: 0.2 }}
+              className="card p-3"
+            >
+              <StaggerContainer className="grid grid-cols-7 gap-2">
+                {DAYS.map((day, di) => {
+                  const isToday = di === (now.getDay() + 6) % 7
+                  return (
+                    <StaggerItem key={day}>
+                      <div className="space-y-1.5">
+                        <div className={`text-center text-[11px] font-semibold tracking-wider py-1.5 rounded-lg ${
+                          isToday ? 'bg-[var(--accent)]/15 text-[var(--accent)]' : 'text-[var(--text-dim)]'
+                        }`}>
+                          {day}
+                        </div>
+                        <div className="space-y-1">
+                          {todaySchedule.map((block, bi) => (
+                            <div
+                              key={bi}
+                              className={`rounded-md border px-2 py-1 text-[10px] ${TYPE_BG[block.type]} ${
+                                isToday && block.completed ? 'opacity-50 line-through' : ''
+                              }`}
+                            >
+                              <span className="font-semibold">{block.time}</span>
+                              <span className="ml-1 opacity-80">{block.title}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    </StaggerItem>
+                  )
+                })}
+              </StaggerContainer>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* Legend */}
+        <div className="flex items-center gap-4 justify-center">
+          {(Object.entries(TYPE_COLORS) as [ScheduleBlock['type'], string][]).map(([type, color]) => (
+            <div key={type} className="flex items-center gap-1.5">
+              <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: color }} />
+              <span className="text-[10px] text-[var(--text-dim)] capitalize">{type}</span>
+            </div>
+          ))}
+        </div>
       </div>
-
-      {/* Toast */}
-      {toast && (
-        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 bg-[var(--surface)] border border-[var(--border)] rounded-[10px] px-5 py-3 text-sm text-[var(--text)] shadow-xl z-50 animate-in">
-          {toast}
-        </div>
-      )}
-    </div>
+    </PageTransition>
   )
 }
