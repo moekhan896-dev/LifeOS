@@ -810,8 +810,12 @@ function OnboardingWizard() {
 // Main Page
 // ══════════════════════════════════════════
 export default function Page() {
-  const { authenticated, onboardingComplete } = useStore()
+  const { authenticated, onboardingComplete, seedDefaultData } = useStore()
   const router = useRouter()
+
+  useEffect(() => {
+    seedDefaultData()
+  }, [seedDefaultData])
 
   useEffect(() => {
     if (authenticated) router.push('/dashboard')

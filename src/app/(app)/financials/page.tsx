@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useMemo } from 'react'
 import { useStore, getAgencyTotals, getClientNet } from '@/stores/store'
 import { FIXED_COSTS } from '@/lib/constants'
 import PageTransition from '@/components/PageTransition'
@@ -9,47 +9,54 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { toast } from 'sonner'
 import { BarChart, Bar, AreaChart, Area, ResponsiveContainer, XAxis, YAxis, Tooltip, CartesianGrid, Legend } from 'recharts'
 
-const plData = [
-  { m: 'Oct', income: 20000, expenses: 6000 },
-  { m: 'Nov', income: 22000, expenses: 5800 },
-  { m: 'Dec', income: 25000, expenses: 6200 },
-  { m: 'Jan', income: 23000, expenses: 5900 },
-  { m: 'Feb', income: 21000, expenses: 6100 },
-  { m: 'Mar', income: 23469, expenses: 5945 },
-]
-
-const plTrend = plData.map((d) => ({ ...d, profit: d.income - d.expenses }))
-
-const INCOME = {
-  agency: { label: 'SEO Agency (Rysen)', net: 15269, detail: '6 clients, net after ad spend + Stripe' },
-  plumbing: { label: 'Honest Plumbers', net: 7200, detail: '~40% of $18K gross revenue' },
-  airbnb: { label: 'Airbnb FL', net: 1000, detail: 'Net after mortgage + management' },
-}
-
-const TOTAL_INCOME = Object.values(INCOME).reduce((s, i) => s + i.net, 0)
-const TOTAL_COSTS = FIXED_COSTS.reduce((s, c) => s + c.amount, 0)
-const NET_TAKE_HOME = TOTAL_INCOME - TOTAL_COSTS
-
-const SCENARIOS = [
-  { name: 'AWS Leaves', lostIncome: 7460, description: 'Lose biggest agency client' },
-  { name: 'Plumber Quits', lostIncome: 7200, description: 'Lose all plumbing revenue' },
-  { name: 'Both Leave', lostIncome: 14660, description: 'AWS + Plumber gone' },
-  { name: 'Housing -20%', lostIncome: 200, description: 'Airbnb revenue drops 20%' },
-]
-
-const TIME_MONEY = [
-  { biz: 'SEO Agency', income: 15269, hours: 5, color: 'var(--accent)' },
-  { biz: 'Honest Plumbers', income: 7200, hours: 15, color: 'var(--cyan)' },
-  { biz: 'Madison Clark', income: 0, hours: 10, color: 'var(--pink)' },
-]
-
 function fmt(n: number) {
   return '$' + n.toLocaleString('en-US', { maximumFractionDigits: 0 })
 }
 
 export default function FinancialsPage() {
-  const [savingsMonths] = useState(6)
+  const { businesses, clients, expenseEntries } = useStore()
   const savings = 35000
+
+  const agencyTotals = getAgencyTotals(clients)
+
+  const incomeStreams = useMemo(() => {
+    return businesses
+      .filter(b => b.monthlyRevenue > 0 || clients.some(c => c.businessId === b.id && c.active))
+      .map(b => {
+        const bizClients = clients.filter(c => c.businessId === b.id && c.active)
+        const clientNet = bizClients.reduce((s, c) => s + getClientNet(c), 0)
+        const net = clientNet > 0 ? clientNet : b.monthlyRevenue
+        const detail = bizClients.length > 0
+          ? `${bizClients.length} client${bizClients.length !== 1 ? 's' : ''}, net after ad spend`
+          : b.notes || ''
+        return { label: b.name, net, detail }
+      })
+  }, [businesses, clients])
+
+  const TOTAL_INCOME = incomeStreams.reduce((s, i) => s + i.net, 0)
+  const TOTAL_COSTS = FIXED_COSTS.reduce((s, c) => s + c.amount, 0)
+  const NET_TAKE_HOME = TOTAL_INCOME - TOTAL_COSTS
+
+  // Build scenarios from top revenue sources
+  const scenarios = useMemo(() => {
+    const sorted = [...incomeStreams].sort((a, b) => b.net - a.net)
+    const result: { name: string; lostIncome: number; description: string }[] = []
+    if (sorted[0]) result.push({ name: `${sorted[0].label} Gone`, lostIncome: sorted[0].net, description: `Lose ${sorted[0].label} revenue` })
+    if (sorted[1]) result.push({ name: `${sorted[1].label} Gone`, lostIncome: sorted[1].net, description: `Lose ${sorted[1].label} revenue` })
+    if (sorted[0] && sorted[1]) result.push({ name: 'Top 2 Gone', lostIncome: sorted[0].net + sorted[1].net, description: `Lose ${sorted[0].label} + ${sorted[1].label}` })
+    return result
+  }, [incomeStreams])
+
+  // P&L chart placeholder (static shape scaled to real totals)
+  const plData = useMemo(() => {
+    const months = ['Oct', 'Nov', 'Dec', 'Jan', 'Feb', 'Mar']
+    return months.map((m, i) => ({
+      m,
+      income: Math.round(TOTAL_INCOME * (0.85 + Math.sin(i) * 0.1 + i * 0.02)),
+      expenses: Math.round(TOTAL_COSTS * (0.95 + Math.cos(i) * 0.05)),
+    }))
+  }, [TOTAL_INCOME, TOTAL_COSTS])
+  const plTrend = plData.map((d) => ({ ...d, profit: d.income - d.expenses }))
 
   return (
     <PageTransition>
@@ -62,7 +69,7 @@ export default function FinancialsPage() {
             <div className="card p-4">
               <span className="label text-[10px] tracking-widest text-[var(--accent)]">MONTHLY INCOME</span>
               <div className="mt-3 space-y-3">
-                {Object.values(INCOME).map((i) => (
+                {incomeStreams.map((i) => (
                   <div key={i.label} className="flex items-center justify-between">
                     <div>
                       <p className="text-sm font-medium text-[var(--text)]">{i.label}</p>
@@ -175,7 +182,7 @@ export default function FinancialsPage() {
             <div className="card p-4">
               <span className="label text-[10px] tracking-widest text-[var(--amber)]">EMERGENCY SCENARIO PLANNER</span>
               <div className="mt-3 grid gap-3 sm:grid-cols-2">
-                {SCENARIOS.map((s) => {
+                {scenarios.map((s) => {
                   const newIncome = TOTAL_INCOME - s.lostIncome
                   const deficit = newIncome - TOTAL_COSTS
                   const runway = deficit < 0 ? Math.floor(savings / Math.abs(deficit)) : Infinity
@@ -217,18 +224,21 @@ export default function FinancialsPage() {
             <div className="card p-4">
               <span className="label text-[10px] tracking-widest text-[var(--cyan)]">TIME VS MONEY MATRIX</span>
               <div className="mt-3 space-y-3">
-                {TIME_MONEY.map((t) => {
-                  const perHour = t.hours > 0 ? t.income / (t.hours * 4.33) : 0
+                {businesses.map((b) => {
+                  const bizClients = clients.filter(c => c.businessId === b.id && c.active)
+                  const income = bizClients.length > 0
+                    ? bizClients.reduce((s, c) => s + getClientNet(c), 0)
+                    : b.monthlyRevenue
+                  const perHour = income > 0 ? income / (10 * 4.33) : 0 // estimate 10 hrs/wk
                   return (
-                    <div key={t.biz} className="flex items-center gap-4">
-                      <div className="w-3 h-3 rounded-full shrink-0" style={{ background: t.color }} />
+                    <div key={b.id} className="flex items-center gap-4">
+                      <div className="w-3 h-3 rounded-full shrink-0" style={{ background: b.color }} />
                       <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium text-[var(--text)]">{t.biz}</p>
-                        <p className="text-xs text-[var(--text-dim)]">~{t.hours} hrs/wk</p>
+                        <p className="text-sm font-medium text-[var(--text)]">{b.name}</p>
+                        <p className="text-xs text-[var(--text-dim)]">{fmt(income)}/mo</p>
                       </div>
                       <div className="text-right">
-                        <p className="data text-sm font-semibold text-[var(--text)]">{fmt(Math.round(perHour))}/hr</p>
-                        <p className="text-xs text-[var(--text-dim)]">{fmt(t.income)}/mo</p>
+                        <p className="data text-sm font-semibold text-[var(--text)]">{income > 0 ? `${fmt(Math.round(perHour))}/hr` : '—'}</p>
                       </div>
                     </div>
                   )

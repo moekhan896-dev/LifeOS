@@ -8,8 +8,13 @@ import CommandPalette from '@/components/CommandPalette'
 import VoiceButton from '@/components/VoiceButton'
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
-  const { authenticated, theme } = useStore()
+  const { authenticated, theme, seedDefaultData } = useStore()
   const router = useRouter()
+
+  // Seed data on first load if store is empty
+  useEffect(() => {
+    seedDefaultData()
+  }, [seedDefaultData])
 
   useEffect(() => {
     if (!authenticated) router.replace('/')
@@ -24,7 +29,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   return (
     <div className="scanline flex min-h-screen">
       <Sidebar />
-      <main className="flex-1 ml-0 md:ml-[220px] min-h-screen overflow-x-hidden">
+      <main className="flex-1 ml-0 md:ml-[240px] min-h-screen overflow-x-hidden">
         <div className="p-4 md:p-5 max-w-[1200px] mx-auto">
           {children}
         </div>

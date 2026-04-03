@@ -17,14 +17,7 @@ const SUGGESTED_PROMPTS = [
   'What am I avoiding right now?',
 ]
 
-const BUSINESS_LABELS: Record<string, string> = {
-  agency: 'Arbaaz Digital (Agency)',
-  plumbing: 'Plumbing Lead Gen',
-  madison: 'Madison Clark',
-  moggley: 'Moggley',
-  brand: 'Personal Brand',
-  airbnb: 'Airbnb',
-}
+// Business labels are now derived from store data at runtime
 
 function renderMarkdown(text: string) {
   return text.split('\n').map((line, i) => {
@@ -66,12 +59,7 @@ Total Logged Revenue: $${totalRevenue.toLocaleString()}
 Total Logged Expenses: $${totalExpenses.toLocaleString()}
 
 --- BUSINESS UNITS ---
-1. Arbaaz Digital (Agency): $26K gross, $15.3K net, 6 clients, AWS = 69% of revenue
-2. Plumbing Lead Gen: ~$18K revenue, 9 GMBs, 1-2 calls/day avg
-3. Madison Clark: 16K followers, $0 revenue, no brand deals yet
-4. Moggley: Pre-revenue, app in development
-5. Personal Brand: Dormant
-6. Airbnb: ~$1K/mo net
+${state.businesses.map((b, i) => `${i + 1}. ${b.name}: $${b.monthlyRevenue.toLocaleString()}/mo, status: ${b.status}${b.notes ? ' — ' + b.notes : ''}`).join('\n')}
 
 --- STREAKS ---
 ${activeStreaks.map(s => `${s.habit}: ${s.currentStreak} day streak (best: ${s.longestStreak})`).join('\n')}
@@ -132,8 +120,8 @@ function AIPageInner() {
     if (!text.trim() || loading) return
     setError(null)
 
-    const userContent = businessFilter && BUSINESS_LABELS[businessFilter]
-      ? `Context: ${BUSINESS_LABELS[businessFilter]}\n\n${text.trim()}`
+    const userContent = businessFilter && businesses.find(b => b.id === businessFilter)?.name
+      ? `Context: ${businesses.find(b => b.id === businessFilter)?.name}\n\n${text.trim()}`
       : text.trim()
 
     addAiMessage({ role: 'user', content: userContent, businessContext: businessFilter || undefined })
@@ -203,8 +191,8 @@ function AIPageInner() {
           <div>
             <h1 className="text-lg font-semibold text-text">AI Strategist</h1>
             <p className="text-[10px] font-mono uppercase tracking-[2px] text-text-dim mt-0.5">
-              {businessFilter && BUSINESS_LABELS[businessFilter]
-                ? `Focused: ${BUSINESS_LABELS[businessFilter]}`
+              {businessFilter && businesses.find(b => b.id === businessFilter)?.name
+                ? `Focused: ${businesses.find(b => b.id === businessFilter)?.name}`
                 : 'Your AI co-founder. Hard truths only.'}
             </p>
           </div>
@@ -376,21 +364,14 @@ function AIPageInner() {
           <div>
             <h3 className="text-[10px] font-mono uppercase tracking-[2px] text-text-dim mb-2">Revenue Streams</h3>
             <div className="space-y-2">
-              {[
-                { name: 'Agency', detail: '$26K gross, $15.3K net, 6 clients', sub: 'AWS = 69% concentration', color: 'accent' },
-                { name: 'Plumbing', detail: '~$18K rev, 9 GMBs', sub: '1-2 calls/day', color: 'cyan' },
-                { name: 'Madison Clark', detail: '16K followers', sub: '$0 revenue', color: 'pink' },
-                { name: 'Moggley', detail: 'Pre-revenue', sub: 'App in development', color: 'purple' },
-                { name: 'Personal Brand', detail: 'Dormant', sub: '', color: 'amber' },
-                { name: 'Airbnb', detail: '$1K net/mo', sub: '', color: 'blue' },
-              ].map(b => (
-                <motion.div key={b.name} whileHover={{ x: 2, y: -1, boxShadow: '0 4px 12px rgba(0,0,0,0.08)' }} className="bg-surface2 border border-border rounded-[12px] px-3 py-2">
+              {businesses.map(b => (
+                <motion.div key={b.id} whileHover={{ x: 2, y: -1, boxShadow: '0 4px 12px rgba(0,0,0,0.08)' }} className="bg-surface2 border border-border rounded-[12px] px-3 py-2">
                   <div className="flex items-center gap-2">
-                    <div className={`w-1.5 h-1.5 rounded-full bg-${b.color}`} />
+                    <div className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: b.color }} />
                     <span className="text-text font-medium">{b.name}</span>
                   </div>
-                  <p className="text-[14px] text-text-mid ml-3.5">{b.detail}</p>
-                  {b.sub && <p className="text-text-dim ml-3.5">{b.sub}</p>}
+                  <p className="text-[14px] text-text-mid ml-3.5">${b.monthlyRevenue.toLocaleString()}/mo</p>
+                  {b.notes && <p className="text-text-dim ml-3.5">{b.notes}</p>}
                 </motion.div>
               ))}
             </div>
