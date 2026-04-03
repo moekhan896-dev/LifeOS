@@ -144,7 +144,7 @@ export default function RevenueDriversPage() {
                       whileHover={{ scale: 1.05 }}
                       whileTap={{ scale: 0.95 }}
                       onClick={() => handleAddDriver(biz.id)}
-                      className="rounded-lg bg-[var(--accent)]/10 px-3 py-2 text-xs font-medium text-[var(--accent)]"
+                      className="rounded-[8px] bg-[var(--accent)]/10 px-3 py-2 text-xs font-medium text-[var(--accent)]"
                     >
                       Add
                     </motion.button>

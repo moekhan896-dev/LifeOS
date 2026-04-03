@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useRef } from 'react'
+import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { motion } from 'framer-motion'
 import { useStore } from '@/stores/store'
@@ -68,18 +68,33 @@ export default function CommandInput() {
   return (
     <form
       onSubmit={handleSubmit}
-      className="fixed bottom-4 left-1/2 -translate-x-1/2 w-[calc(100%-2rem)] max-w-[640px] z-30"
+      className="fixed bottom-0 left-0 right-0 mx-4 mb-4 z-30"
     >
       <motion.div
-        className="relative"
+        className="glass rounded-[16px] p-3 flex items-center gap-3 max-w-[640px] mx-auto"
         animate={{
           boxShadow: focused
-            ? '0 8px 32px rgba(0,0,0,0.25), 0 0 20px rgba(16,185,129,0.08)'
-            : '0 4px 16px rgba(0,0,0,0.15)',
+            ? '0 12px 40px rgba(0,0,0,0.3), 0 0 24px rgba(16,185,129,0.1)'
+            : '0 8px 24px rgba(0,0,0,0.2)',
         }}
-        style={{ borderRadius: 10 }}
         transition={{ duration: 0.2 }}
       >
+        {/* Mic button */}
+        <button
+          type="button"
+          className="flex-shrink-0 w-9 h-9 rounded-full flex items-center justify-center"
+          style={{ background: 'linear-gradient(135deg, rgb(16,185,129), rgb(6,182,212))' }}
+          title="Use floating mic button"
+        >
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/>
+            <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
+            <line x1="12" y1="19" x2="12" y2="23"/>
+            <line x1="8" y1="23" x2="16" y2="23"/>
+          </svg>
+        </button>
+
+        {/* Input */}
         <input
           type="text"
           value={value}
@@ -87,26 +102,11 @@ export default function CommandInput() {
           onFocus={() => setFocused(true)}
           onBlur={() => setFocused(false)}
           placeholder="Quick update or ask AI..."
-          className="glass w-full bg-[var(--surface)]/80 backdrop-blur-xl border border-[var(--border)] rounded-[10px] px-4 py-3 text-[13px] text-[var(--text)] placeholder:text-[var(--text-dim)] outline-none transition-colors duration-200 focus:border-[var(--border-glow)]"
+          className="flex-1 bg-transparent text-[14px] text-[var(--text)] placeholder:text-[var(--text-dim)] outline-none"
         />
-        <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-2 text-[var(--text-dim)]">
-          <button
-            type="button"
-            className="opacity-50 hover:opacity-100 transition-opacity group/mic relative"
-            title="Use floating mic button"
-          >
-            <span className="absolute -top-8 right-0 whitespace-nowrap text-[10px] bg-[var(--surface2)] text-[var(--text-mid)] px-2 py-1 rounded-md opacity-0 group-hover/mic:opacity-100 transition-opacity pointer-events-none">
-              Use floating mic button
-            </span>
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/>
-              <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
-              <line x1="12" y1="19" x2="12" y2="23"/>
-              <line x1="8" y1="23" x2="16" y2="23"/>
-            </svg>
-          </button>
-          <kbd className="data text-[10px] bg-[var(--surface2)] px-1.5 py-0.5 rounded">↵</kbd>
-        </div>
+
+        {/* Enter hint */}
+        <kbd className="data text-[10px] text-[var(--text-dim)] bg-[var(--surface2)] px-1.5 py-0.5 rounded-[8px] flex-shrink-0">&crarr;</kbd>
       </motion.div>
     </form>
   )

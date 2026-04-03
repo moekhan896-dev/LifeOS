@@ -5,6 +5,14 @@ import { useStore } from '@/stores/store'
 import { CLIENTS } from '@/lib/constants'
 import PageTransition from '@/components/PageTransition'
 import { StaggerContainer, StaggerItem } from '@/components/Stagger'
+import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts'
+
+const nwData = [
+  { name: 'Agency', value: 641000, color: '#10b981' },
+  { name: 'Real Estate', value: 50000, color: '#3b82f6' },
+  { name: 'Savings', value: 35000, color: '#06b6d4' },
+  { name: 'Social', value: 15000, color: '#ec4899' },
+]
 
 function fmt(n: number) {
   return '$' + n.toLocaleString('en-US', { maximumFractionDigits: 0 })
@@ -46,7 +54,7 @@ export default function NetWorthPage() {
 
         {/* Net worth summary */}
         <StaggerItem>
-          <div className="rounded-lg border border-[var(--accent)]/30 bg-[var(--accent)]/5 p-4">
+          <motion.div whileHover={{ y: -2 }} className="card border-[var(--accent)]/30 bg-[var(--accent)]/5 p-4">
             <span className="label text-[10px] tracking-widest text-[var(--accent)]">ESTIMATED NET WORTH</span>
             <p className="data text-3xl font-bold text-[var(--accent)] mt-2">{fmt(netWorth)}</p>
             <div className="mt-2 grid grid-cols-2 gap-3 text-xs">
@@ -59,12 +67,12 @@ export default function NetWorthPage() {
                 <p className="data font-semibold text-[var(--rose)]">{fmt(totalLiabilities)}</p>
               </div>
             </div>
-          </div>
+          </motion.div>
         </StaggerItem>
 
         {/* Assets */}
         <StaggerItem>
-          <div className="rounded-lg border border-[var(--border)] bg-[var(--surface)] p-4">
+          <div className="card p-4">
             <span className="label text-[10px] tracking-widest text-[var(--accent)]">ASSETS</span>
             <div className="mt-3 space-y-2.5">
               {ASSETS.map((a) => (
@@ -88,7 +96,7 @@ export default function NetWorthPage() {
 
         {/* Liabilities */}
         <StaggerItem>
-          <div className="rounded-lg border border-[var(--border)] bg-[var(--surface)] p-4">
+          <div className="card p-4">
             <span className="label text-[10px] tracking-widest text-[var(--rose)]">LIABILITIES</span>
             <div className="mt-3 space-y-2.5">
               {LIABILITIES.map((l) => (
@@ -111,7 +119,7 @@ export default function NetWorthPage() {
 
         {/* Impact actions */}
         <StaggerItem>
-          <div className="rounded-lg border border-[var(--border)] bg-[var(--surface)] p-4">
+          <div className="card p-4">
             <span className="label text-[10px] tracking-widest text-[var(--cyan)]">HOW EACH ACTION IMPACTS NET WORTH</span>
             <div className="mt-3 space-y-2.5">
               {IMPACT_ACTIONS.map((ia) => (
@@ -132,14 +140,32 @@ export default function NetWorthPage() {
           </div>
         </StaggerItem>
 
-        {/* Monthly snapshot placeholder */}
+        {/* Asset Allocation Donut */}
         <StaggerItem>
-          <div className="rounded-lg border border-[var(--border)] bg-[var(--surface)] p-4">
-            <span className="label text-[10px] tracking-widest text-[var(--text-dim)]">MONTHLY SNAPSHOTS</span>
-            <div className="mt-3 flex items-center justify-center h-20 text-sm text-[var(--text-dim)]">
-              Monthly tracking coming soon
+          <motion.div whileHover={{ y: -2 }} className="card p-4">
+            <span className="label text-[10px] tracking-widest text-[var(--text-dim)]">ASSET ALLOCATION</span>
+            <div className="mt-3 flex items-center gap-6">
+              <ResponsiveContainer width="50%" height={200}>
+                <PieChart>
+                  <Pie data={nwData} cx="50%" cy="50%" innerRadius={50} outerRadius={80} paddingAngle={3} dataKey="value">
+                    {nwData.map((entry, i) => (
+                      <Cell key={i} fill={entry.color} />
+                    ))}
+                  </Pie>
+                  <Tooltip contentStyle={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 12, fontSize: 12 }} formatter={(v: any) => fmt(Number(v))} />
+                </PieChart>
+              </ResponsiveContainer>
+              <div className="space-y-2">
+                {nwData.map((d) => (
+                  <div key={d.name} className="flex items-center gap-2">
+                    <div className="w-3 h-3 rounded-full shrink-0" style={{ background: d.color }} />
+                    <span className="text-xs text-[var(--text-mid)]">{d.name}</span>
+                    <span className="data text-xs font-bold text-[var(--text)]">{fmt(d.value)}</span>
+                  </div>
+                ))}
+              </div>
             </div>
-          </div>
+          </motion.div>
         </StaggerItem>
       </StaggerContainer>
     </PageTransition>

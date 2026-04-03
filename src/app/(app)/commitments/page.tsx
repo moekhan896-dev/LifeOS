@@ -50,14 +50,14 @@ export default function CommitmentsPage() {
         {/* Stats */}
         <StaggerItem>
           <div className="grid grid-cols-2 gap-3">
-            <motion.div whileHover={{ scale: 1.02 }} className="rounded-lg border border-[var(--border)] bg-[var(--surface)] p-3">
+            <motion.div whileHover={{ scale: 1.02 }} className="card p-3">
               <span className="label text-[10px] tracking-widest text-[var(--text-dim)]">ALL-TIME RATE</span>
               <p className={`data text-2xl font-bold mt-1 ${rate >= 80 ? 'text-[var(--accent)]' : rate >= 50 ? 'text-[var(--amber)]' : 'text-[var(--rose)]'}`}>
                 {rate}%
               </p>
               <p className="text-xs text-[var(--text-dim)]">{fulfilled}/{total} kept</p>
             </motion.div>
-            <motion.div whileHover={{ scale: 1.02 }} className="rounded-lg border border-[var(--border)] bg-[var(--surface)] p-3">
+            <motion.div whileHover={{ scale: 1.02 }} className="card p-3">
               <span className="label text-[10px] tracking-widest text-[var(--text-dim)]">30-DAY RATE</span>
               <p className={`data text-2xl font-bold mt-1 ${recentRate >= 80 ? 'text-[var(--accent)]' : recentRate >= 50 ? 'text-[var(--amber)]' : 'text-[var(--rose)]'}`}>
                 {recentRate}%
@@ -69,7 +69,7 @@ export default function CommitmentsPage() {
 
         {/* Add */}
         <StaggerItem>
-          <div className="rounded-lg border border-[var(--border)] bg-[var(--surface)] p-3">
+          <div className="card p-3">
             <span className="label text-[10px] tracking-widest text-[var(--accent)] mb-2 block">ADD COMMITMENT</span>
             <div className="space-y-2">
               <input
@@ -114,7 +114,7 @@ export default function CommitmentsPage() {
               <motion.div
                 whileHover={{ scale: 1.01 }}
                 transition={{ type: 'spring', stiffness: 400, damping: 25 }}
-                className={`rounded-lg border bg-[var(--surface)] p-3 flex items-start gap-3 ${
+                className={`card p-3 flex items-start gap-3 ${
                   c.fulfilled ? 'border-[var(--accent)]/20' : 'border-[var(--border)]'
                 }`}
               >

@@ -6,6 +6,13 @@ import { useStore, type Task } from '@/stores/store'
 import { BUSINESSES, PRIORITY_COLORS } from '@/lib/constants'
 import { toast } from 'sonner'
 
+const BORDER_COLORS: Record<string, string> = {
+  crit: 'rgb(244,63,94)',
+  high: 'rgb(245,158,11)',
+  med: 'rgb(59,130,246)',
+  low: 'var(--border)',
+}
+
 interface TaskItemProps {
   task: Task
 }
@@ -38,9 +45,9 @@ export default function TaskItem({ task }: TaskItemProps) {
   }
 
   const handleDragEnd = (_: any, info: { offset: { x: number } }) => {
-    if (info.offset.x > 100) {
+    if (info.offset.x > 80) {
       if (!task.done) handleToggle()
-    } else if (info.offset.x < -100) {
+    } else if (info.offset.x < -80) {
       deleteTask(task.id)
       toast('Task deleted')
     }
@@ -68,10 +75,10 @@ export default function TaskItem({ task }: TaskItemProps) {
     : null
 
   return (
-    <div className="relative overflow-hidden rounded-[10px]">
+    <div className="relative overflow-hidden rounded-[12px]">
       {/* Swipe background */}
       <motion.div
-        className="absolute inset-0 rounded-[10px] flex items-center justify-between px-5"
+        className="absolute inset-0 rounded-[12px] flex items-center justify-between px-5"
         style={{ backgroundColor: bgColor, opacity: bgOpacity }}
       >
         <span className="text-[var(--accent)] text-sm font-semibold">Complete</span>
@@ -80,10 +87,13 @@ export default function TaskItem({ task }: TaskItemProps) {
 
       <motion.div
         layout
-        className={`group relative flex items-start gap-3 px-3 py-2.5 rounded-[10px] border border-[var(--border)] bg-[var(--surface)] ${
+        className={`group relative flex items-start gap-3 p-3 rounded-[12px] bg-[var(--surface)] ${
           task.done ? 'opacity-60' : ''
         }`}
-        style={{ x }}
+        style={{
+          x,
+          borderLeft: `3px solid ${BORDER_COLORS[task.priority] || 'var(--border)'}`,
+        }}
         drag="x"
         dragConstraints={{ left: 0, right: 0 }}
         dragElastic={0.3}
@@ -94,7 +104,7 @@ export default function TaskItem({ task }: TaskItemProps) {
         {/* Checkbox */}
         <motion.button
           onClick={handleToggle}
-          className={`mt-0.5 w-[18px] h-[18px] rounded-md border-2 flex-shrink-0 flex items-center justify-center transition-colors ${
+          className={`mt-0.5 w-[18px] h-[18px] rounded-[6px] border-2 flex-shrink-0 flex items-center justify-center transition-colors ${
             task.done
               ? 'bg-[var(--accent)] border-[var(--accent)]'
               : 'border-[var(--border)] hover:border-[var(--accent)]'
@@ -142,11 +152,11 @@ export default function TaskItem({ task }: TaskItemProps) {
             </motion.div>
           )}
           <div className="flex items-center gap-2 mt-1 flex-wrap">
-            <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-md ${pColors.bg} ${pColors.text} ${pColors.border} border`}>
+            <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-[8px] ${pColors.bg} ${pColors.text} ${pColors.border} border`}>
               {task.priority.toUpperCase()}
             </span>
             {task.tag && (
-              <span className="text-[10px] text-[var(--text-dim)] bg-[var(--surface2)] px-1.5 py-0.5 rounded-md">
+              <span className="text-[10px] text-[var(--text-dim)] bg-[var(--surface2)] px-1.5 py-0.5 rounded-[8px]">
                 {task.tag}
               </span>
             )}
@@ -171,7 +181,6 @@ export default function TaskItem({ task }: TaskItemProps) {
           animate={{ opacity: 0, x: 4 }}
           whileTap={{ scale: 0.9 }}
           style={{ pointerEvents: 'auto' }}
-          // Show on parent hover via CSS
           data-delete
         >
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>

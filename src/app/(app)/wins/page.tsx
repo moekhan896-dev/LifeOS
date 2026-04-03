@@ -63,11 +63,11 @@ export default function WinsPage() {
         {/* Stats */}
         <StaggerItem>
           <div className="grid grid-cols-2 gap-3">
-            <motion.div whileHover={{ scale: 1.02 }} className="rounded-lg border border-[var(--amber)]/30 bg-[var(--amber)]/5 p-3">
+            <motion.div whileHover={{ scale: 1.02 }} className="card border-[var(--amber)]/30 bg-[var(--amber)]/5 p-3">
               <span className="label text-[10px] tracking-widest text-[var(--amber)]">TOTAL VALUE</span>
               <p className="data text-2xl font-bold text-[var(--amber)] mt-1">{fmt(totalValue)}</p>
             </motion.div>
-            <motion.div whileHover={{ scale: 1.02 }} className="rounded-lg border border-[var(--amber)]/30 bg-[var(--amber)]/5 p-3">
+            <motion.div whileHover={{ scale: 1.02 }} className="card border-[var(--amber)]/30 bg-[var(--amber)]/5 p-3">
               <span className="label text-[10px] tracking-widest text-[var(--amber)]">WIN STREAK</span>
               <p className="data text-2xl font-bold text-[var(--amber)] mt-1">{streak} day{streak !== 1 ? 's' : ''}</p>
             </motion.div>
@@ -76,7 +76,7 @@ export default function WinsPage() {
 
         {/* Add Win */}
         <StaggerItem>
-          <div className="rounded-lg border border-[var(--amber)]/20 bg-[var(--surface)] p-3">
+          <div className="card border-[var(--amber)]/20 p-3">
             <span className="label text-[10px] tracking-widest text-[var(--amber)] mb-2 block">LOG A WIN</span>
             <div className="space-y-2">
               <input
@@ -135,7 +135,7 @@ export default function WinsPage() {
                 <motion.div
                   whileHover={{ scale: 1.01 }}
                   transition={{ type: 'spring', stiffness: 400, damping: 25 }}
-                  className="rounded-lg border border-[var(--amber)]/20 bg-[var(--surface)] p-3"
+                  className="card border-[var(--amber)]/20 p-3"
                 >
                   <div className="flex items-start gap-3">
                     <div className="w-1 h-full min-h-[40px] rounded-full bg-[var(--amber)]" />

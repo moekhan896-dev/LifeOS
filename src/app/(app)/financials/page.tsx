@@ -7,6 +7,18 @@ import PageTransition from '@/components/PageTransition'
 import { StaggerContainer, StaggerItem } from '@/components/Stagger'
 import { motion, AnimatePresence } from 'framer-motion'
 import { toast } from 'sonner'
+import { BarChart, Bar, AreaChart, Area, ResponsiveContainer, XAxis, YAxis, Tooltip, CartesianGrid, Legend } from 'recharts'
+
+const plData = [
+  { m: 'Oct', income: 20000, expenses: 6000 },
+  { m: 'Nov', income: 22000, expenses: 5800 },
+  { m: 'Dec', income: 25000, expenses: 6200 },
+  { m: 'Jan', income: 23000, expenses: 5900 },
+  { m: 'Feb', income: 21000, expenses: 6100 },
+  { m: 'Mar', income: 23469, expenses: 5945 },
+]
+
+const plTrend = plData.map((d) => ({ ...d, profit: d.income - d.expenses }))
 
 const INCOME = {
   agency: { label: 'SEO Agency (Rysen)', net: 15269, detail: '6 clients, net after ad spend + Stripe' },
@@ -90,7 +102,7 @@ export default function FinancialsPage() {
           <StaggerItem>
             <motion.div
               whileHover={{ y: -1, boxShadow: '0 4px 12px rgba(0,0,0,0.08)' }}
-              className="rounded-lg border border-[var(--accent)]/30 bg-[var(--accent)]/5 p-4"
+              className="card border-[var(--accent)]/30 bg-[var(--accent)]/5 p-4"
             >
               <span className="label text-[10px] tracking-widest text-[var(--accent)]">NET TAKE-HOME</span>
               <div className="mt-2 flex items-baseline gap-3">
@@ -114,14 +126,48 @@ export default function FinancialsPage() {
             </motion.div>
           </StaggerItem>
 
-          {/* Trailing Trends */}
+          {/* Income vs Expenses BarChart */}
           <StaggerItem>
-            <div className="card p-4">
-              <span className="label text-[10px] tracking-widest text-[var(--text-dim)]">TRAILING TRENDS</span>
-              <div className="mt-3 flex items-center justify-center h-32 text-sm text-[var(--text-dim)]">
-                Charts coming soon -- monthly revenue tracking
+            <motion.div whileHover={{ y: -2 }} className="card p-4">
+              <span className="label text-[10px] tracking-widest text-[var(--text-dim)]">INCOME VS EXPENSES</span>
+              <div className="mt-3">
+                <ResponsiveContainer width="100%" height={220}>
+                  <BarChart data={plData}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
+                    <XAxis dataKey="m" tick={{ fill: 'var(--text-dim)', fontSize: 10 }} />
+                    <YAxis tick={{ fill: 'var(--text-dim)', fontSize: 10 }} />
+                    <Tooltip contentStyle={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 12, fontSize: 12 }} />
+                    <Legend wrapperStyle={{ fontSize: 10 }} />
+                    <Bar dataKey="income" fill="#10b981" radius={[4, 4, 0, 0]} />
+                    <Bar dataKey="expenses" fill="#f43f5e" radius={[4, 4, 0, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
               </div>
-            </div>
+            </motion.div>
+          </StaggerItem>
+
+          {/* P&L Trend */}
+          <StaggerItem>
+            <motion.div whileHover={{ y: -2 }} className="card p-4">
+              <span className="label text-[10px] tracking-widest text-[var(--text-dim)]">P&L TREND</span>
+              <div className="mt-3">
+                <ResponsiveContainer width="100%" height={180}>
+                  <AreaChart data={plTrend}>
+                    <defs>
+                      <linearGradient id="profitGrad" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="#10b981" stopOpacity={0.3} />
+                        <stop offset="95%" stopColor="#10b981" stopOpacity={0} />
+                      </linearGradient>
+                    </defs>
+                    <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
+                    <XAxis dataKey="m" tick={{ fill: 'var(--text-dim)', fontSize: 10 }} />
+                    <YAxis tick={{ fill: 'var(--text-dim)', fontSize: 10 }} />
+                    <Tooltip contentStyle={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 12, fontSize: 12 }} />
+                    <Area type="monotone" dataKey="profit" stroke="#10b981" fill="url(#profitGrad)" strokeWidth={2} />
+                  </AreaChart>
+                </ResponsiveContainer>
+              </div>
+            </motion.div>
           </StaggerItem>
 
           {/* Emergency Scenario Planner */}
@@ -137,7 +183,7 @@ export default function FinancialsPage() {
                     <motion.div
                       key={s.name}
                       whileHover={{ y: -1, boxShadow: '0 4px 12px rgba(0,0,0,0.08)' }}
-                      className="rounded-lg border border-[var(--border)] bg-[var(--bg)] p-3"
+                      className="rounded-[12px] border border-[var(--border)] bg-[var(--bg)] p-3"
                     >
                       <p className="text-sm font-semibold text-[var(--text)]">{s.name}</p>
                       <p className="text-xs text-[var(--text-dim)] mb-2">{s.description}</p>

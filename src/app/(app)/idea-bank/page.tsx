@@ -66,7 +66,7 @@ export default function IdeaBankPage() {
               whileHover={{ scale: 1.03 }}
               whileTap={{ scale: 0.97 }}
               onClick={handleAdd}
-              className="rounded-lg bg-[var(--accent)] px-4 py-2 text-xs font-semibold text-[var(--bg)]"
+              className="rounded-[8px] bg-[var(--accent)] px-4 py-2 text-xs font-semibold text-[var(--bg)]"
             >
               Save
             </motion.button>

@@ -6,6 +6,7 @@ import { toast } from 'sonner'
 import { useStore } from '@/stores/store'
 import PageTransition from '@/components/PageTransition'
 import { StaggerContainer, StaggerItem } from '@/components/Stagger'
+import { BarChart, Bar, ResponsiveContainer, XAxis, YAxis, Tooltip, CartesianGrid } from 'recharts'
 
 const VARIABLES = [
   { key: 'agencyClients', label: 'New Agency Clients', min: 0, max: 10, fee: 1500, unit: '/mo each' },
@@ -55,7 +56,7 @@ export default function ScenariosPage() {
 
         {/* Sliders */}
         <StaggerItem>
-          <div className="rounded-lg border border-[var(--border)] bg-[var(--surface)] p-4 space-y-4">
+          <motion.div whileHover={{ y: -2 }} className="card p-4 space-y-4">
             <span className="label text-[10px] tracking-widest text-[var(--accent)]">VARIABLES</span>
             {VARIABLES.map((v) => (
               <div key={v.key}>
@@ -74,12 +75,12 @@ export default function ScenariosPage() {
                 <p className="text-[10px] text-[var(--text-dim)]">{fmt(v.fee)} {v.unit}</p>
               </div>
             ))}
-          </div>
+          </motion.div>
         </StaggerItem>
 
         {/* Output */}
         <StaggerItem>
-          <div className="rounded-lg border border-[var(--accent)]/30 bg-[var(--accent)]/5 p-4">
+          <motion.div whileHover={{ y: -2 }} className="card border-[var(--accent)]/30 bg-[var(--accent)]/5 p-4">
             <span className="label text-[10px] tracking-widest text-[var(--accent)]">PROJECTED INCOME</span>
             <div className="mt-2 grid grid-cols-2 gap-3">
               <div>
@@ -110,12 +111,35 @@ export default function ScenariosPage() {
                 <p className="mt-2 text-xs font-semibold text-[var(--accent)]">Target reached!</p>
               )}
             </div>
-          </div>
+          </motion.div>
+        </StaggerItem>
+
+        {/* Projected Revenue Comparison */}
+        <StaggerItem>
+          <motion.div whileHover={{ y: -2 }} className="card p-4">
+            <span className="label text-[10px] tracking-widest text-[var(--text-dim)]">SCENARIO COMPARISON</span>
+            <div className="mt-3">
+              <ResponsiveContainer width="100%" height={200}>
+                <BarChart data={[
+                  { name: 'Current', revenue: BASE_INCOME },
+                  { name: 'Conservative', revenue: 30000 },
+                  { name: 'Moderate', revenue: 50000 },
+                  { name: 'Aggressive', revenue: 80000 },
+                ]}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
+                  <XAxis dataKey="name" tick={{ fill: 'var(--text-dim)', fontSize: 10 }} />
+                  <YAxis tick={{ fill: 'var(--text-dim)', fontSize: 10 }} />
+                  <Tooltip contentStyle={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 12, fontSize: 12 }} />
+                  <Bar dataKey="revenue" fill="#10b981" radius={[4, 4, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </motion.div>
         </StaggerItem>
 
         {/* Presets */}
         <StaggerItem>
-          <div className="rounded-lg border border-[var(--border)] bg-[var(--surface)] p-4">
+          <motion.div whileHover={{ y: -2 }} className="card p-4">
             <span className="label text-[10px] tracking-widest text-[var(--text-dim)]">PRE-BUILT SCENARIOS</span>
             <div className="mt-3 grid gap-2.5 sm:grid-cols-3">
               {PRESETS.map((p) => (
@@ -127,7 +151,7 @@ export default function ScenariosPage() {
                     setValues(p.values)
                     toast.success(`${p.name} scenario applied`)
                   }}
-                  className="rounded-lg border border-[var(--border)] bg-[var(--bg)] p-3 text-left hover:border-[var(--accent)] transition-colors"
+                  className="rounded-[12px] border border-[var(--border)] bg-[var(--bg)] p-3 text-left hover:border-[var(--accent)] transition-colors"
                 >
                   <p className="text-sm font-semibold text-[var(--text)]">{p.name}</p>
                   <p className="data text-lg font-bold text-[var(--accent)] mt-1">{fmt(p.target)}/mo</p>
@@ -135,7 +159,7 @@ export default function ScenariosPage() {
                 </motion.button>
               ))}
             </div>
-          </div>
+          </motion.div>
         </StaggerItem>
       </StaggerContainer>
     </PageTransition>

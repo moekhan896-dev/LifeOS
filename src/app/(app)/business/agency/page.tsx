@@ -8,6 +8,11 @@ import { CLIENTS, BUSINESSES, DRIVER_STATUS_COLORS } from '@/lib/constants'
 import Link from 'next/link'
 import PageTransition from '@/components/PageTransition'
 import { StaggerContainer, StaggerItem } from '@/components/Stagger'
+import { AreaChart, Area, BarChart, Bar, ResponsiveContainer, XAxis, Tooltip } from 'recharts'
+
+const revenueData = Array.from({length: 6}, (_, i) => ({ month: ['Oct','Nov','Dec','Jan','Feb','Mar'][i], agency: [22,24,28,30,27,26][i] * 1000, plumbing: [15,18,21,19,20,18][i] * 1000 }))
+
+const clientLTVData = CLIENTS.map(c => ({ name: c.name.split(' ')[0], ltv: c.net * 12 }))
 
 const STAGES: { key: PipelineDeal['stage']; label: string }[] = [
   { key: 'lead', label: 'Lead' },
@@ -69,56 +74,86 @@ export default function AgencyPage() {
         <div className="flex items-center justify-between mb-6">
           <div className="flex items-center gap-3">
             <h1 className="text-[22px] font-bold tracking-tight text-[var(--text)]">{biz.name.toUpperCase()}</h1>
-            <span className="text-[12px] font-semibold px-2.5 py-0.5 rounded-full bg-[var(--accent)]/15 text-[var(--accent)]">
+            <span className="text-[10px] font-mono uppercase tracking-[2px] text-[var(--text-dim)] px-2.5 py-0.5 rounded-full bg-[var(--accent)]/15">
               {biz.statusLabel}
             </span>
           </div>
           <motion.div whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }}>
-            <Link href="/ai?business=agency" className="text-[13px] bg-[var(--surface2)] border border-[var(--border)] rounded-[10px] px-3 py-1.5 hover:bg-[var(--surface)] transition-colors">
+            <Link href="/ai?business=agency" className="text-[13px] bg-[var(--surface2)] border border-[var(--border)] rounded-[8px] px-3 py-1.5 hover:bg-[var(--surface)] transition-colors">
               AI Context
             </Link>
           </motion.div>
         </div>
 
         {/* MRR - Sticky metrics */}
-        <div className="sticky top-0 z-10 glass rounded-[12px] p-3 mb-5">
+        <div className="sticky top-0 z-10 glass rounded-[16px] p-3 mb-5">
           <StaggerContainer className="grid grid-cols-2 gap-2">
             <StaggerItem>
-              <div className="bg-[var(--surface)] border border-[var(--border)] rounded-[10px] p-3">
-                <p className="label mb-1">Gross MRR</p>
-                <p className="data text-[22px] font-bold text-[var(--text)]">${totalGross.toLocaleString()}</p>
-              </div>
+              <motion.div whileHover={{ y: -1, boxShadow: '0 8px 24px rgba(0,0,0,0.12)' }} className="card p-3">
+                <p className="text-[10px] font-mono uppercase tracking-[2px] text-[var(--text-dim)] mb-1">Gross MRR</p>
+                <p className="data text-[28px] font-bold text-[var(--text)]">${totalGross.toLocaleString()}</p>
+              </motion.div>
             </StaggerItem>
             <StaggerItem>
-              <div className="bg-[var(--surface)] border border-[var(--border)] rounded-[10px] p-3">
-                <p className="label mb-1">Net MRR</p>
-                <p className="data text-[22px] font-bold text-[var(--accent)]">${totalNet.toLocaleString()}</p>
-              </div>
+              <motion.div whileHover={{ y: -1, boxShadow: '0 8px 24px rgba(0,0,0,0.12)' }} className="card p-3">
+                <p className="text-[10px] font-mono uppercase tracking-[2px] text-[var(--text-dim)] mb-1">Net MRR</p>
+                <p className="data text-[28px] font-bold text-[var(--accent)]">${totalNet.toLocaleString()}</p>
+              </motion.div>
             </StaggerItem>
           </StaggerContainer>
         </div>
 
-        {/* Client Table */}
+        {/* Revenue Trend Chart */}
+        <motion.div whileHover={{ y: -1, boxShadow: '0 8px 24px rgba(0,0,0,0.12)' }} className="card p-3 mb-5">
+          <p className="text-[10px] font-mono uppercase tracking-[2px] text-[var(--text-dim)] mb-3">Revenue Trend (6 Months)</p>
+          <ResponsiveContainer width="100%" height={160}>
+            <AreaChart data={revenueData}>
+              <defs>
+                <linearGradient id="agencyGrad" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="5%" stopColor="var(--accent)" stopOpacity={0.3} />
+                  <stop offset="95%" stopColor="var(--accent)" stopOpacity={0} />
+                </linearGradient>
+              </defs>
+              <XAxis dataKey="month" tick={{ fontSize: 10, fill: 'var(--text-dim)' }} axisLine={false} tickLine={false} />
+              <Tooltip contentStyle={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 12, fontSize: 12 }} />
+              <Area type="monotone" dataKey="agency" stroke="var(--accent)" fill="url(#agencyGrad)" strokeWidth={2} />
+            </AreaChart>
+          </ResponsiveContainer>
+        </motion.div>
+
+        {/* Client LTV Chart */}
+        <motion.div whileHover={{ y: -1, boxShadow: '0 8px 24px rgba(0,0,0,0.12)' }} className="card p-3 mb-5">
+          <p className="text-[10px] font-mono uppercase tracking-[2px] text-[var(--text-dim)] mb-3">Client LTV (Annual Net)</p>
+          <ResponsiveContainer width="100%" height={140}>
+            <BarChart data={clientLTVData}>
+              <XAxis dataKey="name" tick={{ fontSize: 10, fill: 'var(--text-dim)' }} axisLine={false} tickLine={false} />
+              <Tooltip contentStyle={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 12, fontSize: 12 }} />
+              <Bar dataKey="ltv" fill="var(--accent)" radius={[4, 4, 0, 0]} />
+            </BarChart>
+          </ResponsiveContainer>
+        </motion.div>
+
         <StaggerContainer>
+          {/* Client Table */}
           <StaggerItem>
-            <div className="bg-[var(--surface)] border border-[var(--border)] rounded-[10px] p-3 mb-5 overflow-x-auto">
-              <h2 className="text-[15px] font-semibold text-[var(--text)] mb-3">Clients</h2>
+            <motion.div whileHover={{ y: -1, boxShadow: '0 8px 24px rgba(0,0,0,0.12)' }} className="card p-3 mb-5 overflow-x-auto">
+              <h2 className="text-[10px] font-mono uppercase tracking-[2px] text-[var(--text-dim)] mb-3">Clients</h2>
               <table className="w-full text-[13px]">
                 <thead>
-                  <tr className="text-left label">
-                    <th className="pb-2 pr-3">Client</th>
-                    <th className="pb-2 pr-3">Gross</th>
-                    <th className="pb-2 pr-3">Ad Spend</th>
-                    <th className="pb-2 pr-3">Stripe</th>
-                    <th className="pb-2 pr-3">Net</th>
-                    <th className="pb-2 pr-3">Service</th>
-                    <th className="pb-2">Meeting</th>
+                  <tr className="text-left">
+                    <th className="pb-2 pr-3 text-[10px] font-mono uppercase tracking-[2px] text-[var(--text-dim)]">Client</th>
+                    <th className="pb-2 pr-3 text-[10px] font-mono uppercase tracking-[2px] text-[var(--text-dim)]">Gross</th>
+                    <th className="pb-2 pr-3 text-[10px] font-mono uppercase tracking-[2px] text-[var(--text-dim)]">Ad Spend</th>
+                    <th className="pb-2 pr-3 text-[10px] font-mono uppercase tracking-[2px] text-[var(--text-dim)]">Stripe</th>
+                    <th className="pb-2 pr-3 text-[10px] font-mono uppercase tracking-[2px] text-[var(--text-dim)]">Net</th>
+                    <th className="pb-2 pr-3 text-[10px] font-mono uppercase tracking-[2px] text-[var(--text-dim)]">Service</th>
+                    <th className="pb-2 text-[10px] font-mono uppercase tracking-[2px] text-[var(--text-dim)]">Meeting</th>
                   </tr>
                 </thead>
                 <tbody>
                   {CLIENTS.map((c) => (
                     <tr key={c.name} className="border-t border-[var(--border)]">
-                      <td className="py-2 pr-3 text-[var(--text)] font-medium flex items-center gap-2">
+                      <td className="py-2 pr-3 text-[14px] text-[var(--text-mid)] font-medium flex items-center gap-2">
                         {c.name}
                         {c.name.includes('AWS') && (
                           <span className="text-[11px] bg-[var(--rose)]/15 text-[var(--rose)] px-1.5 py-0.5 rounded-full font-semibold">
@@ -126,29 +161,29 @@ export default function AgencyPage() {
                           </span>
                         )}
                       </td>
-                      <td className="py-2 pr-3 data">${c.gross.toLocaleString()}</td>
-                      <td className="py-2 pr-3 text-[var(--text-dim)]">${c.adSpend.toLocaleString()}</td>
-                      <td className="py-2 pr-3 text-[var(--text-dim)]">${c.stripe}</td>
-                      <td className="py-2 pr-3 data text-[var(--accent)]">${c.net.toLocaleString()}</td>
-                      <td className="py-2 pr-3 text-[var(--text-mid)]">{c.service}</td>
-                      <td className="py-2 text-[var(--text-dim)]">{c.meeting}</td>
+                      <td className="py-2 pr-3 data text-[14px]">${c.gross.toLocaleString()}</td>
+                      <td className="py-2 pr-3 text-[14px] text-[var(--text-mid)]">${c.adSpend.toLocaleString()}</td>
+                      <td className="py-2 pr-3 text-[14px] text-[var(--text-mid)]">${c.stripe}</td>
+                      <td className="py-2 pr-3 data text-[14px] text-[var(--accent)]">${c.net.toLocaleString()}</td>
+                      <td className="py-2 pr-3 text-[14px] text-[var(--text-mid)]">{c.service}</td>
+                      <td className="py-2 text-[14px] text-[var(--text-mid)]">{c.meeting}</td>
                     </tr>
                   ))}
                 </tbody>
               </table>
-            </div>
+            </motion.div>
           </StaggerItem>
 
           {/* Pipeline / CRM */}
           <StaggerItem>
-            <div className="bg-[var(--surface)] border border-[var(--border)] rounded-[10px] p-3 mb-5">
+            <motion.div whileHover={{ y: -1, boxShadow: '0 8px 24px rgba(0,0,0,0.12)' }} className="card p-3 mb-5">
               <div className="flex items-center justify-between mb-3">
-                <h2 className="text-[15px] font-semibold text-[var(--text)]">Pipeline / CRM</h2>
+                <h2 className="text-[10px] font-mono uppercase tracking-[2px] text-[var(--text-dim)]">Pipeline / CRM</h2>
                 <motion.button
                   whileHover={{ scale: 1.05 }}
                   whileTap={{ scale: 0.95 }}
                   onClick={() => setShowAddDeal(true)}
-                  className="text-[12px] font-semibold px-3 py-1 rounded-lg bg-[var(--accent)]/15 text-[var(--accent)] hover:bg-[var(--accent)]/25 transition-colors"
+                  className="text-[12px] font-semibold px-3 py-1 rounded-[8px] bg-[var(--accent)]/15 text-[var(--accent)] hover:bg-[var(--accent)]/25 transition-colors"
                 >
                   + Add Deal
                 </motion.button>
@@ -159,15 +194,15 @@ export default function AgencyPage() {
                   initial={{ opacity: 0, height: 0 }}
                   animate={{ opacity: 1, height: 'auto' }}
                   exit={{ opacity: 0, height: 0 }}
-                  className="flex flex-wrap gap-2 mb-4 p-3 bg-[var(--surface2)] rounded-lg"
+                  className="flex flex-wrap gap-2 mb-4 p-3 bg-[var(--surface2)] rounded-[12px]"
                 >
-                  <input value={newDeal.companyName} onChange={(e) => setNewDeal({ ...newDeal, companyName: e.target.value })} placeholder="Company name" className="bg-[var(--bg)] border border-[var(--border)] rounded-lg px-3 py-1.5 text-[13px] text-[var(--text)] flex-1 min-w-[140px]" />
-                  <input value={newDeal.dealValue} onChange={(e) => setNewDeal({ ...newDeal, dealValue: e.target.value })} placeholder="Deal value" type="number" className="bg-[var(--bg)] border border-[var(--border)] rounded-lg px-3 py-1.5 text-[13px] text-[var(--text)] w-[100px]" />
-                  <select value={newDeal.stage} onChange={(e) => setNewDeal({ ...newDeal, stage: e.target.value as PipelineDeal['stage'] })} className="bg-[var(--bg)] border border-[var(--border)] rounded-lg px-3 py-1.5 text-[13px] text-[var(--text)]">
+                  <input value={newDeal.companyName} onChange={(e) => setNewDeal({ ...newDeal, companyName: e.target.value })} placeholder="Company name" className="bg-[var(--bg)] border border-[var(--border)] rounded-[8px] px-3 py-1.5 text-[13px] text-[var(--text)] flex-1 min-w-[140px]" />
+                  <input value={newDeal.dealValue} onChange={(e) => setNewDeal({ ...newDeal, dealValue: e.target.value })} placeholder="Deal value" type="number" className="bg-[var(--bg)] border border-[var(--border)] rounded-[8px] px-3 py-1.5 text-[13px] text-[var(--text)] w-[100px]" />
+                  <select value={newDeal.stage} onChange={(e) => setNewDeal({ ...newDeal, stage: e.target.value as PipelineDeal['stage'] })} className="bg-[var(--bg)] border border-[var(--border)] rounded-[8px] px-3 py-1.5 text-[13px] text-[var(--text)]">
                     {STAGES.map((s) => <option key={s.key} value={s.key}>{s.label}</option>)}
                   </select>
-                  <motion.button whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }} onClick={handleAddDeal} className="text-[12px] font-semibold px-3 py-1.5 rounded-lg bg-[var(--accent)] text-white">Save</motion.button>
-                  <motion.button whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }} onClick={() => setShowAddDeal(false)} className="text-[12px] px-3 py-1.5 rounded-lg text-[var(--text-dim)]">Cancel</motion.button>
+                  <motion.button whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }} onClick={handleAddDeal} className="text-[12px] font-semibold px-3 py-1.5 rounded-[8px] bg-[var(--accent)] text-white">Save</motion.button>
+                  <motion.button whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }} onClick={() => setShowAddDeal(false)} className="text-[12px] px-3 py-1.5 rounded-[8px] text-[var(--text-dim)]">Cancel</motion.button>
                 </motion.div>
               )}
 
@@ -175,13 +210,13 @@ export default function AgencyPage() {
                 {STAGES.map((stage) => {
                   const deals = pipeline.filter((d) => d.stage === stage.key)
                   return (
-                    <div key={stage.key} className="bg-[var(--surface2)] rounded-lg p-2.5 min-h-[100px]">
-                      <p className="label text-[11px] mb-2">{stage.label} ({deals.length})</p>
+                    <div key={stage.key} className="bg-[var(--surface2)] rounded-[12px] p-2.5 min-h-[100px]">
+                      <p className="text-[10px] font-mono uppercase tracking-[2px] text-[var(--text-dim)] mb-2">{stage.label} ({deals.length})</p>
                       {deals.map((d) => (
                         <motion.div
                           key={d.id}
-                          whileHover={{ scale: 1.03, y: -1 }}
-                          className="bg-[var(--surface)] border border-[var(--border)] rounded-lg p-2 mb-1.5 text-[12px] cursor-pointer"
+                          whileHover={{ scale: 1.03, y: -1, boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}
+                          className="bg-[var(--surface)] border border-[var(--border)] rounded-[8px] p-2 mb-1.5 text-[12px] cursor-pointer"
                         >
                           <p className="text-[var(--text)] font-medium truncate">{d.companyName}</p>
                           {d.dealValue && <p className="text-[var(--accent)] data">${d.dealValue.toLocaleString()}/mo</p>}
@@ -191,38 +226,38 @@ export default function AgencyPage() {
                   )
                 })}
               </div>
-            </div>
+            </motion.div>
           </StaggerItem>
 
           {/* Revenue Drivers */}
           <StaggerItem>
-            <div className="bg-[var(--surface)] border border-[var(--border)] rounded-[10px] p-3 mb-5">
-              <h2 className="text-[15px] font-semibold text-[var(--text)] mb-3">Revenue Drivers</h2>
+            <motion.div whileHover={{ y: -1, boxShadow: '0 8px 24px rgba(0,0,0,0.12)' }} className="card p-3 mb-5">
+              <h2 className="text-[10px] font-mono uppercase tracking-[2px] text-[var(--text-dim)] mb-3">Revenue Drivers</h2>
               <div className="flex flex-col gap-1.5">
                 {(displayDrivers || AGENCY_DRIVERS).map((d, i) => (
-                  <motion.div key={i} whileHover={{ x: 2 }} className="flex items-center justify-between bg-[var(--surface2)] rounded-lg px-3 py-2">
-                    <span className="text-[13px] text-[var(--text)]">{d.name}</span>
+                  <motion.div key={i} whileHover={{ x: 2 }} className="flex items-center justify-between bg-[var(--surface2)] rounded-[12px] px-3 py-2">
+                    <span className="text-[14px] text-[var(--text-mid)]">{d.name}</span>
                     <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full ${DRIVER_STATUS_COLORS[d.status] || 'bg-[var(--surface)] text-[var(--text-dim)]'}`}>
                       {d.status}
                     </span>
                   </motion.div>
                 ))}
               </div>
-            </div>
+            </motion.div>
           </StaggerItem>
 
           {/* Exit Readiness Scorecard */}
           <StaggerItem>
-            <div className="bg-[var(--surface)] border border-[var(--border)] rounded-[10px] p-3 mb-5">
+            <motion.div whileHover={{ y: -1, boxShadow: '0 8px 24px rgba(0,0,0,0.12)' }} className="card p-3 mb-5">
               <div className="flex items-center justify-between mb-3">
-                <h2 className="text-[15px] font-semibold text-[var(--text)]">Exit Readiness Scorecard</h2>
-                <span className="data text-[18px] font-bold text-[var(--rose)]">35/100</span>
+                <h2 className="text-[10px] font-mono uppercase tracking-[2px] text-[var(--text-dim)]">Exit Readiness Scorecard</h2>
+                <span className="data text-[28px] font-bold text-[var(--rose)]">35/100</span>
               </div>
               <div className="flex flex-col gap-2.5">
                 {EXIT_SCORECARD.map((item) => (
                   <div key={item.category}>
                     <div className="flex items-center justify-between mb-1">
-                      <span className="text-[13px] text-[var(--text-mid)]">{item.category}</span>
+                      <span className="text-[14px] text-[var(--text-mid)]">{item.category}</span>
                       <span className="data text-[12px] text-[var(--text)]">{item.score}/{item.max}</span>
                     </div>
                     <div className="h-2 bg-[var(--surface2)] rounded-full overflow-hidden">
@@ -239,30 +274,30 @@ export default function AgencyPage() {
                   </div>
                 ))}
               </div>
-            </div>
+            </motion.div>
           </StaggerItem>
 
           {/* Agency GMB Profiles */}
           <StaggerItem>
-            <div className="bg-[var(--surface)] border border-[var(--border)] rounded-[10px] p-3 mb-5">
-              <h2 className="text-[15px] font-semibold text-[var(--text)] mb-3">Agency GMB Profiles</h2>
+            <motion.div whileHover={{ y: -1, boxShadow: '0 8px 24px rgba(0,0,0,0.12)' }} className="card p-3 mb-5">
+              <h2 className="text-[10px] font-mono uppercase tracking-[2px] text-[var(--text-dim)] mb-3">Agency GMB Profiles</h2>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
                 {AGENCY_GMBS.map((g) => (
-                  <motion.div key={g.city} whileHover={{ scale: 1.02, y: -1 }} className="bg-[var(--surface2)] rounded-lg p-3">
+                  <motion.div key={g.city} whileHover={{ scale: 1.02, y: -1, boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }} className="bg-[var(--surface2)] rounded-[12px] p-3">
                     <p className="text-[14px] font-semibold text-[var(--text)] mb-1">{g.city}</p>
                     <span className="text-[11px] bg-[var(--rose)]/15 text-[var(--rose)] px-2 py-0.5 rounded-full font-medium">{g.status}</span>
                   </motion.div>
                 ))}
               </div>
-            </div>
+            </motion.div>
           </StaggerItem>
 
           {/* Cold Email Tracker Placeholder */}
           <StaggerItem>
-            <div className="bg-[var(--surface)] border border-[var(--border)] rounded-[10px] p-3">
-              <h2 className="text-[15px] font-semibold text-[var(--text)] mb-2">Cold Email Tracker</h2>
-              <p className="text-[13px] text-[var(--text-dim)]">Connect Instantly to see open rates, reply rates, and booked calls.</p>
-            </div>
+            <motion.div whileHover={{ y: -1, boxShadow: '0 8px 24px rgba(0,0,0,0.12)' }} className="card p-3">
+              <h2 className="text-[10px] font-mono uppercase tracking-[2px] text-[var(--text-dim)] mb-2">Cold Email Tracker</h2>
+              <p className="text-[14px] text-[var(--text-mid)]">Connect Instantly to see open rates, reply rates, and booked calls.</p>
+            </motion.div>
           </StaggerItem>
         </StaggerContainer>
       </div>

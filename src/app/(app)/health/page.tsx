@@ -6,6 +6,27 @@ import PageTransition from '@/components/PageTransition'
 import { StaggerContainer, StaggerItem } from '@/components/Stagger'
 import { motion, AnimatePresence } from 'framer-motion'
 import { toast } from 'sonner'
+import { BarChart, Bar, AreaChart, Area, ResponsiveContainer, XAxis, YAxis, Tooltip, CartesianGrid } from 'recharts'
+
+const weeklyPrayerData = [
+  { day: 'Mon', completed: 5 },
+  { day: 'Tue', completed: 4 },
+  { day: 'Wed', completed: 5 },
+  { day: 'Thu', completed: 3 },
+  { day: 'Fri', completed: 5 },
+  { day: 'Sat', completed: 4 },
+  { day: 'Sun', completed: 5 },
+]
+
+const dailyScoreData = [
+  { day: 'Mon', score: 72 },
+  { day: 'Tue', score: 65 },
+  { day: 'Wed', score: 80 },
+  { day: 'Thu', score: 58 },
+  { day: 'Fri', score: 85 },
+  { day: 'Sat', score: 70 },
+  { day: 'Sun', score: 78 },
+]
 
 const PRAYERS = [
   { key: 'fajr' as const, name: 'Fajr', time: '5:47 AM' },
@@ -113,7 +134,7 @@ export default function HealthPage() {
                         togglePrayer(p.key)
                         toast(prayed ? `Unmarked ${p.name}` : `${p.name} logged`)
                       }}
-                      className={`flex flex-col items-center gap-1.5 p-3 md:p-4 rounded-[10px] border transition-all duration-200 ${
+                      className={`flex flex-col items-center gap-1.5 p-3 md:p-4 rounded-[12px] border transition-all duration-200 ${
                         prayed
                           ? 'bg-[var(--gold)]/10 border-[var(--gold)]/40 shadow-[0_0_12px_var(--gold)/10]'
                           : 'bg-[var(--surface2)] border-[var(--border)] hover:border-[var(--border-glow)]'
@@ -144,6 +165,50 @@ export default function HealthPage() {
                 </p>
               </div>
             </Section>
+          </StaggerItem>
+
+          {/* Weekly Prayer Chart */}
+          <StaggerItem>
+            <motion.div whileHover={{ y: -2 }} className="card p-4">
+              <div className="flex items-center gap-2.5 mb-3">
+                <span className="text-lg">📊</span>
+                <h2 className="text-[14px] font-bold tracking-tight text-[var(--text)] uppercase">Weekly Prayer Completion</h2>
+              </div>
+              <ResponsiveContainer width="100%" height={180}>
+                <BarChart data={weeklyPrayerData}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
+                  <XAxis dataKey="day" tick={{ fill: 'var(--text-dim)', fontSize: 10 }} />
+                  <YAxis domain={[0, 5]} tick={{ fill: 'var(--text-dim)', fontSize: 10 }} />
+                  <Tooltip contentStyle={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 12, fontSize: 12 }} />
+                  <Bar dataKey="completed" fill="#eab308" radius={[4, 4, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            </motion.div>
+          </StaggerItem>
+
+          {/* Daily Score Trend */}
+          <StaggerItem>
+            <motion.div whileHover={{ y: -2 }} className="card p-4">
+              <div className="flex items-center gap-2.5 mb-3">
+                <span className="text-lg">📈</span>
+                <h2 className="text-[14px] font-bold tracking-tight text-[var(--text)] uppercase">Daily Score Trend</h2>
+              </div>
+              <ResponsiveContainer width="100%" height={180}>
+                <AreaChart data={dailyScoreData}>
+                  <defs>
+                    <linearGradient id="scoreGradient" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="var(--accent)" stopOpacity={0.3} />
+                      <stop offset="95%" stopColor="var(--accent)" stopOpacity={0} />
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
+                  <XAxis dataKey="day" tick={{ fill: 'var(--text-dim)', fontSize: 10 }} />
+                  <YAxis domain={[0, 100]} tick={{ fill: 'var(--text-dim)', fontSize: 10 }} />
+                  <Tooltip contentStyle={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 12, fontSize: 12 }} />
+                  <Area type="monotone" dataKey="score" stroke="var(--accent)" fill="url(#scoreGradient)" strokeWidth={2} />
+                </AreaChart>
+              </ResponsiveContainer>
+            </motion.div>
           </StaggerItem>
 
           {/* Gym Tracker */}

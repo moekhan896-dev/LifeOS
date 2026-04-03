@@ -67,7 +67,7 @@ export default function EcosystemPage() {
 
         {/* SVG Diagram */}
         <StaggerItem>
-          <div className="rounded-lg border border-[var(--border)] bg-[var(--surface)] p-3">
+          <div className="card p-3">
             <svg viewBox="0 0 400 320" className="w-full h-auto" style={{ maxHeight: '400px' }}>
               {/* Connections */}
               {CONNECTIONS.map((conn, i) => {
@@ -148,7 +148,7 @@ export default function EcosystemPage() {
 
         {/* Connections list */}
         <StaggerItem>
-          <div className="rounded-lg border border-[var(--border)] bg-[var(--surface)] p-4">
+          <div className="card p-4">
             <span className="label text-[10px] tracking-widest text-[var(--text-dim)]">ALL CONNECTIONS</span>
             <div className="mt-3 space-y-2">
               {CONNECTIONS.map((conn, i) => {

@@ -41,7 +41,7 @@ export default function SopsPage() {
 
         {/* Completion bar */}
         <StaggerItem>
-          <div className="rounded-lg border border-[var(--border)] bg-[var(--surface)] p-4">
+          <div className="card p-4">
             <div className="flex items-center justify-between mb-2">
               <span className="label text-[10px] tracking-widest text-[var(--accent)]">DOCUMENTATION PROGRESS</span>
               <span className="data text-sm font-semibold text-[var(--accent)]">{pct}%</span>
@@ -60,7 +60,7 @@ export default function SopsPage() {
 
         {/* Add SOP */}
         <StaggerItem>
-          <div className="rounded-lg border border-[var(--border)] bg-[var(--surface)] p-3">
+          <div className="card p-3">
             <div className="flex gap-2">
               <select
                 value={newBiz}
@@ -102,7 +102,7 @@ export default function SopsPage() {
                 <motion.div
                   whileHover={{ scale: 1.01 }}
                   transition={{ type: 'spring', stiffness: 400, damping: 25 }}
-                  className="rounded-lg border border-[var(--border)] bg-[var(--surface)] overflow-hidden"
+                  className="card overflow-hidden"
                 >
                   <div
                     className="flex items-center gap-3 p-3 cursor-pointer"

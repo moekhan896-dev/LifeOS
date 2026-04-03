@@ -31,7 +31,7 @@ export default function SprintPage() {
 
         {/* Overall progress */}
         <StaggerItem>
-          <div className="rounded-lg border border-[var(--border)] bg-[var(--surface)] p-4">
+          <motion.div whileHover={{ y: -2 }} className="card p-4">
             <div className="flex items-center justify-between mb-2">
               <span className="label text-[10px] tracking-widest text-[var(--accent)]">OVERALL PROGRESS</span>
               <span className="data text-sm font-semibold text-[var(--accent)]">{overallPct}%</span>
@@ -45,7 +45,7 @@ export default function SprintPage() {
               />
             </div>
             <p className="mt-2 text-xs text-[var(--text-dim)]">{totalDone} of {totalDeliverables} deliverables complete</p>
-          </div>
+          </motion.div>
         </StaggerItem>
 
         {/* Sprints */}
@@ -58,12 +58,12 @@ export default function SprintPage() {
               <motion.div
                 whileHover={{ scale: 1.01 }}
                 transition={{ type: 'spring', stiffness: 400, damping: 25 }}
-                className={`rounded-lg border p-4 ${
+                className={`card p-4 ${
                   isActive
                     ? 'border-[var(--accent)] bg-[var(--accent)]/5'
                     : sprint.status === 'completed'
-                    ? 'border-[var(--accent)]/30 bg-[var(--surface)]'
-                    : 'border-[var(--border)] bg-[var(--surface)]'
+                    ? 'border-[var(--accent)]/30'
+                    : ''
                 }`}
               >
                 <div className="flex items-center justify-between mb-2">
