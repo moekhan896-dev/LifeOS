@@ -255,7 +255,7 @@ export default function HomePage() {
 
   // ═══ RENDER ═══
   return (
-    <div className="relative min-h-screen pb-24">
+    <div className="relative min-h-screen pb-24" style={{ background: 'linear-gradient(180deg, #060810 0%, #0a0d15 50%, #080b12 100%)' }}>
       {/* ══════════ ZONE 1: LIVE TICKER ══════════ */}
       <TickerBar
         artEarned={artEarned}
@@ -365,43 +365,43 @@ export default function HomePage() {
 
         {/* ══════════ ALERTS ══════════ */}
         {alerts.length > 0 && (
-          <motion.div {...stagger(8)} className="space-y-2.5">
-            {alerts.map((alert, i) => (
-              <motion.div
-                key={alert.id}
-                {...stagger(9 + i)}
-                className={`glass flex items-center gap-3 rounded-xl border-l-[3px] p-3 ${
-                  alert.color === 'rose'
-                    ? 'border-l-rose-500'
-                    : alert.color === 'amber'
-                      ? 'border-l-amber-500'
-                      : alert.color === 'emerald'
-                        ? 'border-l-emerald-500'
-                        : 'border-l-yellow-500'
-                }`}
-              >
-                <span className="text-lg">{alert.icon}</span>
-                <p className="flex-1 text-xs leading-snug text-white/70">
-                  {alert.text}
-                </p>
-                <button
-                  onClick={() => toast(alert.action)}
-                  className={`shrink-0 rounded-lg px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wider ${
-                    alert.color === 'rose'
-                      ? 'bg-rose-500/10 text-rose-400'
-                      : alert.color === 'amber'
-                        ? 'bg-amber-500/10 text-amber-400'
-                        : alert.color === 'emerald'
-                          ? 'bg-emerald-500/10 text-emerald-400'
-                          : 'bg-yellow-500/10 text-yellow-400'
-                  }`}
+          <motion.div {...stagger(10)} className="space-y-2.5">
+            {alerts.map((alert, i) => {
+              const alertColor = alert.color === 'rose' ? '#f43f5e' : alert.color === 'amber' ? '#f59e0b' : alert.color === 'emerald' ? '#10b981' : '#eab308'
+              return (
+                <motion.div
+                  key={alert.id}
+                  {...stagger(11 + i)}
+                  className="flex items-center gap-3 rounded-[16px] p-4 transition-all hover:-translate-y-[1px]"
+                  style={{ background: 'rgba(14,17,24,0.7)', backdropFilter: 'blur(16px)', border: '1px solid rgba(255,255,255,0.06)', borderLeftWidth: 3, borderLeftColor: alertColor, boxShadow: '0 4px 24px rgba(0,0,0,0.15)' }}
                 >
-                  {alert.action}
-                </button>
-              </motion.div>
-            ))}
+                  <span className="text-lg">{alert.icon}</span>
+                  <p className="flex-1 text-xs leading-snug text-white/70">
+                    {alert.text}
+                  </p>
+                  <button
+                    onClick={() => toast(alert.action)}
+                    className="shrink-0 rounded-[10px] px-3 py-1.5 text-[11px] font-semibold transition-all hover:brightness-110"
+                    style={{ background: `${alertColor}15`, color: alertColor, border: `1px solid ${alertColor}30` }}
+                  >
+                    {alert.action}
+                  </button>
+                </motion.div>
+              )
+            })}
           </motion.div>
         )}
+
+        {/* ══════════ COMMAND INPUT ══════════ */}
+        <motion.div {...stagger(12)} className="mt-6">
+          <div className="flex items-center gap-3 rounded-[16px] p-3" style={{ background: 'rgba(14,17,24,0.85)', backdropFilter: 'blur(24px)', border: '1px solid rgba(255,255,255,0.08)', boxShadow: '0 -4px 24px rgba(0,0,0,0.2)' }}>
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[10px] text-white" style={{ background: 'linear-gradient(135deg, #10b981, #06b6d4)' }}>
+              <span className="text-sm">🎤</span>
+            </div>
+            <input placeholder="Quick update or ask AI..." className="flex-1 bg-transparent text-sm text-white placeholder:text-white/20 outline-none" />
+            <span className="data shrink-0 rounded-[8px] bg-white/[0.05] px-2.5 py-1 text-[10px] text-white/30">↵</span>
+          </div>
+        </motion.div>
       </div>
     </div>
   )
@@ -590,7 +590,7 @@ function MorningCard({
     <div className="relative">
       {/* Animated border glow */}
       <div className="absolute -inset-[1px] rounded-[21px] bg-gradient-to-br from-emerald-500/30 via-transparent to-cyan-500/20 opacity-60" />
-      <div className="glass relative overflow-hidden rounded-[20px] p-5">
+      <div className="glass relative overflow-hidden rounded-[20px] p-8" style={{ border: '1px solid rgba(16,185,129,0.3)', boxShadow: '0 0 40px rgba(16,185,129,0.08), 0 4px 24px rgba(0,0,0,0.2)' }}>
         {/* Subtle animated gradient bg */}
         <motion.div
           className="absolute inset-0 bg-gradient-to-br from-emerald-500/[0.04] via-transparent to-cyan-500/[0.03]"
@@ -829,18 +829,30 @@ function EveningCard({
       {/* Big score */}
       <div className="mb-4 flex items-end justify-center gap-6">
         <div className="text-center">
-          <p className="data text-3xl font-extrabold text-emerald-400 glow-emerald">
+          <p className="data text-[48px] font-extrabold text-emerald-400 glow-emerald">
             ${fmt(artEarned)}
           </p>
           <p className="text-[10px] uppercase tracking-wider text-white/40">You</p>
         </div>
         <div className="mb-1 text-xl text-white/20">vs</div>
         <div className="text-center">
-          <p className="data text-3xl font-extrabold text-white/30">
+          <p className="data text-[40px] font-extrabold text-white/30 opacity-40">
             ${fmt(idealEarned)}
           </p>
           <p className="text-[10px] uppercase tracking-wider text-white/40">Ideal Art</p>
         </div>
+      </div>
+
+      {/* Progress arc */}
+      <div className="flex justify-center my-3">
+        <svg width="120" height="65" viewBox="0 0 120 65">
+          <path d="M10 60 A50 50 0 0 1 110 60" fill="none" stroke="rgba(255,255,255,0.06)" strokeWidth="6" strokeLinecap="round" />
+          <motion.path d="M10 60 A50 50 0 0 1 110 60" fill="none" stroke="#10b981" strokeWidth="6" strokeLinecap="round"
+            strokeDasharray="157" initial={{ strokeDashoffset: 157 }}
+            animate={{ strokeDashoffset: 157 * (1 - progressPct / 100) }}
+            transition={{ duration: 1.2, ease: [0.25, 0.46, 0.45, 0.94] as const }} />
+          <text x="60" y="55" textAnchor="middle" fill="#10b981" fontSize="14" fontWeight="700" fontFamily="var(--font-mono)">{progressPct}%</text>
+        </svg>
       </div>
 
       {/* Progress bar */}
@@ -861,9 +873,9 @@ function EveningCard({
         <div className="mb-3">
           <p className="label mb-1.5">✅ Won:</p>
           {doneTodayTasks.map((t) => (
-            <div key={t.id} className="flex items-center justify-between py-1">
-              <span className="text-xs text-emerald-400/80">{t.text}</span>
-              <span className="data text-[11px] font-semibold text-emerald-400">+${fmt(t.dollarValue)}</span>
+            <div key={t.id} className="mb-1.5 flex items-center justify-between rounded-xl p-2.5" style={{ background: 'rgba(16,185,129,0.04)', borderLeft: '3px solid rgba(16,185,129,0.4)', backdropFilter: 'blur(8px)' }}>
+              <span className="text-xs text-emerald-300/80">{t.text}</span>
+              <span className="data text-[11px] font-semibold text-emerald-400 glow-emerald">+${fmt(t.dollarValue)}</span>
             </div>
           ))}
         </div>
@@ -876,9 +888,9 @@ function EveningCard({
           {undoneTasks
             .filter((t) => t.priority === 'crit' || t.priority === 'high')
             .map((t) => (
-              <div key={t.id} className="flex items-center justify-between py-1">
-                <span className="text-xs text-rose-400/80">{t.text}</span>
-                <span className="data text-[11px] font-semibold text-rose-400">-${fmt(t.dollarValue)}</span>
+              <div key={t.id} className="mb-1.5 flex items-center justify-between rounded-xl p-2.5" style={{ background: 'rgba(244,63,94,0.04)', borderLeft: '3px solid rgba(244,63,94,0.4)', backdropFilter: 'blur(8px)' }}>
+                <span className="text-xs text-rose-300/80">{t.text}</span>
+                <span className="data text-[11px] font-semibold text-rose-400 glow-rose">-${fmt(t.dollarValue)}</span>
               </div>
             ))}
         </div>
@@ -1023,13 +1035,14 @@ function PrayerCard({
       <Drawer.Trigger asChild>
         <motion.div
           {...stagger(7)}
-          className={`glass cursor-pointer rounded-[16px] p-4 transition-all ${
+          className={`cursor-pointer rounded-[16px] p-4 transition-all ${
             prayerCount === 5
               ? 'border-yellow-500/30 bg-yellow-500/[0.08]'
               : prayerCount > 0
                 ? 'bg-yellow-500/[0.03]'
                 : ''
           }`}
+          style={{ background: 'rgba(14,17,24,0.7)', backdropFilter: 'blur(16px)', border: prayerCount > 0 ? '1px solid rgba(234,179,8,0.2)' : '1px solid rgba(255,255,255,0.06)', boxShadow: '0 4px 24px rgba(0,0,0,0.15), inset 0 1px 0 rgba(255,255,255,0.03)' }}
         >
           <div className="flex items-baseline gap-1.5">
             <span className="text-2xl font-bold text-yellow-400 glow-gold">
@@ -1116,9 +1129,10 @@ function GymCard({
       <Drawer.Trigger asChild>
         <motion.div
           {...stagger(7)}
-          className={`glass cursor-pointer rounded-[16px] p-4 transition-all ${
+          className={`cursor-pointer rounded-[16px] p-4 transition-all ${
             gymDone ? 'border-emerald-500/30 bg-emerald-500/[0.05]' : ''
           }`}
+          style={{ background: 'rgba(14,17,24,0.7)', backdropFilter: 'blur(16px)', border: gymDone ? '1px solid rgba(16,185,129,0.2)' : '1px solid rgba(255,255,255,0.06)', boxShadow: '0 4px 24px rgba(0,0,0,0.15), inset 0 1px 0 rgba(255,255,255,0.03)' }}
         >
           <p className="text-2xl font-bold">
             {gymDone ? (
@@ -1241,7 +1255,7 @@ function SleepCard({
   return (
     <Drawer.Root>
       <Drawer.Trigger asChild>
-        <motion.div {...stagger(7)} className="glass cursor-pointer rounded-[16px] p-4">
+        <motion.div {...stagger(7)} className="cursor-pointer rounded-[16px] p-4" style={{ background: 'rgba(14,17,24,0.7)', backdropFilter: 'blur(16px)', border: '1px solid rgba(255,255,255,0.06)', boxShadow: '0 4px 24px rgba(0,0,0,0.15), inset 0 1px 0 rgba(255,255,255,0.03)' }}>
           <p className={`text-2xl font-bold ${sleepColor}`}>
             😴 {wakeTime ? `${wakeTime.replace(/^0/, '')}am` : '—'}
           </p>
@@ -1320,7 +1334,7 @@ function StreakCard({
   return (
     <Drawer.Root>
       <Drawer.Trigger asChild>
-        <motion.div {...stagger(7)} className="glass cursor-pointer rounded-[16px] p-4">
+        <motion.div {...stagger(7)} className="cursor-pointer rounded-[16px] p-4" style={{ background: 'rgba(14,17,24,0.7)', backdropFilter: 'blur(16px)', border: '1px solid rgba(255,255,255,0.06)', boxShadow: '0 4px 24px rgba(0,0,0,0.15), inset 0 1px 0 rgba(255,255,255,0.03)' }}>
           <p className="text-2xl font-bold text-amber-400 glow-gold">
             🔥 Day {longestStreak.current}
           </p>
