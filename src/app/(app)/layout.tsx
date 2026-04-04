@@ -8,13 +8,8 @@ import CommandPalette from '@/components/CommandPalette'
 import VoiceButton from '@/components/VoiceButton'
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
-  const { authenticated, theme, seedDefaultData } = useStore()
+  const { authenticated, theme } = useStore()
   const router = useRouter()
-
-  // Seed data on first load if store is empty
-  useEffect(() => {
-    seedDefaultData()
-  }, [seedDefaultData])
 
   useEffect(() => {
     if (!authenticated) router.replace('/')
