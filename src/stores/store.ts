@@ -144,17 +144,44 @@ interface AppState {
   onboardingComplete: boolean
   userName: string
   userLocation: string
+  userAge: number
+  userSituation: string
   incomeTarget: number
   targetDate: string
+  incomeWhy: string
   exitTarget: number
+  exitBusinessId: string
+  northStarMetric: string
   wakeUpTime: string
+  actualWakeTime: string
+  exercise: string
+  dietQuality: string
+  caffeineType: string
+  caffeineAmount: number
+  phoneScreenTime: number
+  energyLevel: number
+  stressLevel: number
+  hasFaith: boolean
+  faithTradition: string
+  trackPrayers: boolean
+  faithConsistency: string
+  faithRoleModel: string
+  procrastination: string
+  patterns: string
+  biggestDistraction: string
+  tryingToQuit: string
+  lockedInMemory: string
+  aiAvoidanceStyle: string
+  aiPushStyle: string
+  aiMotivators: string[]
+  savingsRange: string
   anthropicKey: string
   stripeKey: string
   trackingPrefs: { prayers: boolean; gym: boolean; sleep: boolean; meals: boolean; energyDrinks: boolean; screenTime: boolean; gambling: boolean; coldEmail: boolean }
   setAuthenticated: (v: boolean) => void
   setPin: (v: string) => void
   completeOnboarding: () => void
-  updateProfile: (updates: Partial<Pick<AppState, 'userName' | 'userLocation' | 'incomeTarget' | 'targetDate' | 'exitTarget' | 'wakeUpTime' | 'anthropicKey' | 'stripeKey'>>) => void
+  updateProfile: (updates: Partial<Pick<AppState, 'userName' | 'userLocation' | 'userAge' | 'userSituation' | 'incomeTarget' | 'targetDate' | 'incomeWhy' | 'exitTarget' | 'exitBusinessId' | 'northStarMetric' | 'wakeUpTime' | 'actualWakeTime' | 'exercise' | 'dietQuality' | 'caffeineType' | 'caffeineAmount' | 'phoneScreenTime' | 'energyLevel' | 'stressLevel' | 'hasFaith' | 'faithTradition' | 'trackPrayers' | 'faithConsistency' | 'faithRoleModel' | 'procrastination' | 'patterns' | 'biggestDistraction' | 'tryingToQuit' | 'lockedInMemory' | 'aiAvoidanceStyle' | 'aiPushStyle' | 'aiMotivators' | 'savingsRange' | 'anthropicKey' | 'stripeKey'>>) => void
   setTrackingPrefs: (prefs: Partial<AppState['trackingPrefs']>) => void
   resetAll: () => void
   seedDefaultData: () => void
@@ -360,12 +387,39 @@ export const useStore = create<AppState>()(
       authenticated: false,
       pin: '1234',
       onboardingComplete: false,
-      userName: 'Art',
-      userLocation: 'Westland, MI',
+      userName: '',
+      userLocation: '',
+      userAge: 0,
+      userSituation: '',
       incomeTarget: 50000,
       targetDate: '',
-      exitTarget: 1000000,
+      incomeWhy: '',
+      exitTarget: 0,
+      exitBusinessId: '',
+      northStarMetric: '',
       wakeUpTime: '07:00',
+      actualWakeTime: '08:00',
+      exercise: '',
+      dietQuality: '',
+      caffeineType: '',
+      caffeineAmount: 0,
+      phoneScreenTime: 4,
+      energyLevel: 5,
+      stressLevel: 5,
+      hasFaith: false,
+      faithTradition: '',
+      trackPrayers: false,
+      faithConsistency: '',
+      faithRoleModel: '',
+      procrastination: '',
+      patterns: '',
+      biggestDistraction: '',
+      tryingToQuit: '',
+      lockedInMemory: '',
+      aiAvoidanceStyle: '',
+      aiPushStyle: '',
+      aiMotivators: [],
+      savingsRange: '',
       anthropicKey: '',
       stripeKey: '',
       trackingPrefs: { ...INITIAL_TRACKING },
