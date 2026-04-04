@@ -261,6 +261,8 @@ export interface ProactiveMessage {
   read: boolean
   /** Optional deep link (e.g. decision review) */
   ctaHref?: string
+  /** If set, message is hidden from inbox until this ISO time (scheduled check-ins). */
+  revealAt?: string
 }
 
 export interface DailyNetSnapshot {
@@ -286,6 +288,10 @@ interface AppState {
   pinFailedAttempts: number
   pinLockoutUntil: number
   lastOpenedAt: string | null
+  /** Previous session open time (set when `touchLastOpened` runs). Used for absence / gap UX. */
+  previousLastOpenedAt: string | null
+  /** Days between last session's `lastOpenedAt` and this open (computed in `touchLastOpened`). */
+  lastSessionDaysSinceOpen: number
   onboardingComplete: boolean
   userName: string
   userLocation: string
@@ -584,6 +590,14 @@ interface AppState {
   markProactiveRead: (id: string) => void
   dismissProactive: (id: string) => void
   runProactiveEvaluation: () => void
+  /** PRD Decision Lab — check-in appears in inbox on `revealAt`. */
+  addScheduledProactiveMessage: (p: {
+    triggerId: string
+    body: string
+    priority: ProactivePriority
+    revealAt: string
+    ctaHref?: string
+  }) => void
   appendDailyNetSnapshot: () => void
 
   // ── Mentors (PRD §7.4) ──
@@ -666,6 +680,8 @@ export const useStore = create<AppState>()(
       pinFailedAttempts: 0,
       pinLockoutUntil: 0,
       lastOpenedAt: null,
+      previousLastOpenedAt: null,
+      lastSessionDaysSinceOpen: 0,
       lastScoreZoneLabel: null,
       onboardingComplete: false,
       userName: '',
@@ -778,7 +794,11 @@ export const useStore = create<AppState>()(
         const daysSinceLastOpen = prev
           ? Math.floor((Date.now() - new Date(prev).getTime()) / 86400000)
           : 0
-        set({ lastOpenedAt: new Date().toISOString() })
+        set({
+          previousLastOpenedAt: prev,
+          lastOpenedAt: new Date().toISOString(),
+          lastSessionDaysSinceOpen: daysSinceLastOpen,
+        })
         queueMicrotask(() => {
           get().logEvent('app_opened', { daysSinceLastOpen })
         })
@@ -797,6 +817,8 @@ export const useStore = create<AppState>()(
           pinFailedAttempts: 0,
           pinLockoutUntil: 0,
           lastOpenedAt: null,
+          previousLastOpenedAt: null,
+          lastSessionDaysSinceOpen: 0,
           lastScoreZoneLabel: null,
           plaidConnected: false,
           calendarConnected: false,
@@ -1403,6 +1425,22 @@ export const useStore = create<AppState>()(
         })),
       dismissProactive: (id) =>
         set((s) => ({ proactiveMessages: s.proactiveMessages.filter((m) => m.id !== id) })),
+      addScheduledProactiveMessage: (p) =>
+        set((s) => ({
+          proactiveMessages: [
+            {
+              id: uid(),
+              triggerId: p.triggerId,
+              priority: p.priority,
+              body: p.body,
+              createdAt: new Date().toISOString(),
+              read: false,
+              revealAt: p.revealAt,
+              ctaHref: p.ctaHref,
+            },
+            ...s.proactiveMessages,
+          ],
+        })),
       runProactiveEvaluation: () => {
         const s = get()
         const now = Date.now()

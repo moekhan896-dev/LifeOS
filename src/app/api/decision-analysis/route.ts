@@ -1,40 +1,35 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { parseDecisionAnalysisJson } from '@/lib/decision-analysis-types'
 
-/** PRD §7.2 — Option A/B/C with explicit financial vs non-financial sections. */
-const DECISION_SYSTEM = `You are the Decision Impact engine inside ART OS. The user stated a decision and answered clarifying questions.
+/** Force a single JSON object — client renders cards per section. */
+const DECISION_SYSTEM_JSON = `You are the Decision Impact engine inside ART OS. The user stated a decision and answered clarifying questions.
 
-Output markdown with EXACTLY this structure (use these headings):
+Respond with ONLY a single JSON object (no markdown, no prose before or after). Use this exact shape and string fields (use "" if unknown):
 
-## Decision
-Restate the question clearly in one short paragraph.
+{
+  "decisionSummary": "Restate the decision in one short paragraph.",
+  "optionA": {
+    "financialImpact": "Monthly/annual effects, cash flow. Never invent dollar amounts or names — only from context.",
+    "nonFinancialImpact": "Time, stress, relationships, reversibility.",
+    "timeline": "When effects land; milestones.",
+    "riskFactors": "Main risks and mitigations in one paragraph.",
+    "confidence": "Low/Medium/High plus brief rationale."
+  },
+  "optionB": {
+    "statusQuo": "What staying the course looks like.",
+    "costOfInaction": "Opportunity cost, trajectory, qualitative cost."
+  },
+  "optionC": {
+    "alternative": "Smaller step, different timing, or negotiated variant — include tradeoffs."
+  },
+  "aiRecommendation": {
+    "verdict": "YES | NO | CONDITIONAL — one short phrase",
+    "confidencePercent": 0,
+    "reasoning": "Tight paragraph; cite only facts from answers/context."
+  }
+}
 
-## Option A — The proposed action
-### Financial impact
-Monthly and annual effects, net cash flow, payback or runway if applicable. Use only numbers from context or user answers — never invent dollar amounts or client names.
-
-### Non-financial impact
-Time commitment, bandwidth, reputation, stress, relationships, lock-in, reversibility.
-
-### Risks and mitigations
-2–4 bullet risks with a concrete mitigation each.
-
-### Confidence
-State Low / Medium / Medium-High / High and 2–3 sentences why.
-
-## Option B — Status quo (do nothing)
-### Cost of inaction
-Opportunity left on table, trajectory, qualitative cost.
-
-### Financial and non-financial
-Brief notes on staying the course.
-
-## Option C — Alternative
-A smaller step, different timing, or negotiated variant — include financial and non-financial angles.
-
-## Recommendation
-Verdict: YES / NO / CONDITIONAL. One tight paragraph plus any conditions.
-
-Rules: Use only facts from the user's answers and context snapshot. If data is missing, say what is unknown rather than guessing.`
+Rules: confidencePercent is 0-100. Use only facts from the user's answers and context. If data is missing, say so in the relevant strings rather than guessing.`
 
 export async function POST(req: NextRequest) {
   try {
@@ -49,7 +44,7 @@ export async function POST(req: NextRequest) {
         ? `Mentor lens — respond as if advising in the spirit of "${mentorLens.name}". Perspective: ${mentorLens.description || ''}. ${Array.isArray(mentorLens.sourceUrls) && mentorLens.sourceUrls.length ? `Reference style only (no need to fetch URLs): ${mentorLens.sourceUrls.join(', ')}` : ''}`
         : ''
 
-    const system = lensBlock ? `${DECISION_SYSTEM}\n\n${lensBlock}` : DECISION_SYSTEM
+    const system = lensBlock ? `${DECISION_SYSTEM_JSON}\n\n${lensBlock}` : DECISION_SYSTEM_JSON
 
     const userBlock = [
       `Decision: ${decision || ''}`,
@@ -82,7 +77,15 @@ export async function POST(req: NextRequest) {
 
     const data = await res.json()
     const text = data.content?.[0]?.text ?? ''
-    return NextResponse.json({ content: text })
+    const structured = parseDecisionAnalysisJson(text)
+    if (structured) {
+      return NextResponse.json({ structured })
+    }
+    return NextResponse.json({
+      structured: null,
+      content: text,
+      parseError: 'Model did not return valid JSON; showing raw response.',
+    })
   } catch (e) {
     console.error(e)
     return NextResponse.json({ error: 'Server error' }, { status: 500 })

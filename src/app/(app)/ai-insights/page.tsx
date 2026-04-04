@@ -4,13 +4,14 @@ import Link from 'next/link'
 import { motion } from 'framer-motion'
 import { toast } from 'sonner'
 import { useStore } from '@/stores/store'
+import { isProactiveMessageVisible } from '@/lib/proactive-visibility'
 import PageTransition from '@/components/PageTransition'
 
 export default function AiInsightsInboxPage() {
   const { proactiveMessages, markProactiveRead, dismissProactive } = useStore()
-  const sorted = [...proactiveMessages].sort(
-    (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-  )
+  const sorted = [...proactiveMessages]
+    .filter((m) => isProactiveMessageVisible(m))
+    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
 
   return (
     <PageTransition>

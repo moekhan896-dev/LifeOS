@@ -28,6 +28,7 @@ import SortableDashboardTile from '@/components/dashboard/SortableDashboardTile'
 import TileLibrarySheet from '@/components/dashboard/TileLibrarySheet'
 import { useLongPress } from '@/hooks/useLongPress'
 import { renderDashboardTile, type DashboardTileRenderCtx } from '@/app/(app)/dashboard/dashboard-tile-render'
+import { isProactiveMessageVisible } from '@/lib/proactive-visibility'
 /* ── Helpers ── */
 
 function getGreeting() {
@@ -51,6 +52,7 @@ export default function DashboardPage() {
     dailyNetSnapshots, proactiveMessages, markProactiveRead,
     userLat, userLng, prayerCalcMethod, prayerAsrHanafi,
     userAge, exercise, smokingStatus, dietQuality, stressLevel, phoneScreenTime,
+    lastSessionDaysSinceOpen, previousLastOpenedAt,
     dashboardLayout,
     reorderDashboardTiles,
     updateDashboardTileSpan,
@@ -60,14 +62,15 @@ export default function DashboardPage() {
   } = useStore()
 
   const unreadProactive = useMemo(
-    () => proactiveMessages.filter((m) => !m.read).length,
+    () => proactiveMessages.filter((m) => !m.read && isProactiveMessageVisible(m)).length,
     [proactiveMessages]
   )
 
   const todayStr = new Date().toISOString().split('T')[0]
   const now = new Date()
   const hour = now.getHours()
-  const isMorning = hour < 14
+  /** PRD §9.21 — morning briefing tile before noon. */
+  const isMorningBriefWindow = hour < 12
 
   /* ── Interactive state ── */
   const [showAddTask, setShowAddTask] = useState(false)
@@ -169,7 +172,7 @@ export default function DashboardPage() {
   const alerts = useMemo(() => {
     const list: { text: string; color: string; type: string; id?: string }[] = []
     proactiveMessages
-      .filter((m) => !m.read)
+      .filter((m) => !m.read && isProactiveMessageVisible(m))
       .slice(0, 5)
       .forEach((m) => {
         list.push({
@@ -323,6 +326,43 @@ export default function DashboardPage() {
     executionScore,
   ])
 
+  /** PRD §9.5 — Ideal Self gap when returning after 2+ days. */
+  const idealSelfBenchmark = useMemo(() => {
+    const days = lastSessionDaysSinceOpen
+    if (days < 2) return null
+    const idealTasks = Math.min(Math.round(days * 2.5), 40)
+    const idealXp = idealTasks * 13
+    let actualDone = 0
+    let actualXp = 0
+    if (previousLastOpenedAt) {
+      const t0 = new Date(previousLastOpenedAt).getTime()
+      const t1 = Date.now()
+      for (const t of tasks) {
+        if (!t.done || !t.completedAt) continue
+        const ct = new Date(t.completedAt).getTime()
+        if (ct >= t0 && ct <= t1) {
+          actualDone += 1
+          actualXp += t.xpValue
+        }
+      }
+    }
+    return {
+      days,
+      idealTasks,
+      idealXp,
+      actualDone,
+      actualXp,
+      gapXp: Math.max(0, idealXp - actualXp),
+    }
+  }, [lastSessionDaysSinceOpen, previousLastOpenedAt, tasks])
+
+  const nextActionMotivation = useMemo(() => {
+    if (yesterdayScore != null && executionScore > yesterdayScore) {
+      return "Complete this and you're already ahead of yesterday."
+    }
+    return 'If you do one thing today, make it this.'
+  }, [yesterdayScore, executionScore])
+
   // ── Sparkline: last 7 daily net snapshots (PRD GAP 18) ──
   const incomeSparkData = useMemo(() => {
     const sorted = [...dailyNetSnapshots].sort((a, b) => a.date.localeCompare(b.date))
@@ -428,7 +468,7 @@ export default function DashboardPage() {
   const tileCtx: DashboardTileRenderCtx = useMemo(
     () => ({
       router,
-      isMorning,
+      isMorningBriefWindow,
       editMode,
       morningBrief,
       yesterdayScore,
@@ -503,10 +543,13 @@ export default function DashboardPage() {
       gmbProfiles,
       updateHealth,
       markProactiveRead,
+      lastSessionDaysSinceOpen,
+      idealSelfBenchmark,
+      nextActionMotivation,
     }),
     [
       router,
-      isMorning,
+      isMorningBriefWindow,
       editMode,
       morningBrief,
       yesterdayScore,
@@ -570,6 +613,9 @@ export default function DashboardPage() {
       gmbProfiles,
       updateHealth,
       markProactiveRead,
+      lastSessionDaysSinceOpen,
+      idealSelfBenchmark,
+      nextActionMotivation,
     ]
   )
 

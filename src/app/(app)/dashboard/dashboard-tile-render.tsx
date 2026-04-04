@@ -46,7 +46,7 @@ export type DashboardTileRenderCtx = Record<string, unknown>
 
 export function renderDashboardTile(tileId: string, x: DashboardTileRenderCtx): ReactNode {
   const router = x.router as ReturnType<typeof useRouter>
-  const isMorning = x.isMorning as boolean
+  const isMorningBriefWindow = x.isMorningBriefWindow as boolean
   const editMode = x.editMode as boolean
   const morningBrief = x.morningBrief as { prayerLine: string; energyLine: string; screenLine: string; beatTips: string[] }
   const yesterdayScore = x.yesterdayScore as number | null
@@ -170,7 +170,7 @@ export function renderDashboardTile(tileId: string, x: DashboardTileRenderCtx): 
   switch (tileId) {
 
     case 'morning_brief': {
-      if (!isMorning && !editMode) {
+      if (!isMorningBriefWindow && !editMode) {
         return (
           <div className="w-full rounded-2xl border border-[var(--border)] border-dashed bg-[var(--bg-secondary)]/40 p-6 text-center text-[14px] text-[var(--text-secondary)]">
             Morning briefing appears before 2 PM. Use Customize to reorder this tile.
@@ -223,48 +223,34 @@ export function renderDashboardTile(tileId: string, x: DashboardTileRenderCtx): 
   </motion.div>
       )
     }
-    case 'one_thing':
-      return (
-<motion.div
-  className="w-full cursor-pointer rounded-2xl border border-[var(--border)] bg-[var(--bg-elevated)] p-6"
-  {...cardAnim(0.04)}
->
-  <div className="text-center">
-    <p className="text-[13px] font-semibold text-[var(--text-secondary)]">The one thing</p>
-      {theOneThing ? (
+    case 'one_thing': {
+      const lastSessionDaysSinceOpen = x.lastSessionDaysSinceOpen as number
+      const idealSelfBenchmark = x.idealSelfBenchmark as {
+        days: number
+        idealTasks: number
+        idealXp: number
+        actualDone: number
+        actualXp: number
+        gapXp: number
+      } | null
+      const nextActionMotivation = (x.nextActionMotivation as string) || 'If you do one thing today, make it this.'
+      const topFive = (
+        x.sortedTasks as { id: string; text: string; xpValue: number; priority: string; score?: number }[]
+      ).slice(0, 5)
+
+      const absence = lastSessionDaysSinceOpen >= 2
+      // Morning before noon; afternoon noon–8pm task list; evening after 8pm — PRD §9.5
+      const phase: 'absence' | 'morning' | 'afternoon' | 'evening' = absence
+        ? 'absence'
+        : hour >= 20
+          ? 'evening'
+          : hour >= 12
+            ? 'afternoon'
+            : 'morning'
+
+      const emptyPlate = (
         <>
-          <p className="mt-3 text-[22px] font-bold text-[var(--text-primary)]">{theOneThing.text}</p>
-          {theOneThing.score && (
-            <span className="data mt-2 inline-block rounded-full bg-[var(--accent-bg)] px-2 py-0.5 text-[11px] text-[var(--accent)]">
-              Score: {theOneThing.score}/100
-            </span>
-          )}
-          {(theOneThingProject || theOneThingGoal) && (
-            <p className="text-[11px] text-[var(--text-dim)] mt-2">
-              {theOneThingProject && <>📋 {theOneThingProject.name}</>}
-              {theOneThingGoal && <> → 🎯 {theOneThingGoal.title}</>}
-            </p>
-          )}
-          <div className="mt-4 flex items-center justify-center gap-4">
-            <motion.button
-              type="button"
-              onClick={() => {
-                toggleTask(theOneThing.id)
-                toast.success(`Done! +${theOneThing.xpValue} XP`)
-              }}
-              className="rounded-[14px] bg-[#0A84FF] px-5 py-2.5 text-[17px] font-semibold text-white hover:bg-[var(--accent-hover)]"
-              whileTap={{ scale: 0.97 }}
-            >
-              ✓ Done
-            </motion.button>
-            <Link href="/tasks" className="text-[17px] text-[#0A84FF] hover:underline">
-              Skip →
-            </Link>
-          </div>
-        </>
-      ) : (
-        <>
-          <p className="text-[20px] font-semibold text-white mt-3">Your plate is clear.</p>
+          <p className="text-[20px] font-semibold text-[var(--text-primary)] mt-3">Your plate is clear.</p>
           {!showAddTask ? (
             <div className="mt-4 flex flex-col items-center gap-2">
               <button
@@ -280,41 +266,207 @@ export function renderDashboardTile(tileId: string, x: DashboardTileRenderCtx): 
             </div>
           ) : (
             <div className="mt-4 space-y-3 max-w-md mx-auto">
-              <input value={newTaskText} onChange={e => setNewTaskText(e.target.value)} placeholder="What needs to get done?"
-                className="w-full rounded-[12px] border border-[var(--border)] bg-[var(--bg-secondary)] px-4 py-[14px] text-[17px] text-[var(--text-primary)] placeholder:text-[var(--text-tertiary)] outline-none focus:border-[var(--accent)] focus:ring-0" autoFocus />
+              <input
+                value={newTaskText}
+                onChange={(e) => setNewTaskText(e.target.value)}
+                placeholder="What needs to get done?"
+                className="w-full rounded-[12px] border border-[var(--border)] bg-[var(--bg-secondary)] px-4 py-[14px] text-[17px] text-[var(--text-primary)] placeholder:text-[var(--text-tertiary)] outline-none focus:border-[var(--accent)] focus:ring-0"
+                autoFocus
+              />
               <div className="flex gap-2">
-                <select value={newTaskBiz} onChange={e => setNewTaskBiz(e.target.value)} className="flex-1 bg-[var(--surface2)] border border-[var(--border)] rounded-[10px] px-3 py-2 text-[12px] text-white">
-                  {businesses.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
+                <select
+                  value={newTaskBiz}
+                  onChange={(e) => setNewTaskBiz(e.target.value)}
+                  className="flex-1 bg-[var(--surface2)] border border-[var(--border)] rounded-[10px] px-3 py-2 text-[12px] text-[var(--text-primary)]"
+                >
+                  {businesses.map((b) => (
+                    <option key={b.id} value={b.id}>
+                      {b.name}
+                    </option>
+                  ))}
                 </select>
                 <div className="flex gap-1">
-                  {(['crit', 'high', 'med', 'low'] as const).map(p => (
-                    <button key={p} onClick={() => setNewTaskPriority(p)} className={`min-h-[36px] px-2.5 py-1.5 rounded-[8px] text-[13px] font-semibold capitalize ${newTaskPriority === p ? 'bg-[var(--accent-bg)] text-[var(--accent)]' : 'bg-[var(--surface2)] text-[var(--text-dim)]'}`}>{p}</button>
+                  {(['crit', 'high', 'med', 'low'] as const).map((p) => (
+                    <button
+                      key={p}
+                      type="button"
+                      onClick={() => setNewTaskPriority(p)}
+                      className={`min-h-[36px] px-2.5 py-1.5 rounded-[8px] text-[13px] font-semibold capitalize ${newTaskPriority === p ? 'bg-[var(--accent-bg)] text-[var(--accent)]' : 'bg-[var(--surface2)] text-[var(--text-dim)]'}`}
+                    >
+                      {p}
+                    </button>
                   ))}
                 </div>
               </div>
               <div className="flex gap-2">
-                <motion.button onClick={() => { if (newTaskText.trim()) { const tid = addTask({ businessId: newTaskBiz, text: newTaskText.trim(), tag: '', priority: newTaskPriority, done: false, xpValue: XP_VALUES[newTaskPriority] }); void applyTaskDollarEstimateAfterCreate(tid, newTaskText.trim()); setNewTaskText(''); setShowAddTask(false); toast.success('Task added!') } }} whileHover={{ filter: 'brightness(1.08)' }} whileTap={{ scale: 0.97 }}
-                  className="btn-primary flex-1 min-h-[44px]">Add Task</motion.button>
-                <button onClick={() => setShowAddTask(false)} className="px-4 py-2.5 rounded-[10px] text-[12px] text-[var(--text-dim)]">Cancel</button>
+                <motion.button
+                  type="button"
+                  onClick={() => {
+                    if (newTaskText.trim()) {
+                      const tid = addTask({
+                        businessId: newTaskBiz,
+                        text: newTaskText.trim(),
+                        tag: '',
+                        priority: newTaskPriority,
+                        done: false,
+                        xpValue: XP_VALUES[newTaskPriority],
+                      })
+                      void applyTaskDollarEstimateAfterCreate(tid, newTaskText.trim())
+                      setNewTaskText('')
+                      setShowAddTask(false)
+                      toast.success('Task added!')
+                    }
+                  }}
+                  whileHover={{ filter: 'brightness(1.08)' }}
+                  whileTap={{ scale: 0.97 }}
+                  className="btn-primary flex-1 min-h-[44px]"
+                >
+                  Add Task
+                </motion.button>
+                <button type="button" onClick={() => setShowAddTask(false)} className="px-4 py-2.5 rounded-[10px] text-[12px] text-[var(--text-dim)]">
+                  Cancel
+                </button>
               </div>
             </div>
           )}
         </>
-      )}
-      {hour >= 20 && (
-        <div
-          className="mt-6 border-t border-[var(--border)] pt-5"
-          onClick={(e) => e.stopPropagation()}
-        >
-          <p className="text-[11px] font-semibold uppercase tracking-wide text-[var(--text-dim)]">
-            Evening — reflect
-          </p>
-          <EveningVoiceReview />
-        </div>
-      )}
-    </div>
-</motion.div>
       )
+
+      return (
+        <motion.div
+          className="w-full rounded-2xl border border-[var(--border)] bg-[var(--bg-elevated)] p-6"
+          {...cardAnim(0.04)}
+        >
+          <p className="text-center text-[13px] font-semibold text-[var(--text-secondary)]">The one thing</p>
+          <AnimatePresence mode="wait">
+            <motion.div
+              key={`${phase}-${theOneThing?.id ?? 'none'}`}
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1, transition: { duration: 0.3 } }}
+              exit={{ opacity: 0, transition: { duration: 0.2 } }}
+              className="mt-2"
+            >
+              {phase === 'absence' && (
+                <div className="text-center space-y-3">
+                  <p className="text-[15px] text-[var(--text-secondary)]">
+                    Welcome back — it&apos;s been {lastSessionDaysSinceOpen} day{lastSessionDaysSinceOpen === 1 ? '' : 's'} since your last session.
+                  </p>
+                  {idealSelfBenchmark ? (
+                    <p className="text-[15px] text-[var(--text-primary)]">
+                      While you were away, your Ideal Self benchmark was ~{idealSelfBenchmark.idealTasks} priority tasks (~
+                      {idealSelfBenchmark.idealXp} XP). You logged {idealSelfBenchmark.actualDone} completions (~
+                      {idealSelfBenchmark.actualXp} XP). Gap: ~{idealSelfBenchmark.gapXp} XP.
+                    </p>
+                  ) : (
+                    <p className="text-[15px] text-[var(--text-secondary)]">Open the app more consistently to unlock gap tracking.</p>
+                  )}
+                  <Link
+                    href="/ai"
+                    className="inline-block rounded-[14px] bg-[var(--accent)] px-5 py-2.5 text-[17px] font-semibold text-white"
+                  >
+                    Let&apos;s catch up →
+                  </Link>
+                </div>
+              )}
+
+              {phase === 'morning' &&
+                (theOneThing ? (
+                  <div className="text-center">
+                    <p className="text-[15px] text-[var(--text-secondary)] mb-3">{nextActionMotivation}</p>
+                    <p className="text-[22px] font-bold text-[var(--text-primary)]">{theOneThing.text}</p>
+                    {theOneThing.score != null && (
+                      <span className="data mt-2 inline-block rounded-full bg-[var(--accent-bg)] px-2 py-0.5 text-[11px] text-[var(--accent)]">
+                        Score: {theOneThing.score}/100
+                      </span>
+                    )}
+                    {(theOneThingProject || theOneThingGoal) && (
+                      <p className="text-[11px] text-[var(--text-dim)] mt-2">
+                        {theOneThingProject && <>📋 {theOneThingProject.name}</>}
+                        {theOneThingGoal && <> → 🎯 {theOneThingGoal.title}</>}
+                      </p>
+                    )}
+                    <div className="mt-4 flex items-center justify-center gap-4">
+                      <motion.button
+                        type="button"
+                        onClick={() => {
+                          toggleTask(theOneThing.id)
+                          toast.success(`Done! +${theOneThing.xpValue} XP`)
+                        }}
+                        className="rounded-[14px] bg-[var(--accent)] px-5 py-2.5 text-[17px] font-semibold text-white hover:bg-[var(--accent-hover)]"
+                        whileTap={{ scale: 0.97 }}
+                      >
+                        ✓ Done
+                      </motion.button>
+                      <Link href="/tasks" className="text-[17px] text-[var(--accent)] hover:underline">
+                        Skip →
+                      </Link>
+                    </div>
+                  </div>
+                ) : (
+                  emptyPlate
+                ))}
+
+              {phase === 'afternoon' && (
+                <div>
+                  <p className="text-[13px] font-medium text-[var(--text-secondary)] mb-2">
+                    Still on your plate ({topFive.length})
+                  </p>
+                  {topFive.length === 0 ? (
+                    emptyPlate
+                  ) : (
+                    <ul className="space-y-2">
+                      {topFive.map((t) => (
+                        <li
+                          key={t.id}
+                          className="flex items-start justify-between gap-2 rounded-xl border border-[var(--border)] bg-[var(--bg-secondary)]/50 px-3 py-2"
+                        >
+                          <span className="text-[15px] text-[var(--text-primary)] flex-1">{t.text}</span>
+                          <div className="flex shrink-0 items-center gap-2">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                toggleTask(t.id)
+                                toast.success(`Done! +${t.xpValue} XP`)
+                              }}
+                              className="text-[13px] font-semibold text-[var(--accent)]"
+                            >
+                              Done
+                            </button>
+                            <Link href="/tasks" className="text-[13px] text-[var(--text-secondary)] hover:underline">
+                              Skip
+                            </Link>
+                          </div>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              )}
+
+              {phase === 'evening' && (
+                <div className="space-y-4" onClick={(e) => e.stopPropagation()}>
+                  <div className="text-center">
+                    <p className="text-[15px] text-[var(--text-secondary)]">
+                      Today&apos;s score: <span className="font-semibold text-[var(--text-primary)]">{executionScore}</span> · Tasks done{' '}
+                      {tasksDoneToday} / {tasksCommitted || '—'} committed
+                    </p>
+                  </div>
+                  {theOneThing && (
+                    <p className="text-center text-[14px] text-[var(--text-dim)]">Top priority still: {theOneThing.text.slice(0, 80)}</p>
+                  )}
+                  <div className="border-t border-[var(--border)] pt-4">
+                    <p className="text-[11px] font-semibold uppercase tracking-wide text-[var(--text-dim)] mb-2">
+                      How was your day?
+                    </p>
+                    <EveningVoiceReview />
+                  </div>
+                </div>
+              )}
+            </motion.div>
+          </AnimatePresence>
+        </motion.div>
+      )
+    }
     case 'net_income':
       return (
 <Drawer.Root>

@@ -1,68 +1,9 @@
 'use client'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { motion, AnimatePresence } from 'framer-motion'
+import { motion } from 'framer-motion'
 import { useStore, getExecutionScore, getBusinessHealth } from '@/stores/store'
-
-const NAV_SECTIONS = [
-  {
-    label: 'Your day',
-    items: [
-      { href: '/dashboard', label: 'Command Center', icon: '◉' },
-      { href: '/ai-insights', label: 'AI Insights', icon: '✉' },
-      { href: '/focus', label: 'Focus Mode', icon: '◎' },
-      { href: '/schedule', label: 'Schedule', icon: '◷' },
-    ],
-  },
-  {
-    label: 'Think',
-    items: [
-      { href: '/vision', label: 'Identity & Vision', icon: '🧬' },
-      { href: '/goals', label: '12-Week Goals', icon: '🎯' },
-      { href: '/projects', label: 'Projects', icon: '📋', badge: 'projects' as const },
-      { href: '/roadmap', label: 'Roadmap', icon: '🗓' },
-      { href: '/decision-lab', label: 'Decision Lab', icon: '⚗' },
-      { href: '/mentors', label: 'Mentors', icon: '🎭' },
-      { href: '/spending-calculator', label: 'Spending calc', icon: '⧉' },
-    ],
-  },
-  {
-    label: 'Execute',
-    items: [
-      { href: '/tasks', label: 'Tasks', icon: '☐', badge: 'tasks' as const },
-      { href: '/drip', label: 'DRIP Matrix', icon: '📊' },
-      { href: '/revenue-drivers', label: 'Revenue Drivers', icon: '↗' },
-    ],
-  },
-  {
-    label: 'Measure',
-    items: [
-      { href: '/insights', label: 'Execution Score', icon: '📈' },
-      { href: '/financials', label: 'Financial Command', icon: '💰' },
-      { href: '/energy', label: 'Energy Dashboard', icon: '⚡' },
-      { href: '/health', label: 'Health & Deen', icon: '♡' },
-    ],
-  },
-  {
-    label: 'Learn',
-    items: [
-      { href: '/reports', label: 'AI Reports', icon: '🧠' },
-      { href: '/knowledge', label: 'Knowledge Vault', icon: '📚' },
-      { href: '/skills', label: 'Skill Tree', icon: '🏆' },
-      { href: '/idea-bank', label: 'Idea Bank', icon: '💡' },
-    ],
-  },
-  {
-    label: 'System',
-    items: [
-      { href: '/ecosystem', label: 'Ecosystem', icon: '🔗' },
-      { href: '/wins', label: 'Wins', icon: '🏆' },
-      { href: '/commitments', label: 'Commitments', icon: '📝' },
-      { href: '/decisions', label: 'Decision Journal', icon: '📓' },
-      { href: '/settings', label: 'Settings', icon: '⚙' },
-    ],
-  },
-]
+import { NAV_SECTIONS } from '@/config/navigation'
 
 function getRevenueLabel(b: { monthlyRevenue: number; status: string }) {
   if (b.status === 'dormant' || b.status === 'backburner') return 'Dormant'
@@ -74,7 +15,7 @@ function getRevenueLabel(b: { monthlyRevenue: number; status: string }) {
 export default function Sidebar() {
   const pathname = usePathname()
   const {
-    theme, toggleTheme, sidebarOpen, toggleSidebar,
+    theme, toggleTheme,
     businesses, tasks, revenueEntries, projects,
     xp, level, todayHealth, focusSessions, trackPrayers,
   } = useStore()
@@ -103,10 +44,6 @@ export default function Sidebar() {
   const ringRadius = 24
   const ringCircumference = 2 * Math.PI * ringRadius
   const ringOffset = ringCircumference - (executionScore / 100) * ringCircumference
-
-  const closeMobileIfNeeded = () => {
-    if (typeof window !== 'undefined' && window.innerWidth < 768) toggleSidebar()
-  }
 
   const getBadgeText = (badge: string) => {
     if (badge === 'tasks') return undoneCount > 0 ? `${undoneCount}` : null
@@ -177,7 +114,7 @@ export default function Sidebar() {
                 const active = isActive(item.href)
                 const badgeText = 'badge' in item && item.badge ? getBadgeText(item.badge as string) : null
                 return (
-                  <Link key={item.href} href={item.href} onClick={closeMobileIfNeeded} className="block group">
+                  <Link key={item.href} href={item.href} className="block group">
                     <motion.div
                       className={`relative flex min-h-[44px] items-center gap-2.5 px-4 py-[6px] text-[13px] font-medium rounded-[10px] mx-1.5 transition-colors ${
                         active
@@ -228,7 +165,7 @@ export default function Sidebar() {
               const health = getBusinessHealth(b, tasks, revenueEntries)
               const dotColor = health === 'strong' ? 'var(--positive)' : health === 'weak' ? '#f59e0b' : '#ef4444'
               return (
-                <Link key={b.id} href={href} onClick={closeMobileIfNeeded} className="block group">
+                <Link key={b.id} href={href} className="block group">
                   <motion.div
                     className={`relative flex min-h-[44px] items-center gap-2.5 px-4 py-[6px] text-[13px] font-medium rounded-[10px] mx-1.5 transition-colors ${
                       active
@@ -308,7 +245,7 @@ export default function Sidebar() {
         {/* XP Bar */}
         <div className="space-y-1.5">
           <div className="flex justify-between items-center">
-            <span className="data text-[10px] text-[var(--color-text-dim)]">{xpInLevel}/500 XP</span>
+            <span className="data text-[10px] text-[var(--color-text-dim)]">{xpInLevel}/100 XP</span>
             <span className="data text-[10px] font-bold bg-[var(--accent)] text-white px-2 py-0.5 rounded-full">
               LVL {level}
             </span>
@@ -334,49 +271,8 @@ export default function Sidebar() {
   )
 
   return (
-    <>
-      {/* Mobile hamburger */}
-      <button
-        type="button"
-        onClick={toggleSidebar}
-        aria-label={sidebarOpen ? 'Close navigation menu' : 'Open navigation menu'}
-        aria-expanded={sidebarOpen}
-        className="touch-target-44 md:hidden fixed top-3 left-3 z-50 flex items-center justify-center rounded-2xl bg-[var(--color-surface)] border border-[var(--color-border)] text-[var(--color-text)] hover:bg-[var(--color-surface2)] transition-all shadow-lg"
-      >
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-          <line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/>
-        </svg>
-      </button>
-
-      {/* Desktop sidebar */}
-      <aside className="hidden md:block flex-shrink-0">
-        {sidebarContent}
-      </aside>
-
-      {/* Mobile drawer */}
-      <AnimatePresence>
-        {sidebarOpen && (
-          <>
-            <motion.div
-              className="md:hidden fixed inset-0 bg-black/60 backdrop-blur-sm z-40"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              transition={{ duration: 0.2 }}
-              onClick={toggleSidebar}
-            />
-            <motion.aside
-              className="md:hidden fixed inset-y-0 left-0 z-50"
-              initial={{ x: -240 }}
-              animate={{ x: 0 }}
-              exit={{ x: -240 }}
-              transition={{ type: 'spring', stiffness: 300, damping: 30 }}
-            >
-              {sidebarContent}
-            </motion.aside>
-          </>
-        )}
-      </AnimatePresence>
-    </>
+    <aside className="hidden md:block flex-shrink-0">
+      {sidebarContent}
+    </aside>
   )
 }
