@@ -8,6 +8,8 @@ import { StaggerContainer, StaggerItem } from '@/components/Stagger'
 import { motion, AnimatePresence } from 'framer-motion'
 import { toast } from 'sonner'
 import { BarChart, Bar, AreaChart, Area, ResponsiveContainer, XAxis, YAxis, Tooltip, CartesianGrid } from 'recharts'
+import { computeHealthBusinessCorrelations } from '@/lib/health-correlations'
+import { Drawer } from 'vaul'
 
 const weeklyPrayerData = [
   { day: 'Mon', completed: 5 },
@@ -46,7 +48,13 @@ export default function HealthPage() {
     todayHealth, updateHealth, togglePrayer,
     streaks, xp, level, tasks, addXp,
     userLat, userLng, prayerCalcMethod, prayerAsrHanafi,
+    healthHistory,
   } = useStore()
+
+  const correlations = useMemo(
+    () => computeHealthBusinessCorrelations({ healthHistory, tasks }),
+    [healthHistory, tasks]
+  )
 
   const prayerTimes12 = useMemo(() => {
     if (userLat == null || userLng == null) return null
@@ -178,6 +186,21 @@ export default function HealthPage() {
             </Section>
           </StaggerItem>
 
+          {/* PRD GAP 30 — health ↔ business correlations */}
+          <StaggerItem>
+            <div className="card p-4">
+              <div className="flex items-center gap-2.5 mb-3">
+                <span className="text-lg">🔗</span>
+                <h2 className="text-[14px] font-bold tracking-tight text-[var(--text)] uppercase">Patterns in your data</h2>
+              </div>
+              <ul className="space-y-2 text-[14px] text-[var(--text-mid)]">
+                {correlations.lines.map((l) => (
+                  <li key={l.id}>{l.text}</li>
+                ))}
+              </ul>
+            </div>
+          </StaggerItem>
+
           {/* Weekly Prayer Chart */}
           <StaggerItem>
             <motion.div whileHover={{ y: -2 }} className="card p-4">
@@ -224,33 +247,61 @@ export default function HealthPage() {
 
           {/* Gym Tracker */}
           <StaggerItem>
-            <Section title="Gym Tracker" icon="💪">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <motion.button
-                    whileHover={{ scale: 1.03 }}
-                    whileTap={{ scale: 0.97 }}
-                    onClick={() => {
-                      updateHealth({ gym: !todayHealth.gym })
-                      toast(todayHealth.gym ? 'Workout unmarked' : 'Workout logged!')
-                    }}
-                    className={`px-5 py-2.5 rounded-lg text-[13px] font-semibold transition-all duration-200 ${
-                      todayHealth.gym
-                        ? 'bg-[var(--accent)] text-black shadow-[0_0_16px_var(--accent)/20]'
-                        : 'bg-[var(--surface2)] border border-[var(--border)] text-[var(--text-mid)] hover:border-[var(--accent)]'
-                    }`}
-                  >
-                    {todayHealth.gym ? '✓ Workout Logged' : 'Log Workout'}
-                  </motion.button>
-                  <span className="text-[13px] text-[var(--text-mid)]">
-                    Streak: <span className="data font-bold text-[var(--accent)]">{gymStreak?.currentStreak || 0}</span>
-                  </span>
+            <Drawer.Root>
+              <Section title="Gym Tracker" icon="💪">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <motion.button
+                      whileHover={{ scale: 1.03 }}
+                      whileTap={{ scale: 0.97 }}
+                      onClick={() => {
+                        updateHealth({ gym: !todayHealth.gym })
+                        toast(todayHealth.gym ? 'Workout unmarked' : 'Workout logged!')
+                      }}
+                      className={`px-5 py-2.5 rounded-lg text-[13px] font-semibold transition-all duration-200 ${
+                        todayHealth.gym
+                          ? 'bg-[var(--accent)] text-black shadow-[0_0_16px_var(--accent)/20]'
+                          : 'bg-[var(--surface2)] border border-[var(--border)] text-[var(--text-mid)] hover:border-[var(--accent)]'
+                      }`}
+                    >
+                      {todayHealth.gym ? '✓ Workout Logged' : 'Log Workout'}
+                    </motion.button>
+                    <span className="text-[13px] text-[var(--text-mid)]">
+                      Streak: <span className="data font-bold text-[var(--accent)]">{gymStreak?.currentStreak || 0}</span>
+                    </span>
+                  </div>
+                  <div className="flex flex-col items-end gap-2 sm:flex-row sm:items-center">
+                    <Drawer.Trigger asChild>
+                      <button
+                        type="button"
+                        className="text-[12px] font-medium text-[var(--accent)] hover:underline"
+                      >
+                        Why gym matters →
+                      </button>
+                    </Drawer.Trigger>
+                    <div className="bg-[var(--surface2)] border border-[var(--border)] rounded-lg px-4 py-2">
+                      <p className="text-[12px] text-[var(--text-mid)] italic">Go to gym. No excuses.</p>
+                    </div>
+                  </div>
                 </div>
-                <div className="bg-[var(--surface2)] border border-[var(--border)] rounded-lg px-4 py-2">
-                  <p className="text-[12px] text-[var(--text-mid)] italic">Go to gym. No excuses.</p>
-                </div>
-              </div>
-            </Section>
+                {correlations.ready && correlations.lines.find((l) => l.id === 'gym-tasks') ? (
+                  <p className="mt-3 text-[12px] text-[var(--text-dim)]">
+                    {correlations.lines.find((l) => l.id === 'gym-tasks')?.text}
+                  </p>
+                ) : null}
+              </Section>
+              <Drawer.Portal>
+                <Drawer.Overlay className="fixed inset-0 z-[100] bg-black/60" />
+                <Drawer.Content className="fixed bottom-0 left-0 right-0 z-[110] max-h-[80vh] rounded-t-[20px] border border-[var(--border)] bg-[var(--bg-elevated)] p-5">
+                  <div className="mx-auto mb-3 h-1 w-10 rounded-full bg-white/10" />
+                  <Drawer.Title className="text-lg font-semibold text-[var(--text-primary)]">Gym &amp; your work</Drawer.Title>
+                  <p className="mt-3 text-[15px] text-[var(--text-secondary)]">
+                    {correlations.lines.find((l) => l.id === 'gym-tasks')?.text ??
+                      'I need more data to identify patterns. Keep logging gym and tasks for 14+ days.'}
+                  </p>
+                </Drawer.Content>
+              </Drawer.Portal>
+            </Drawer.Root>
           </StaggerItem>
 
           {/* Sleep Tracker */}

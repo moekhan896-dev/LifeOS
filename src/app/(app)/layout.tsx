@@ -8,6 +8,8 @@ import { runWeeklyReportIfDue } from '@/lib/weekly-report'
 import Sidebar from '@/components/Sidebar'
 import CommandPalette from '@/components/CommandPalette'
 import VoiceCommandFab from '@/components/VoiceCommandFab'
+import OfflineBanner from '@/components/OfflineBanner'
+import PwaInstallPrompt from '@/components/PwaInstallPrompt'
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const {
@@ -58,12 +60,14 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="scanline flex min-h-screen">
+      <OfflineBanner />
       <Sidebar />
       <main className="flex-1 ml-0 md:ml-[240px] min-h-screen overflow-x-hidden">
         <div className="p-4 md:p-5 max-w-[1200px] mx-auto">
           {children}
         </div>
       </main>
+      <PwaInstallPrompt />
       <CommandPalette />
       <VoiceCommandFab />
     </div>

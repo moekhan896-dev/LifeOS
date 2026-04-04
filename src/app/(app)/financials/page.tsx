@@ -100,9 +100,9 @@ export default function FinancialsPage() {
 
   const pfBuckets: { key: keyof typeof pf; label: string; color: string }[] = [
     { key: 'ownersPay', label: "Owner's pay", color: 'var(--positive)' },
-    { key: 'tax', label: 'Tax', color: '#FF9F0A' },
-    { key: 'operating', label: 'Operating', color: '#0A84FF' },
-    { key: 'profit', label: 'Profit', color: '#BF5AF2' },
+    { key: 'tax', label: 'Tax', color: 'var(--warning)' },
+    { key: 'operating', label: 'Operating', color: 'var(--accent)' },
+    { key: 'profit', label: 'Profit', color: 'var(--ai)' },
   ]
 
   return (
@@ -120,7 +120,7 @@ export default function FinancialsPage() {
                   <div key={i.label} className="flex items-center justify-between">
                     <div>
                       <p className="text-[17px] font-medium text-[var(--text)]">{i.label}</p>
-                      <p className="text-[15px] text-[rgba(255,255,255,0.55)]">{i.detail}</p>
+                      <p className="text-[15px] text-[var(--text-secondary)]">{i.detail}</p>
                     </div>
                     <span className="data text-lg font-semibold text-[var(--accent)]">{fmt(i.net)}</span>
                   </div>
@@ -136,16 +136,16 @@ export default function FinancialsPage() {
           {/* Fixed Costs */}
           <StaggerItem>
             <div className="card px-5 py-4">
-              <span className="label text-[#FF453A]">Fixed costs</span>
+              <span className="label text-[var(--negative)]">Fixed costs</span>
               <div className="mt-3 space-y-2">
                 {expenseEntries.length === 0 && (
-                  <p className="text-[17px] text-[rgba(255,255,255,0.55)]">
+                  <p className="text-[17px] text-[var(--text-secondary)]">
                     No expenses logged yet. Add them from onboarding follow-up or manual entry.
                   </p>
                 )}
                 {expenseEntries.map((c) => (
                   <div key={c.id} className="flex items-center justify-between text-[17px]">
-                    <span className="text-[rgba(255,255,255,0.55)]">{c.category}</span>
+                    <span className="text-[var(--text-secondary)]">{c.category}</span>
                     <span className="data text-[var(--rose)]">{fmt(c.amount)}</span>
                   </div>
                 ))}
@@ -166,7 +166,7 @@ export default function FinancialsPage() {
               <span className="label text-[var(--accent)]">Net take-home</span>
               <div className="mt-2 flex items-baseline gap-3">
                 <span className="data text-3xl font-bold text-[var(--accent)]">{fmt(NET_TAKE_HOME)}</span>
-                <span className="text-[17px] text-[rgba(255,255,255,0.55)]">/ month</span>
+                <span className="text-[17px] text-[var(--text-secondary)]">/ month</span>
               </div>
               <div className="mt-3 grid grid-cols-3 gap-3 text-center">
                 <div>
@@ -234,7 +234,7 @@ export default function FinancialsPage() {
           {/* Emergency Scenario Planner */}
           <StaggerItem>
             <div className="card px-5 py-4">
-              <span className="label text-[#FF9F0A]">Emergency scenario planner</span>
+              <span className="label text-[var(--warning)]">Emergency scenario planner</span>
               <div className="mt-3 grid gap-3 sm:grid-cols-2">
                 {scenarios.map((s) => {
                   const newIncome = TOTAL_INCOME - s.lostIncome
@@ -244,10 +244,10 @@ export default function FinancialsPage() {
                     <motion.div
                       key={s.name}
                       whileHover={{ filter: 'brightness(1.05)' }}
-                      className="rounded-[12px] border border-[rgba(255,255,255,0.08)] bg-[#2C2C2E] p-4"
+                      className="rounded-[12px] border border-[var(--border)] bg-[var(--bg-elevated)] p-4"
                     >
                       <p className="text-[17px] font-semibold text-[var(--text)]">{s.name}</p>
-                      <p className="text-[15px] text-[rgba(255,255,255,0.55)] mb-2">{s.description}</p>
+                      <p className="text-[15px] text-[var(--text-secondary)] mb-2">{s.description}</p>
                       <div className="space-y-1.5 text-[15px]">
                         <div className="flex justify-between">
                           <span className="text-[var(--text-dim)]">New Income</span>
@@ -285,7 +285,7 @@ export default function FinancialsPage() {
           <StaggerItem>
             <div className="card px-5 py-4">
               <span className="label text-[var(--accent)]">Profit First allocations</span>
-              <p className="mt-1 text-[13px] text-[rgba(255,255,255,0.5)]">
+              <p className="mt-1 text-[13px] text-[var(--text-secondary)]">
                 Four buckets — percentages renormalize to 100%. Dollar amounts use monthly net take-home ({fmt(NET_TAKE_HOME)}).
               </p>
               <div className="mt-3 flex h-3 gap-0.5 overflow-hidden rounded-full">
@@ -299,7 +299,7 @@ export default function FinancialsPage() {
               </div>
               <div className="mt-4 grid gap-4 sm:grid-cols-2">
                 {pfBuckets.map((b) => (
-                  <div key={b.key} className="rounded-[12px] border border-[rgba(255,255,255,0.08)] bg-[#2C2C2E] p-3">
+                  <div key={b.key} className="rounded-[12px] border border-[var(--border)] bg-[var(--bg-elevated)] p-3">
                     <div className="flex items-center justify-between">
                       <span className="label">{b.label}</span>
                       <span className="data font-mono text-[15px]" style={{ color: b.color }}>
@@ -326,12 +326,12 @@ export default function FinancialsPage() {
 
           <StaggerItem>
             <div className="card px-5 py-4">
-              <span className="label text-[#FF9F0A]">Tax liability (estimated)</span>
-              <p className="mt-1 text-[13px] text-[rgba(255,255,255,0.5)]">
+              <span className="label text-[var(--warning)]">Tax liability (estimated)</span>
+              <p className="mt-1 text-[13px] text-[var(--text-secondary)]">
                 Illustrative only — not tax advice. Adjust assumed income tax rate in Settings.
               </p>
               <div className="mt-4 grid gap-3 sm:grid-cols-2">
-                <div className="rounded-[12px] border border-[rgba(255,255,255,0.08)] bg-[#2C2C2E] p-4">
+                <div className="rounded-[12px] border border-[var(--border)] bg-[var(--bg-elevated)] p-4">
                   <p className="label">Next typical estimated deadline</p>
                   {taxSnapshot.next ? (
                     <>
@@ -352,10 +352,10 @@ export default function FinancialsPage() {
                     <p className="text-[var(--text-dim)]">—</p>
                   )}
                 </div>
-                <div className="rounded-[12px] border border-[rgba(255,255,255,0.08)] bg-[#2C2C2E] p-4">
+                <div className="rounded-[12px] border border-[var(--border)] bg-[var(--bg-elevated)] p-4">
                   <p className="label">Year-to-date est. tax (accrual)</p>
                   <p className="data mt-1 font-mono text-2xl font-bold text-[var(--text)]">{fmt(Math.round(taxSnapshot.ytd))}</p>
-                  <p className="mt-2 text-[12px] text-[rgba(255,255,255,0.45)]">
+                  <p className="mt-2 text-[12px] text-[var(--text-dim)]">
                     Based on net take-home × {estimatedIncomeTaxRatePct}% × fraction of year elapsed.
                   </p>
                 </div>
@@ -366,18 +366,18 @@ export default function FinancialsPage() {
           {/* Agency Valuation */}
           <StaggerItem>
             <motion.div whileHover={{ filter: 'brightness(1.05)' }} className="card px-5 py-4">
-              <span className="label text-[#5AC8FA]">Estimated net worth</span>
+              <span className="label text-[var(--info)]">Estimated net worth</span>
               <div className="mt-3 space-y-2">
                 <div className="flex justify-between text-[17px]">
-                  <span className="text-[rgba(255,255,255,0.55)]">Savings (range)</span>
+                  <span className="text-[var(--text-secondary)]">Savings (range)</span>
                   <span className="data text-[var(--text)]">{savingsLabel}</span>
                 </div>
                 <div className="flex justify-between text-[17px]">
-                  <span className="text-[rgba(255,255,255,0.55)]">Agency valuation (net MRR × 12 × 3.5)</span>
+                  <span className="text-[var(--text-secondary)]">Agency valuation (net MRR × 12 × 3.5)</span>
                   <span className="data text-[var(--text)]">{fmt(Math.round(agencyTotals.net * 12 * 3.5))}</span>
                 </div>
                 <div className="border-t border-[var(--border)] pt-2">
-                  <p className="text-[15px] text-[rgba(255,255,255,0.45)]">
+                  <p className="text-[15px] text-[var(--text-dim)]">
                     Add asset values in Settings to combine savings + business valuation into a full net worth figure.
                   </p>
                 </div>
@@ -388,7 +388,7 @@ export default function FinancialsPage() {
           {/* Time vs Money Matrix */}
           <StaggerItem>
             <div className="card px-5 py-4">
-              <span className="label text-[#5AC8FA]">Time vs money matrix</span>
+              <span className="label text-[var(--info)]">Time vs money matrix</span>
               <div className="mt-3 space-y-3">
                 {businesses.map((b) => {
                   const bizClients = clients.filter(c => c.businessId === b.id && c.active)
@@ -401,7 +401,7 @@ export default function FinancialsPage() {
                       <div className="w-3 h-3 rounded-full shrink-0" style={{ background: b.color }} />
                       <div className="flex-1 min-w-0">
                         <p className="text-[17px] font-medium text-[var(--text)]">{b.name}</p>
-                        <p className="text-[15px] text-[rgba(255,255,255,0.55)]">{fmt(income)}/mo</p>
+                        <p className="text-[15px] text-[var(--text-secondary)]">{fmt(income)}/mo</p>
                       </div>
                       <div className="text-right">
                         <p className="data text-sm font-semibold text-[var(--text)]">{income > 0 ? `${fmt(Math.round(perHour))}/hr` : '—'}</p>
@@ -418,8 +418,8 @@ export default function FinancialsPage() {
               <motion.div whileHover={{ filter: 'brightness(1.05)' }} className="card px-5 py-4 flex items-center gap-3 opacity-90 hover:opacity-100 transition-opacity">
                 <div className="data flex h-9 w-9 items-center justify-center rounded-full bg-[rgba(48,209,88,0.15)] text-[15px] font-bold text-[var(--positive)]">{noGambleStreak.currentStreak}</div>
                 <div>
-                  <p className="text-[15px] font-medium text-[rgba(255,255,255,0.55)]">Days clean</p>
-                  <p className="text-[13px] text-[rgba(255,255,255,0.45)]">Longest: {noGambleStreak.longestStreak}d</p>
+                  <p className="text-[15px] font-medium text-[var(--text-secondary)]">Days clean</p>
+                  <p className="text-[13px] text-[var(--text-dim)]">Longest: {noGambleStreak.longestStreak}d</p>
                 </div>
               </motion.div>
             </StaggerItem>

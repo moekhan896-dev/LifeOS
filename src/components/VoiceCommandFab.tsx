@@ -304,7 +304,7 @@ export default function VoiceCommandFab() {
             initial={{ opacity: 0, y: 8 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0 }}
-            className="fixed bottom-[88px] right-6 z-[90] max-w-[min(90vw,320px)] rounded-2xl border border-[var(--border)] bg-[rgba(44,44,46,0.92)] p-3 text-[13px] text-[var(--text-secondary)] shadow-2xl backdrop-blur-[40px] md:bottom-24"
+            className="fixed bottom-[88px] right-6 z-[90] max-w-[min(90vw,320px)] rounded-2xl border border-[var(--border)] bg-[var(--bg-elevated)]/95 p-3 text-[13px] text-[var(--text-secondary)] shadow-2xl backdrop-blur-[40px] md:bottom-24"
           >
             {text || 'Listening…'}
           </motion.div>

@@ -135,12 +135,14 @@ export default function Sidebar() {
           </span>
         </Link>
         <motion.button
+          type="button"
           onClick={() => toggleTheme()}
-          className="w-8 h-8 flex items-center justify-center rounded-xl hover:bg-[#141824] text-[#8892b0] transition-colors"
+          className="touch-target-44 flex items-center justify-center rounded-xl text-[var(--color-text-mid)] transition-colors hover:bg-[var(--color-surface2)]"
           whileTap={{ scale: 0.9 }}
           animate={{ rotate: theme === 'dark' ? 0 : 180 }}
           transition={{ type: 'spring', stiffness: 200, damping: 15 }}
           title="Toggle theme"
+          aria-label={theme === 'dark' ? 'Switch to light theme' : 'Switch to dark theme'}
         >
           {theme === 'dark' ? (
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -177,12 +179,12 @@ export default function Sidebar() {
                 return (
                   <Link key={item.href} href={item.href} onClick={closeMobileIfNeeded} className="block group">
                     <motion.div
-                      className={`relative flex items-center gap-2.5 px-4 py-[6px] text-[13px] font-medium rounded-[10px] mx-1.5 transition-colors ${
+                      className={`relative flex min-h-[44px] items-center gap-2.5 px-4 py-[6px] text-[13px] font-medium rounded-[10px] mx-1.5 transition-colors ${
                         active
-                          ? 'bg-[var(--accent-bg)] text-[#F5F5F7] font-semibold'
-                          : 'text-[rgba(255,255,255,0.55)]'
+                          ? 'bg-[var(--accent-bg)] text-[var(--color-text)] font-semibold'
+                          : 'text-[var(--color-text-mid)]'
                       }`}
-                      whileHover={{ x: 1, backgroundColor: 'rgba(44,44,46,0.9)', color: '#F5F5F7' }}
+                      whileHover={{ x: 1, backgroundColor: 'var(--color-surface2)', color: 'var(--color-text)' }}
                       transition={{ duration: 0.15, ease: 'easeOut' }}
                     >
                       {active && (
@@ -228,12 +230,12 @@ export default function Sidebar() {
               return (
                 <Link key={b.id} href={href} onClick={closeMobileIfNeeded} className="block group">
                   <motion.div
-                    className={`relative flex items-center gap-2.5 px-4 py-[6px] text-[13px] font-medium rounded-[10px] mx-1.5 transition-colors ${
+                    className={`relative flex min-h-[44px] items-center gap-2.5 px-4 py-[6px] text-[13px] font-medium rounded-[10px] mx-1.5 transition-colors ${
                       active
-                        ? 'bg-[var(--accent-bg)] text-[#F5F5F7] font-semibold'
-                        : 'text-[rgba(255,255,255,0.55)]'
+                        ? 'bg-[var(--accent-bg)] text-[var(--color-text)] font-semibold'
+                        : 'text-[var(--color-text-mid)]'
                     }`}
-                    whileHover={{ x: 1, backgroundColor: 'rgba(44,44,46,0.9)', color: '#F5F5F7' }}
+                    whileHover={{ x: 1, backgroundColor: 'var(--color-surface2)', color: 'var(--color-text)' }}
                     transition={{ duration: 0.15, ease: 'easeOut' }}
                   >
                     {active && (
@@ -255,7 +257,7 @@ export default function Sidebar() {
                     )}
                     <span className="text-[14px] leading-none">{b.icon}</span>
                     <span className="flex-1 truncate">{b.name}</span>
-                    <span className="font-mono text-[10px] text-[#4a5278]">
+                    <span className="font-mono text-[10px] text-[var(--color-text-dim)]">
                       {getRevenueLabel(b)}
                     </span>
                   </motion.div>
@@ -335,8 +337,11 @@ export default function Sidebar() {
     <>
       {/* Mobile hamburger */}
       <button
+        type="button"
         onClick={toggleSidebar}
-        className="md:hidden fixed top-3 left-3 z-50 w-10 h-10 flex items-center justify-center rounded-2xl bg-[var(--color-surface)] border border-[var(--color-border)] text-[var(--color-text)] hover:bg-[var(--color-surface2)] transition-all shadow-lg"
+        aria-label={sidebarOpen ? 'Close navigation menu' : 'Open navigation menu'}
+        aria-expanded={sidebarOpen}
+        className="touch-target-44 md:hidden fixed top-3 left-3 z-50 flex items-center justify-center rounded-2xl bg-[var(--color-surface)] border border-[var(--color-border)] text-[var(--color-text)] hover:bg-[var(--color-surface2)] transition-all shadow-lg"
       >
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
           <line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/>

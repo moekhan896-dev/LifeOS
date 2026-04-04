@@ -1,8 +1,22 @@
 'use client'
 
+import { useEffect } from 'react'
 import { Toaster } from 'sonner'
 
 export default function Providers({ children }: { children: React.ReactNode }) {
+  useEffect(() => {
+    const apply = () => {
+      const el = document.querySelector('[data-sonner-toaster]')
+      if (!el) return false
+      el.setAttribute('aria-live', 'polite')
+      el.setAttribute('role', 'status')
+      return true
+    }
+    if (apply()) return
+    const t = window.setTimeout(apply, 150)
+    return () => clearTimeout(t)
+  }, [])
+
   return (
     <>
       {children}

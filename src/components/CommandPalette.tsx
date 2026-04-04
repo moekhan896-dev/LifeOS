@@ -43,10 +43,10 @@ const PAGES = [
 ]
 
 const paletteShell =
-  'overflow-hidden rounded-[16px] border border-[rgba(255,255,255,0.06)] bg-[rgba(44,44,46,0.92)] shadow-2xl backdrop-blur-[40px]'
+  'overflow-hidden rounded-[16px] border border-[var(--border)] bg-[var(--color-surface)] shadow-2xl backdrop-blur-[40px]'
 
 const itemCls =
-  'flex cursor-pointer items-center gap-3 rounded-[12px] px-3 py-2.5 text-[17px] text-[rgba(255,255,255,0.55)] transition-colors data-[selected]:bg-[rgba(255,255,255,0.08)] data-[selected]:text-[#F5F5F7]'
+  'flex min-h-[44px] cursor-pointer items-center gap-3 rounded-[12px] px-3 py-2.5 text-[17px] text-[var(--color-text-mid)] transition-colors data-[selected]:bg-[var(--accent-bg)] data-[selected]:text-[var(--color-text)]'
 
 export default function CommandPalette() {
   const [open, setOpen] = useState(false)
@@ -106,17 +106,17 @@ export default function CommandPalette() {
             className="relative z-10 mx-4 w-full max-w-[560px]"
           >
             <Command className={paletteShell}>
-              <div className="border-b border-[rgba(255,255,255,0.08)] px-4 pb-3 pt-4">
+              <div className="border-b border-[var(--border)] px-4 pb-3 pt-4">
                 <label className="sr-only" htmlFor="command-palette-input">
                   Search
                 </label>
-                <div className="flex items-center gap-3 rounded-[12px] border border-[rgba(255,255,255,0.08)] bg-[#2C2C2E] px-4">
+                <div className="flex items-center gap-3 rounded-[12px] border border-[var(--border)] bg-[var(--bg-elevated)] px-4">
                   <svg
                     width="18"
                     height="18"
                     viewBox="0 0 24 24"
                     fill="none"
-                    stroke="rgba(255,255,255,0.45)"
+                    stroke="var(--text-dim)"
                     strokeWidth="2"
                     strokeLinecap="round"
                     aria-hidden
@@ -129,15 +129,15 @@ export default function CommandPalette() {
                     id="command-palette-input"
                     defaultValue={inputBoot.q}
                     placeholder="Search pages, tasks, or type a command…"
-                    className="min-h-[48px] flex-1 bg-transparent py-[14px] text-[17px] text-[#F5F5F7] placeholder:text-[rgba(255,255,255,0.3)] outline-none focus:ring-0"
+                    className="min-h-[48px] flex-1 bg-transparent py-[14px] text-[17px] text-[var(--text-primary)] placeholder:text-[var(--text-tertiary)] outline-none focus:ring-0"
                   />
-                  <kbd className="data shrink-0 rounded-md bg-[rgba(255,255,255,0.08)] px-2 py-1 text-[11px] text-[rgba(255,255,255,0.45)]">
+                  <kbd className="data shrink-0 rounded-md bg-[var(--color-surface2)] px-2 py-1 text-[11px] text-[var(--color-text-dim)]">
                     ESC
                   </kbd>
                 </div>
               </div>
               <Command.List className="max-h-[min(420px,50vh)] overflow-y-auto p-2">
-                <Command.Empty className="py-8 text-center text-[17px] text-[rgba(255,255,255,0.45)]">
+                <Command.Empty className="py-8 text-center text-[17px] text-[var(--text-dim)]">
                   No results found.
                 </Command.Empty>
 

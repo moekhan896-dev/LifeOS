@@ -2,6 +2,12 @@ import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import { newId } from '@/lib/id'
 import { advanceRecurringDue, initialNextDue, type TaskRecurring } from '@/lib/task-recurring'
+import {
+  DEFAULT_DASHBOARD_LAYOUT,
+  normalizeDashboardLayout,
+  type DashboardLayoutState,
+  type DashboardTileConfig,
+} from '@/lib/dashboard-layout'
 import { buildProactiveCandidates } from '@/lib/proactive-engine'
 
 // ── Types ──
@@ -342,7 +348,14 @@ interface AppState {
   estimatedIncomeTaxRatePct: number
   setProfitFirstPct: (p: Partial<ProfitFirstPct>) => void
   /** In-app notification toggles (browser push is future). PRD — notification preferences. */
-  notificationPrefs: { proactiveInbox: boolean; morningBrief: boolean; weeklyDigest: boolean }
+  notificationPrefs: {
+    proactiveInbox: boolean
+    morningBrief: boolean
+    weeklyDigest: boolean
+    quietHoursEnabled: boolean
+    quietHoursStart: string
+    quietHoursEnd: string
+  }
   trackingPrefs: { prayers: boolean; gym: boolean; sleep: boolean; meals: boolean; energyDrinks: boolean; screenTime: boolean; gambling: boolean; coldEmail: boolean }
   setAuthenticated: (v: boolean) => void
   setPinHash: (hex: string) => void
@@ -576,7 +589,18 @@ interface AppState {
   // ── Mentors (PRD §7.4) ──
   mentorPersonas: MentorPersona[]
   addMentorPersona: (m: Omit<MentorPersona, 'id' | 'createdAt'>) => void
+  updateMentorPersona: (id: string, updates: Partial<Pick<MentorPersona, 'name' | 'description' | 'sourceUrls'>>) => void
   removeMentorPersona: (id: string) => void
+
+  /** PRD §9.18 — dashboard tile layout */
+  dashboardLayout: DashboardLayoutState
+  setDashboardLayout: (layout: DashboardLayoutState) => void
+  reorderDashboardTiles: (activeId: string, overId: string) => void
+  updateDashboardTileSpan: (tileId: string, gridColumn: DashboardTileConfig['gridColumn']) => void
+  setDashboardTileVisible: (tileId: string, visible: boolean) => void
+  /** Add tile back from library at bottom */
+  showDashboardTile: (tileId: string) => void
+  resetDashboardLayout: () => void
 }
 
 const uid = () => newId()
@@ -601,7 +625,14 @@ function builtinMentors(): MentorPersona[] {
 }
 
 const INITIAL_TRACKING = { prayers: true, gym: true, sleep: true, meals: true, energyDrinks: true, screenTime: true, gambling: true, coldEmail: true }
-const INITIAL_NOTIFICATIONS = { proactiveInbox: true, morningBrief: false, weeklyDigest: false }
+const INITIAL_NOTIFICATIONS = {
+  proactiveInbox: true,
+  morningBrief: false,
+  weeklyDigest: false,
+  quietHoursEnabled: false,
+  quietHoursStart: '22:00',
+  quietHoursEnd: '07:00',
+}
 
 export function getClientNet(c: Client) {
   return c.grossMonthly - c.adSpend - c.grossMonthly * 0.03
@@ -810,6 +841,7 @@ export const useStore = create<AppState>()(
           scorecards: Array.from({ length: 12 }, () => null) as (WeeklyScorecardSlot | null)[],
           lastWeeklyScorecardWeekKey: null,
           lastWeeklyReportWeekKey: null,
+          dashboardLayout: DEFAULT_DASHBOARD_LAYOUT,
         }),
 
       seedDefaultData: () => {
@@ -1429,16 +1461,85 @@ export const useStore = create<AppState>()(
         set((s) => ({
           mentorPersonas: [...s.mentorPersonas, { ...m, id: uid(), createdAt: new Date().toISOString() }],
         })),
+      updateMentorPersona: (id, updates) =>
+        set((s) => ({
+          mentorPersonas: s.mentorPersonas.map((m) =>
+            m.id === id ? { ...m, ...updates } : m
+          ),
+        })),
       removeMentorPersona: (id) =>
         set((s) => ({
           mentorPersonas: s.mentorPersonas.filter((m) => m.id !== id || m.isBuiltin),
         })),
+
+      dashboardLayout: DEFAULT_DASHBOARD_LAYOUT,
+      setDashboardLayout: (layout) => set({ dashboardLayout: layout }),
+      reorderDashboardTiles: (activeId, overId) =>
+        set((s) => {
+          const sorted = [...s.dashboardLayout.tiles].sort((a, b) => a.order - b.order)
+          const oldIndex = sorted.findIndex((t) => t.tileId === activeId)
+          const newIndex = sorted.findIndex((t) => t.tileId === overId)
+          if (oldIndex < 0 || newIndex < 0 || oldIndex === newIndex) return {}
+          const next = [...sorted]
+          const [removed] = next.splice(oldIndex, 1)
+          next.splice(newIndex, 0, removed)
+          const reordered = next.map((t, i) => ({ ...t, order: i }))
+          return {
+            dashboardLayout: {
+              tiles: reordered,
+              lastModified: new Date().toISOString(),
+            },
+          }
+        }),
+      updateDashboardTileSpan: (tileId, gridColumn) =>
+        set((s) => ({
+          dashboardLayout: {
+            ...s.dashboardLayout,
+            lastModified: new Date().toISOString(),
+            tiles: s.dashboardLayout.tiles.map((t) => (t.tileId === tileId ? { ...t, gridColumn } : t)),
+          },
+        })),
+      setDashboardTileVisible: (tileId, visible) =>
+        set((s) => ({
+          dashboardLayout: {
+            ...s.dashboardLayout,
+            lastModified: new Date().toISOString(),
+            tiles: s.dashboardLayout.tiles.map((t) => (t.tileId === tileId ? { ...t, visible } : t)),
+          },
+        })),
+      showDashboardTile: (tileId) =>
+        set((s) => {
+          const maxOrder = Math.max(0, ...s.dashboardLayout.tiles.map((t) => t.order))
+          return {
+            dashboardLayout: {
+              ...s.dashboardLayout,
+              lastModified: new Date().toISOString(),
+              tiles: s.dashboardLayout.tiles.map((t) =>
+                t.tileId === tileId ? { ...t, visible: true, order: maxOrder + 1 } : t
+              ),
+            },
+          }
+        }),
+      resetDashboardLayout: () =>
+        set({
+          dashboardLayout: {
+            ...DEFAULT_DASHBOARD_LAYOUT,
+            lastModified: new Date().toISOString(),
+          },
+        }),
     }),
     {
       name: 'art-os-store',
       partialize: (state) => {
         const { authenticated: _a, ...rest } = state
         return rest as unknown as AppState
+      },
+      merge: (persisted, current) => {
+        const p = persisted as Partial<AppState> | undefined
+        const base = { ...current, ...p } as AppState
+        base.dashboardLayout = normalizeDashboardLayout(p?.dashboardLayout ?? current.dashboardLayout)
+        base.notificationPrefs = { ...INITIAL_NOTIFICATIONS, ...base.notificationPrefs }
+        return base
       },
     }
   )
