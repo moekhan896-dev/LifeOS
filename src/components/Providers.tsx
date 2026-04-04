@@ -7,15 +7,19 @@ export default function Providers({ children }: { children: React.ReactNode }) {
     <>
       {children}
       <Toaster
-        position="bottom-center"
+        position="bottom-right"
         toastOptions={{
           style: {
-            background: '#0e1118',
-            border: '1px solid rgba(255,255,255,0.06)',
-            color: '#f1f3f9',
-            fontFamily: 'var(--font-sans), system-ui, sans-serif',
+            background: 'var(--color-surface)',
+            border: '1px solid var(--color-border)',
+            color: 'var(--color-text)',
+            fontFamily: 'var(--font-sans)',
+            fontSize: '13px',
+            borderRadius: '10px',
+            boxShadow: '0 8px 32px rgba(0,0,0,0.3)',
           },
         }}
+        gap={8}
       />
     </>
   )

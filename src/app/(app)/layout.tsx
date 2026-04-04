@@ -3,28 +3,39 @@
 import { useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { useStore } from '@/stores/store'
-import TabBar from '@/components/TabBar'
-import VoiceMic from '@/components/VoiceMic'
+import Sidebar from '@/components/Sidebar'
+import CommandPalette from '@/components/CommandPalette'
+import VoiceButton from '@/components/VoiceButton'
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
+  const { authenticated, theme, seedDefaultData } = useStore()
   const router = useRouter()
-  const authenticated = useStore((s) => s.authenticated)
+
+  // Seed data on first load if store is empty
+  useEffect(() => {
+    seedDefaultData()
+  }, [seedDefaultData])
 
   useEffect(() => {
-    if (!authenticated) {
-      router.replace('/')
-    }
+    if (!authenticated) router.replace('/')
   }, [authenticated, router])
 
-  if (!authenticated) {
-    return null
-  }
+  useEffect(() => {
+    document.documentElement.classList.toggle('light', theme === 'light')
+  }, [theme])
+
+  if (!authenticated) return null
 
   return (
-    <div className="min-h-screen pb-14">
-      {children}
-      <VoiceMic />
-      <TabBar />
+    <div className="scanline flex min-h-screen">
+      <Sidebar />
+      <main className="flex-1 ml-0 md:ml-[240px] min-h-screen overflow-x-hidden">
+        <div className="p-4 md:p-5 max-w-[1200px] mx-auto">
+          {children}
+        </div>
+      </main>
+      <CommandPalette />
+      <VoiceButton />
     </div>
   )
 }
