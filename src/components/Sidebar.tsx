@@ -6,23 +6,28 @@ import { useStore, getExecutionScore, getBusinessHealth } from '@/stores/store'
 
 const NAV_SECTIONS = [
   {
-    label: 'YOUR DAY',
+    label: 'Your day',
     items: [
       { href: '/dashboard', label: 'Command Center', icon: '◉' },
+      { href: '/ai-insights', label: 'AI Insights', icon: '✉' },
       { href: '/focus', label: 'Focus Mode', icon: '◎' },
       { href: '/schedule', label: 'Schedule', icon: '◷' },
     ],
   },
   {
-    label: 'THINK',
+    label: 'Think',
     items: [
       { href: '/vision', label: 'Identity & Vision', icon: '🧬' },
       { href: '/goals', label: '12-Week Goals', icon: '🎯' },
       { href: '/projects', label: 'Projects', icon: '📋', badge: 'projects' as const },
+      { href: '/roadmap', label: 'Roadmap', icon: '🗓' },
+      { href: '/decision-lab', label: 'Decision Lab', icon: '⚗' },
+      { href: '/mentors', label: 'Mentors', icon: '🎭' },
+      { href: '/spending-calculator', label: 'Spending calc', icon: '⧉' },
     ],
   },
   {
-    label: 'EXECUTE',
+    label: 'Execute',
     items: [
       { href: '/tasks', label: 'Tasks', icon: '☐', badge: 'tasks' as const },
       { href: '/drip', label: 'DRIP Matrix', icon: '📊' },
@@ -30,7 +35,7 @@ const NAV_SECTIONS = [
     ],
   },
   {
-    label: 'MEASURE',
+    label: 'Measure',
     items: [
       { href: '/insights', label: 'Execution Score', icon: '📈' },
       { href: '/financials', label: 'Financial Command', icon: '💰' },
@@ -39,7 +44,7 @@ const NAV_SECTIONS = [
     ],
   },
   {
-    label: 'LEARN',
+    label: 'Learn',
     items: [
       { href: '/reports', label: 'AI Reports', icon: '🧠' },
       { href: '/knowledge', label: 'Knowledge Vault', icon: '📚' },
@@ -48,7 +53,7 @@ const NAV_SECTIONS = [
     ],
   },
   {
-    label: 'SYSTEM',
+    label: 'System',
     items: [
       { href: '/ecosystem', label: 'Ecosystem', icon: '🔗' },
       { href: '/wins', label: 'Wins', icon: '🏆' },
@@ -71,7 +76,7 @@ export default function Sidebar() {
   const {
     theme, toggleTheme, sidebarOpen, toggleSidebar,
     businesses, tasks, revenueEntries, projects,
-    xp, level, todayHealth, focusSessions,
+    xp, level, todayHealth, focusSessions, trackPrayers,
   } = useStore()
 
   const undoneCount = tasks.filter((t) => !t.done).length
@@ -79,10 +84,19 @@ export default function Sidebar() {
   const today = todayHealth.date
   const todayFocusCount = focusSessions.filter((s) => s.startedAt?.startsWith(today)).length
   const tasksDoneToday = tasks.filter((t) => t.done && t.completedAt?.startsWith(today)).length
-  const executionScore = getExecutionScore(todayHealth, tasks.length, tasksDoneToday, todayFocusCount)
+  const tasksCommitted = tasks.filter(
+    (t) => t.createdAt.startsWith(today) || (!t.done && t.priority !== 'low')
+  ).length
+  const executionScore = getExecutionScore(
+    todayHealth,
+    tasksCommitted,
+    tasksDoneToday,
+    todayFocusCount,
+    trackPrayers
+  )
 
-  const xpInLevel = xp % 500
-  const xpPercent = (xpInLevel / 500) * 100
+  const xpInLevel = xp % 100
+  const xpPercent = xpInLevel
 
   const isActive = (href: string) => pathname === href || pathname?.startsWith(href + '/')
 
@@ -112,11 +126,11 @@ export default function Sidebar() {
       <div className="flex items-center justify-between px-5 pt-5 pb-3">
         <Link href="/dashboard" className="flex items-center gap-2.5">
           <motion.div
-            className="w-2 h-2 rounded-full bg-[#10b981]"
+            className="w-2 h-2 rounded-full bg-[var(--accent)]"
             animate={{ opacity: [0.4, 1, 0.4] }}
             transition={{ duration: 2, repeat: Infinity, ease: 'easeInOut' }}
           />
-          <span className="data text-[14px] font-bold tracking-[5px]" style={{ color: '#10b981' }}>
+          <span className="text-[15px] font-semibold tracking-[-0.3px] text-[var(--accent)]">
             ART OS
           </span>
         </Link>
@@ -140,18 +154,14 @@ export default function Sidebar() {
         </motion.button>
       </div>
 
-      {/* AI Strategist Button */}
+      {/* AI Strategist — subtle text link + purple dot (AI-only accent) */}
       <div className="px-4 pb-3">
-        <Link href="/ai" className="block">
-          <motion.div
-            className="gradient-border flex items-center justify-center gap-2 py-2.5 rounded-2xl text-[12px] font-semibold text-white cursor-pointer"
-            style={{ background: '#0e1018' }}
-            whileHover={{ scale: 1.02, boxShadow: '0 0 24px rgba(16, 185, 129, 0.3)' }}
-            transition={{ duration: 0.2 }}
-          >
-            <span>🧠</span>
-            <span>AI Strategist</span>
-          </motion.div>
+        <Link
+          href="/ai"
+          className="flex items-center gap-2 px-1 py-2 text-[13px] font-medium text-[var(--ai)] transition-opacity hover:opacity-90"
+        >
+          <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-[var(--ai)]" aria-hidden />
+          <span>AI Strategist</span>
         </Link>
       </div>
 
@@ -159,9 +169,7 @@ export default function Sidebar() {
       <div className="flex-1 overflow-y-auto pb-2 scrollbar-thin">
         {NAV_SECTIONS.map((section) => (
           <div key={section.label}>
-            <div className="font-mono text-[9px] uppercase tracking-[3px] text-[#4a5278] px-4 mt-4 mb-1">
-              {section.label}
-            </div>
+            <div className="label px-4 mt-4 mb-1">{section.label}</div>
             <div className="space-y-0.5">
               {section.items.map((item) => {
                 const active = isActive(item.href)
@@ -169,18 +177,18 @@ export default function Sidebar() {
                 return (
                   <Link key={item.href} href={item.href} onClick={closeMobileIfNeeded} className="block group">
                     <motion.div
-                      className={`relative flex items-center gap-2.5 px-4 py-[6px] text-[12px] font-medium rounded-[10px] mx-1.5 transition-colors ${
+                      className={`relative flex items-center gap-2.5 px-4 py-[6px] text-[13px] font-medium rounded-[10px] mx-1.5 transition-colors ${
                         active
-                          ? 'bg-emerald-500/5 text-white font-semibold'
-                          : 'text-[#8892b0]'
+                          ? 'bg-[var(--accent-bg)] text-[#F5F5F7] font-semibold'
+                          : 'text-[rgba(255,255,255,0.55)]'
                       }`}
-                      whileHover={{ x: 1, backgroundColor: '#141824', color: '#ffffff' }}
+                      whileHover={{ x: 1, backgroundColor: 'rgba(44,44,46,0.9)', color: '#F5F5F7' }}
                       transition={{ duration: 0.15, ease: 'easeOut' }}
                     >
                       {active && (
                         <motion.div
                           layoutId="sidebar-active"
-                          className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-4 rounded-r-full bg-emerald-500"
+                          className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-4 rounded-r-full bg-[var(--accent)]"
                           transition={{ type: 'spring', stiffness: 300, damping: 30 }}
                         />
                       )}
@@ -189,7 +197,7 @@ export default function Sidebar() {
                       </span>
                       <span className="flex-1 truncate">{item.label}</span>
                       {badgeText && (
-                        <span className="font-mono text-[9px] bg-emerald-500/15 text-emerald-400 px-1.5 py-0.5 rounded-md min-w-[20px] text-center font-semibold">
+                        <span className="data text-[10px] bg-[var(--accent-bg)] text-[var(--accent)] px-1.5 py-0.5 rounded-md min-w-[20px] text-center font-semibold">
                           {badgeText}
                         </span>
                       )}
@@ -203,10 +211,10 @@ export default function Sidebar() {
 
         {/* Businesses */}
         <div>
-          <div className="font-mono text-[9px] uppercase tracking-[3px] text-[#4a5278] px-4 mt-4 mb-1 flex items-center gap-2">
-            BUSINESSES
+          <div className="label px-4 mt-4 mb-1 flex items-center gap-2">
+            Businesses
             <motion.div
-              className="w-1.5 h-1.5 rounded-full bg-emerald-500"
+              className="w-1.5 h-1.5 rounded-full bg-[var(--accent)]"
               animate={{ opacity: [0.4, 1, 0.4] }}
               transition={{ duration: 2, repeat: Infinity, ease: 'easeInOut' }}
             />
@@ -216,22 +224,22 @@ export default function Sidebar() {
               const href = `/business/${b.id}`
               const active = isActive(href)
               const health = getBusinessHealth(b, tasks, revenueEntries)
-              const dotColor = health === 'strong' ? '#10b981' : health === 'weak' ? '#f59e0b' : '#ef4444'
+              const dotColor = health === 'strong' ? 'var(--positive)' : health === 'weak' ? '#f59e0b' : '#ef4444'
               return (
                 <Link key={b.id} href={href} onClick={closeMobileIfNeeded} className="block group">
                   <motion.div
-                    className={`relative flex items-center gap-2.5 px-4 py-[6px] text-[12px] font-medium rounded-[10px] mx-1.5 transition-colors ${
+                    className={`relative flex items-center gap-2.5 px-4 py-[6px] text-[13px] font-medium rounded-[10px] mx-1.5 transition-colors ${
                       active
-                        ? 'bg-emerald-500/5 text-white font-semibold'
-                        : 'text-[#8892b0]'
+                        ? 'bg-[var(--accent-bg)] text-[#F5F5F7] font-semibold'
+                        : 'text-[rgba(255,255,255,0.55)]'
                     }`}
-                    whileHover={{ x: 1, backgroundColor: '#141824', color: '#ffffff' }}
+                    whileHover={{ x: 1, backgroundColor: 'rgba(44,44,46,0.9)', color: '#F5F5F7' }}
                     transition={{ duration: 0.15, ease: 'easeOut' }}
                   >
                     {active && (
                       <motion.div
                         layoutId="sidebar-active"
-                        className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-4 rounded-r-full bg-emerald-500"
+                        className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-4 rounded-r-full bg-[var(--accent)]"
                         transition={{ type: 'spring', stiffness: 300, damping: 30 }}
                       />
                     )}
@@ -265,7 +273,7 @@ export default function Sidebar() {
             <svg className="w-full h-full" viewBox="0 0 60 60" style={{ transform: 'rotate(-90deg)' }}>
               <defs>
                 <linearGradient id="execRingGrad" x1="0%" y1="0%" x2="100%" y2="0%">
-                  <stop offset="0%" stopColor="#10b981" />
+                  <stop offset="0%" stopColor="var(--accent)" />
                   <stop offset="100%" stopColor="#06b6d4" />
                 </linearGradient>
               </defs>
@@ -299,13 +307,13 @@ export default function Sidebar() {
         <div className="space-y-1.5">
           <div className="flex justify-between items-center">
             <span className="data text-[10px] text-[var(--color-text-dim)]">{xpInLevel}/500 XP</span>
-            <span className="data text-[10px] font-bold bg-emerald-500 text-white px-2 py-0.5 rounded-full">
+            <span className="data text-[10px] font-bold bg-[var(--accent)] text-white px-2 py-0.5 rounded-full">
               LVL {level}
             </span>
           </div>
           <div className="h-[3px] bg-[var(--color-surface2)] rounded-full overflow-hidden">
             <motion.div
-              className="h-full bg-emerald-500 rounded-full"
+              className="h-full rounded-full bg-[var(--accent)]"
               initial={false}
               animate={{ width: `${xpPercent}%` }}
               transition={{ duration: 0.6, ease: 'easeOut' }}

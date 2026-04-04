@@ -6,15 +6,15 @@ import { useStore } from '@/stores/store'
 import PageTransition from '@/components/PageTransition'
 
 const CATEGORY_COLORS: Record<string, string> = {
-  Marketing: '#06b6d4',
-  Business: '#10b981',
-  Personal: '#eab308',
+  Marketing: 'var(--info)',
+  Business: 'var(--positive)',
+  Personal: 'var(--spiritual)',
 }
 
 const CATEGORY_LABELS: Record<string, string> = {
-  Marketing: 'MARKETING',
-  Business: 'BUSINESS OPS',
-  Personal: 'PERSONAL',
+  Marketing: 'Marketing',
+  Business: 'Business ops',
+  Personal: 'Personal',
 }
 
 const TIPS: Record<string, string> = {
@@ -47,14 +47,12 @@ export default function SkillsPage() {
         {/* Header */}
         <div className="flex items-baseline justify-between">
           <div>
-            <h1 style={{ fontSize: 28, fontWeight: 600 }} className="text-white">
-              Skill Tree
-            </h1>
-            <p className="text-[13px] text-[var(--text-mid)] mt-1">Level up through action.</p>
+            <h1 className="title">Skill Tree</h1>
+            <p className="subheadline mt-1">Level up through action.</p>
           </div>
           <div className="text-right">
-            <div className="text-[11px] uppercase tracking-wider text-[var(--text-dim)]">Total Level</div>
-            <div className="text-[32px] font-mono font-bold text-emerald-400">{totalLevel}</div>
+            <div className="footnote text-[var(--text-secondary)]">Total level</div>
+            <div className="data text-[32px] font-bold text-[var(--accent)]">{totalLevel}</div>
           </div>
         </div>
 
@@ -66,13 +64,12 @@ export default function SkillsPage() {
           return (
             <motion.div
               key={cat}
-              initial={{ opacity: 0, y: 12 }}
+              initial={{ opacity: 0, y: 8 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: ci * 0.08, duration: 0.25 }}
-              className="rounded-[16px] p-5"
-              style={{ background: '#0e1018' }}
+              transition={{ delay: ci * 0.03, duration: 0.25, ease: [0.25, 0.1, 0.25, 1] as const }}
+              className="card rounded-2xl p-5"
             >
-              <h2 className="text-[14px] font-semibold text-white mb-4">
+              <h2 className="headline mb-4">
                 {CATEGORY_LABELS[cat]}
               </h2>
               <div className="space-y-4">
@@ -83,9 +80,9 @@ export default function SkillsPage() {
                         {sk.skill}
                       </span>
                       <span
-                        className="font-mono text-[11px] rounded-md px-2 py-0.5"
+                        className="data-number text-[11px] rounded-md px-2 py-0.5"
                         style={{
-                          background: `${color}15`,
+                          background: `color-mix(in srgb, ${color} 22%, transparent)`,
                           color: color,
                         }}
                       >
@@ -93,7 +90,7 @@ export default function SkillsPage() {
                       </span>
                     </div>
                     <div className="flex items-center gap-2">
-                      <div className="flex-1 h-2 rounded-full" style={{ background: '#1e2338' }}>
+                      <div className="h-2 flex-1 rounded-full bg-[var(--bg-secondary)]">
                         <motion.div
                           className="h-full rounded-full"
                           style={{ background: color }}
@@ -102,12 +99,12 @@ export default function SkillsPage() {
                           transition={{ duration: 0.5, ease: 'easeOut' }}
                         />
                       </div>
-                      <span className="text-[10px] font-mono text-[var(--text-dim)] w-[52px] text-right">
+                      <span className="caption data-number w-[52px] text-right text-[var(--text-tertiary)]">
                         {sk.xp}/100 XP
                       </span>
                     </div>
                     {/* Tooltip */}
-                    <div className="absolute -top-8 left-1/2 -translate-x-1/2 bg-[#1a1d2e] text-[11px] text-[var(--text-mid)] px-2.5 py-1 rounded-md opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-10">
+                    <div className="card-floating absolute -top-8 left-1/2 z-10 -translate-x-1/2 px-2.5 py-1 text-[13px] text-[var(--text-secondary)] opacity-0 transition-opacity group-hover:opacity-100 pointer-events-none whitespace-nowrap">
                       {TIPS[sk.skill] || `Complete ${sk.skill} tasks to level up`}
                     </div>
                   </div>

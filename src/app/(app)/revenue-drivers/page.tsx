@@ -1,44 +1,19 @@
 'use client'
 
-import { useState, useEffect } from 'react'
-import { useStore, type DriverStatus, type RevenueDriver } from '@/stores/store'
+import { useState } from 'react'
+import { useStore, type DriverStatus } from '@/stores/store'
 import { DRIVER_STATUSES, DRIVER_STATUS_COLORS } from '@/lib/constants'
 import PageTransition from '@/components/PageTransition'
 import { StaggerContainer, StaggerItem } from '@/components/Stagger'
-import { motion, AnimatePresence } from 'framer-motion'
+import { motion } from 'framer-motion'
 import { toast } from 'sonner'
-
-const SEED_DRIVERS: Omit<RevenueDriver, 'id'>[] = [
-  { businessId: 'agency', category: 'Acquisition', name: 'Cold email to UMich alumni', impact: 5, status: 'BUILD' },
-  { businessId: 'agency', category: 'Acquisition', name: 'LinkedIn outbound DMs', impact: 3, status: 'IDEA' },
-  { businessId: 'agency', category: 'Retention', name: 'Monthly client reports', impact: 4, status: 'LIVE' },
-  { businessId: 'agency', category: 'Upsell', name: 'Offer paid ads to SEO clients', impact: 4, status: 'PLAN' },
-  { businessId: 'plumbing', category: 'Growth', name: 'GMB SEO on all 9 profiles', impact: 5, status: 'BUILD' },
-  { businessId: 'plumbing', category: 'Growth', name: 'Google LSA ads', impact: 4, status: 'NEVER TRIED' },
-  { businessId: 'plumbing', category: 'Growth', name: 'Thumbtack / Angi leads', impact: 3, status: 'STALE' },
-  { businessId: 'plumbing', category: 'Ops', name: 'Hire 2nd plumber', impact: 5, status: 'PLAN' },
-  { businessId: 'madison', category: 'Monetize', name: 'Brand deal outreach', impact: 5, status: 'PLAN' },
-  { businessId: 'madison', category: 'Growth', name: 'Reels strategy 3x/week', impact: 4, status: 'LIVE' },
-  { businessId: 'madison', category: 'Monetize', name: 'Affiliate skincare links', impact: 3, status: 'IDEA' },
-  { businessId: 'moggley', category: 'Product', name: 'MVP feature complete', impact: 5, status: 'BUILD' },
-  { businessId: 'moggley', category: 'Launch', name: 'Beta launch via Madison story', impact: 4, status: 'PLAN' },
-  { businessId: 'brand', category: 'Content', name: 'YouTube: behind the businesses', impact: 4, status: 'IDEA' },
-  { businessId: 'brand', category: 'Content', name: 'Twitter/X daily posting', impact: 3, status: 'STALE' },
-  { businessId: 'airbnb', category: 'Ops', name: 'Dynamic pricing tool', impact: 2, status: 'LIVE' },
-]
 
 export default function RevenueDriversPage() {
   const { businesses, drivers, updateDriverStatus, addDriver } = useStore()
   const [filter, setFilter] = useState<DriverStatus | 'ALL'>('ALL')
   const [newDrivers, setNewDrivers] = useState<Record<string, string>>({})
 
-  useEffect(() => {
-    if (drivers.length === 0) {
-      SEED_DRIVERS.forEach((d) => addDriver(d))
-    }
-  }, [])
-
-  const allDrivers = drivers.length > 0 ? drivers : []
+  const allDrivers = drivers
 
   const cycleStatus = (id: string, current: DriverStatus) => {
     const idx = DRIVER_STATUSES.indexOf(current)

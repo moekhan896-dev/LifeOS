@@ -82,7 +82,7 @@ export default function EnergyPage() {
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
           {/* Today's Energy Arc */}
-          <motion.div {...cardAnim(0.05)} className="rounded-[16px] border border-[#1e2338] bg-[#0e1018] p-5 space-y-3">
+          <motion.div {...cardAnim(0.05)} className="rounded-[16px] border border-[var(--border)] bg-[var(--bg-elevated)] p-5 space-y-3">
             <h3 className="text-[14px] font-semibold text-[var(--text)]">Today&apos;s Energy Arc</h3>
             {todayLogs.length === 0 ? (
               <div className="h-[160px] flex items-center justify-center">
@@ -108,7 +108,7 @@ export default function EnergyPage() {
           </motion.div>
 
           {/* Current Energy + Log */}
-          <motion.div {...cardAnim(0.1)} className="rounded-[16px] border border-[#1e2338] bg-[#0e1018] p-5 space-y-4">
+          <motion.div {...cardAnim(0.1)} className="rounded-[16px] border border-[var(--border)] bg-[var(--bg-elevated)] p-5 space-y-4">
             <h3 className="text-[14px] font-semibold text-[var(--text)]">Log Energy Now</h3>
 
             {latestLog && (
@@ -147,7 +147,7 @@ export default function EnergyPage() {
         </div>
 
         {/* Energy Inputs */}
-        <motion.div {...cardAnim(0.15)} className="rounded-[16px] border border-[#1e2338] bg-[#0e1018] p-5 space-y-3">
+        <motion.div {...cardAnim(0.15)} className="rounded-[16px] border border-[var(--border)] bg-[var(--bg-elevated)] p-5 space-y-3">
           <h3 className="text-[14px] font-semibold text-[var(--text)]">Today&apos;s Energy Inputs</h3>
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
             <InputCard label="Fajr" value={prayers.fajr} type="check" />
@@ -160,7 +160,7 @@ export default function EnergyPage() {
         </motion.div>
 
         {/* Patterns */}
-        <motion.div {...cardAnim(0.2)} className="rounded-[16px] border border-[#1e2338] bg-[#0e1018] p-5 space-y-3">
+        <motion.div {...cardAnim(0.2)} className="rounded-[16px] border border-[var(--border)] bg-[var(--bg-elevated)] p-5 space-y-3">
           <h3 className="text-[14px] font-semibold text-[var(--text)]">Patterns Detected</h3>
           {!hasEnoughHistory && (
             <p className="text-[12px] text-[var(--text-dim)]">Log 7+ days of health data to unlock real pattern detection. Showing example insights:</p>

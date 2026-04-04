@@ -1,49 +1,77 @@
 'use client'
 
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { motion } from 'framer-motion'
 import { toast } from 'sonner'
-import { useStore } from '@/stores/store'
+import { useStore, computeMonthlyMoneySnapshot } from '@/stores/store'
 import PageTransition from '@/components/PageTransition'
 import { StaggerContainer, StaggerItem } from '@/components/Stagger'
 import { BarChart, Bar, ResponsiveContainer, XAxis, YAxis, Tooltip, CartesianGrid } from 'recharts'
 
+/** PRD §1 — generic levers; baseline comes from live store income, not sample businesses. */
 const VARIABLES = [
-  { key: 'agencyClients', label: 'New Agency Clients', min: 0, max: 10, fee: 1500, unit: '/mo each' },
-  { key: 'plumbingCalls', label: 'Plumbing Calls/Day', min: 1, max: 6, fee: 700, unit: '/ticket avg' },
-  { key: 'coachingStudents', label: 'Coaching Students', min: 0, max: 20, fee: 3000, unit: '/student' },
-  { key: 'brandDeals', label: 'Brand Deals/Month', min: 0, max: 5, fee: 2000, unit: '/deal' },
+  { key: 'retainers', label: 'New retainer clients / month', min: 0, max: 10, fee: 1500, unit: 'each / mo est.' },
+  { key: 'dailyUnits', label: 'Billable units / day', min: 0, max: 20, fee: 350, unit: 'avg ticket est.' },
+  { key: 'groupOffers', label: 'Group program seats', min: 0, max: 20, fee: 3000, unit: '/ seat / mo est.' },
+  { key: 'sponsorships', label: 'Sponsorships / month', min: 0, max: 5, fee: 2000, unit: '/ deal est.' },
+] as const
+
+type LeverKey = (typeof VARIABLES)[number]['key']
+
+const PRESETS: { name: string; values: Record<LeverKey, number> }[] = [
+  { name: 'Conservative', values: { retainers: 1, dailyUnits: 2, groupOffers: 0, sponsorships: 0 } },
+  { name: 'Moderate', values: { retainers: 3, dailyUnits: 4, groupOffers: 3, sponsorships: 1 } },
+  { name: 'Aggressive', values: { retainers: 5, dailyUnits: 8, groupOffers: 10, sponsorships: 3 } },
 ]
 
-const PRESETS = [
-  { name: 'Conservative', values: { agencyClients: 2, plumbingCalls: 2, coachingStudents: 0, brandDeals: 0 }, target: 30000 },
-  { name: 'Moderate', values: { agencyClients: 5, plumbingCalls: 3, coachingStudents: 5, brandDeals: 1 }, target: 50000 },
-  { name: 'Aggressive', values: { agencyClients: 8, plumbingCalls: 5, coachingStudents: 15, brandDeals: 3 }, target: 80000 },
-]
-
-const BASE_INCOME = 23469
+function projectedMonthly(
+  base: number,
+  v: Record<LeverKey, number>
+) {
+  return (
+    base +
+    v.retainers * 1500 +
+    v.dailyUnits * 350 * 22 * 0.35 +
+    v.groupOffers * 3000 +
+    v.sponsorships * 2000
+  )
+}
 
 function fmt(n: number) {
   return '$' + n.toLocaleString('en-US', { maximumFractionDigits: 0 })
 }
 
-export default function ScenariosPage() {
-  const [values, setValues] = useState<Record<string, number>>({
-    agencyClients: 3,
-    plumbingCalls: 3,
-    coachingStudents: 0,
-    brandDeals: 0,
-  })
+const DEFAULT_LEVERS: Record<LeverKey, number> = {
+  retainers: 0,
+  dailyUnits: 3,
+  groupOffers: 0,
+  sponsorships: 0,
+}
 
-  const projected =
-    BASE_INCOME +
-    values.agencyClients * 1500 +
-    values.plumbingCalls * 700 * 22 * 0.4 +
-    values.coachingStudents * 3000 +
-    values.brandDeals * 2000
+export default function ScenariosPage() {
+  const { businesses, clients, expenseEntries, incomeTarget } = useStore()
+  const baseIncome = useMemo(
+    () => computeMonthlyMoneySnapshot({ businesses, clients, expenseEntries }).totalIncome,
+    [businesses, clients, expenseEntries]
+  )
+
+  const [values, setValues] = useState<Record<LeverKey, number>>(DEFAULT_LEVERS)
+
+  const projected = projectedMonthly(baseIncome, values)
 
   const annual = projected * 12
-  const target = 50000
+  const target = incomeTarget > 0 ? incomeTarget : Math.max(Math.round(baseIncome * 1.2), 10000)
+
+  const comparisonBars = useMemo(
+    () => [
+      { name: 'Current', revenue: Math.round(baseIncome) },
+      ...PRESETS.map((p) => ({
+        name: p.name,
+        revenue: Math.round(projectedMonthly(baseIncome, p.values)),
+      })),
+    ],
+    [baseIncome]
+  )
 
   return (
     <PageTransition>
@@ -56,7 +84,7 @@ export default function ScenariosPage() {
 
         {/* Sliders */}
         <StaggerItem>
-          <motion.div whileHover={{ y: -2 }} className="card p-4 space-y-4">
+          <motion.div className="card p-4 space-y-4">
             <span className="label text-[10px] tracking-widest text-[var(--accent)]">VARIABLES</span>
             {VARIABLES.map((v) => (
               <div key={v.key}>
@@ -80,7 +108,7 @@ export default function ScenariosPage() {
 
         {/* Output */}
         <StaggerItem>
-          <motion.div whileHover={{ y: -2 }} className="card border-[var(--accent)]/30 bg-[var(--accent)]/5 p-4">
+          <motion.div className="card border-[var(--accent)]/30 bg-[var(--accent)]/5 p-4">
             <span className="label text-[10px] tracking-widest text-[var(--accent)]">PROJECTED INCOME</span>
             <div className="mt-2 grid grid-cols-2 gap-3">
               <div>
@@ -116,21 +144,16 @@ export default function ScenariosPage() {
 
         {/* Projected Revenue Comparison */}
         <StaggerItem>
-          <motion.div whileHover={{ y: -2 }} className="card p-4">
+          <motion.div className="card p-4">
             <span className="label text-[10px] tracking-widest text-[var(--text-dim)]">SCENARIO COMPARISON</span>
             <div className="mt-3">
               <ResponsiveContainer width="100%" height={200}>
-                <BarChart data={[
-                  { name: 'Current', revenue: BASE_INCOME },
-                  { name: 'Conservative', revenue: 30000 },
-                  { name: 'Moderate', revenue: 50000 },
-                  { name: 'Aggressive', revenue: 80000 },
-                ]}>
+                <BarChart data={comparisonBars}>
                   <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
                   <XAxis dataKey="name" tick={{ fill: 'var(--text-dim)', fontSize: 10 }} />
                   <YAxis tick={{ fill: 'var(--text-dim)', fontSize: 10 }} />
                   <Tooltip contentStyle={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 12, fontSize: 12 }} />
-                  <Bar dataKey="revenue" fill="#10b981" radius={[4, 4, 0, 0]} />
+                  <Bar dataKey="revenue" fill="var(--positive)" radius={[4, 4, 0, 0]} />
                 </BarChart>
               </ResponsiveContainer>
             </div>
@@ -139,7 +162,7 @@ export default function ScenariosPage() {
 
         {/* Presets */}
         <StaggerItem>
-          <motion.div whileHover={{ y: -2 }} className="card p-4">
+          <motion.div className="card p-4">
             <span className="label text-[10px] tracking-widest text-[var(--text-dim)]">PRE-BUILT SCENARIOS</span>
             <div className="mt-3 grid gap-2.5 sm:grid-cols-3">
               {PRESETS.map((p) => (
@@ -154,7 +177,9 @@ export default function ScenariosPage() {
                   className="rounded-[12px] border border-[var(--border)] bg-[var(--bg)] p-3 text-left hover:border-[var(--accent)] transition-colors"
                 >
                   <p className="text-sm font-semibold text-[var(--text)]">{p.name}</p>
-                  <p className="data text-lg font-bold text-[var(--accent)] mt-1">{fmt(p.target)}/mo</p>
+                  <p className="data text-lg font-bold text-[var(--accent)] mt-1">
+                    {fmt(Math.round(projectedMonthly(baseIncome, p.values)))}/mo
+                  </p>
                   <p className="text-[10px] text-[var(--text-dim)] mt-1">Click to apply</p>
                 </motion.button>
               ))}

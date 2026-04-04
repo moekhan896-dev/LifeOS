@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { toast } from 'sonner'
 import { useStore, type IdentityStatus } from '@/stores/store'
@@ -8,43 +8,36 @@ import PageTransition from '@/components/PageTransition'
 
 const STATUS_CYCLE: IdentityStatus[] = ['aspirational', 'developing', 'integrated']
 const STATUS_STYLE: Record<IdentityStatus, string> = {
-  aspirational: 'bg-purple-500/15 text-purple-400',
-  developing: 'bg-amber-500/15 text-amber-400',
-  integrated: 'bg-emerald-500/15 text-emerald-400',
+  aspirational: 'bg-[rgba(191,90,242,0.15)] text-[var(--ai)]',
+  developing: 'bg-[rgba(255,159,10,0.15)] text-[var(--warning)]',
+  integrated: 'bg-[rgba(48,209,88,0.15)] text-[var(--positive)]',
 }
 
+/** PRD §1 — starter chips are generic; north star defaults use onboarding income target when set. */
 const IDENTITY_SEEDS = [
-  'I am a disciplined entrepreneur who finishes what he starts',
-  'I am a man of faith who prays 5 times daily',
-  'I am physically fit and energized',
-  'I am a $50K/mo earner who builds assets',
-  'I am focused — I say no to distractions',
+  'I am a disciplined entrepreneur who finishes what I start',
+  'I am clear on my priorities and say no to the rest',
+  'I am physically energized and consistent with recovery',
+  'I build assets and systems, not just income',
+  'I am focused — I protect deep work',
 ]
 
 const VISION_SEEDS = [
-  'Running a $50K/mo portfolio of businesses from anywhere',
-  'Financially free — no debt, assets cashflowing',
-  'Strong body, clear mind, consistent prayers',
-  'Team handling operations while I focus on growth',
+  'A portfolio of businesses that fit my strengths',
+  'Financial clarity — I know my numbers every week',
+  'Strong routines for body, mind, and relationships',
+  'Leverage: team and systems handle repetition',
 ]
 
 const ANTI_VISION_SEEDS = [
-  'Still stuck at $19K/mo in 2 years',
-  'Burned out, scattered across 6 half-built projects',
-  'Health declining from energy drinks and no sleep',
-  'Missing prayers and feeling spiritually empty',
+  'Stuck at the same revenue two years from now',
+  'Burned out, scattered across too many half-built projects',
+  'Health and sleep sacrificed for busywork',
+  'Drifting from the identity I want to embody',
 ]
 
-const NORTH_STAR_SEEDS = [
-  { label: 'Monthly net income', current: 19400, target: 50000, unit: '$' },
-  { label: 'Agency MRR', current: 15300, target: 25000, unit: '$' },
-  { label: 'Plumbing calls/day', current: 2, target: 5, unit: '' },
-  { label: 'Execution score', current: 40, target: 80, unit: '%' },
-  { label: 'Prayer consistency', current: 10, target: 95, unit: '%' },
-]
-
-const card = 'bg-[#0e1018] border border-[#1e2338] rounded-[16px] p-5'
-const label = 'text-[10px] font-mono uppercase tracking-widest text-slate-500'
+const card = 'bg-[var(--bg-elevated)] border border-[var(--border)] rounded-2xl p-5'
+const label = 'label text-[var(--text-secondary)]'
 const stagger = { hidden: {}, visible: { transition: { staggerChildren: 0.04 } } }
 const fadeUp = { hidden: { opacity: 0, y: 8 }, visible: { opacity: 1, y: 0 } }
 
@@ -53,7 +46,21 @@ export default function VisionPage() {
     identityStatements, addIdentity, updateIdentity, deleteIdentity,
     visionItems, addVisionItem, deleteVisionItem,
     northStars, addNorthStar, updateNorthStar,
+    incomeTarget,
   } = useStore()
+
+  const northStarSuggestions = useMemo(
+    () => [
+      {
+        label: 'Monthly net income',
+        current: 0,
+        target: incomeTarget > 0 ? incomeTarget : 10000,
+        unit: '$',
+      },
+      { label: 'Average execution score', current: 0, target: 80, unit: '%' },
+    ],
+    [incomeTarget]
+  )
 
   const [idInput, setIdInput] = useState('')
   const [visionInput, setVisionInput] = useState('')
@@ -103,25 +110,25 @@ export default function VisionPage() {
       <div className="max-w-5xl mx-auto space-y-10 pb-20">
         {/* Header */}
         <div>
-          <h1 className="text-2xl font-semibold text-white">Vision & Identity</h1>
-          <p className="text-sm text-slate-400 mt-1">Define who you are becoming and where you are going.</p>
+          <h1 className="title">Vision &amp; Identity</h1>
+          <p className="subheadline mt-1">Define who you are becoming and where you are going.</p>
         </div>
 
         {/* ── Section 1: Higher Self ── */}
         <section className="space-y-4">
           <div>
             <p className={label}>Higher Self</p>
-            <p className="text-white font-medium mt-1">Who are you becoming?</p>
+            <p className="headline mt-1">Who are you becoming?</p>
           </div>
 
           {identityStatements.length === 0 ? (
             <div className={`${card} space-y-3`}>
-              <p className="text-sm text-slate-400">Tap to add an identity statement:</p>
+              <p className="callout">Tap to add an identity statement:</p>
               <div className="flex flex-wrap gap-2">
                 {IDENTITY_SEEDS.map(s => (
-                  <motion.button key={s} whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }}
+                  <motion.button key={s} type="button" whileTap={{ scale: 0.97 }}
                     onClick={() => addIdentityStatement(s)}
-                    className="text-xs bg-purple-500/10 text-purple-300 border border-purple-500/20 rounded-full px-3 py-1.5 hover:bg-purple-500/20 transition"
+                    className="callout rounded-full border border-[color-mix(in_srgb,var(--ai)_35%,transparent)] bg-[rgba(191,90,242,0.1)] px-3 py-2 text-[var(--ai)] hover:bg-[rgba(191,90,242,0.18)] transition-colors"
                   >{s}</motion.button>
                 ))}
               </div>
@@ -133,11 +140,11 @@ export default function VisionPage() {
                   <motion.div key={st.id} variants={fadeUp} layout
                     className={`${card} flex items-center justify-between gap-3 group`}
                   >
-                    <p className="text-sm text-white flex-1">{st.text}</p>
+                    <p className="body flex-1">{st.text}</p>
                     <div className="flex items-center gap-2">
-                      <button onClick={() => cycleStatus(st.id, st.status)}
-                        className={`text-[10px] font-mono uppercase px-2 py-0.5 rounded-md ${STATUS_STYLE[st.status]}`}
-                      >{st.status}</button>
+                      <button type="button" onClick={() => cycleStatus(st.id, st.status)}
+                        className={`caption rounded-md px-2 py-1 capitalize ${STATUS_STYLE[st.status]}`}
+                      >{st.status.replace('_', ' ')}</button>
                       <button onClick={() => { deleteIdentity(st.id); toast('Removed') }}
                         className="text-slate-600 hover:text-rose-400 opacity-0 group-hover:opacity-100 transition text-sm">✕</button>
                     </div>
@@ -151,11 +158,11 @@ export default function VisionPage() {
             <input value={idInput} onChange={e => setIdInput(e.target.value)}
               onKeyDown={e => e.key === 'Enter' && addIdentityStatement(idInput)}
               placeholder="I am..."
-              className="flex-1 bg-[#0e1018] border border-[#1e2338] rounded-[12px] px-4 py-2.5 text-sm text-white placeholder:text-slate-600 outline-none focus:border-purple-500/50"
+              className="min-h-[44px] flex-1 rounded-xl border border-[var(--border)] bg-[var(--bg-secondary)] px-4 py-3 text-[17px] text-[var(--text-primary)] placeholder:text-[var(--text-tertiary)] outline-none transition-[border-color] duration-200 focus:border-[var(--accent)]"
             />
-            <motion.button whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}
+            <motion.button type="button" whileTap={{ scale: 0.97 }}
               onClick={() => addIdentityStatement(idInput)}
-              className="bg-purple-600 hover:bg-purple-500 text-white text-sm font-medium px-4 rounded-[12px] transition"
+              className="btn-primary shrink-0 !px-6 !py-3"
             >Add</motion.button>
           </div>
         </section>
@@ -169,14 +176,14 @@ export default function VisionPage() {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             {/* Where I'm Going */}
             <div className="space-y-3">
-              <p className="text-white font-medium text-sm">Where I&apos;m Going</p>
+              <p className="headline">Where I&apos;m going</p>
               {visions.length === 0 ? (
                 <div className={`${card} space-y-3`}>
-                  <p className="text-xs text-slate-500">Tap to add:</p>
+                  <p className="callout">Tap to add:</p>
                   <div className="flex flex-wrap gap-2">
                     {VISION_SEEDS.map(s => (
-                      <button key={s} onClick={() => { addVisionItem(s, 'vision'); toast.success('Added') }}
-                        className="text-xs bg-emerald-500/10 text-emerald-300 border border-emerald-500/20 rounded-full px-3 py-1.5 hover:bg-emerald-500/20 transition"
+                      <button key={s} type="button" onClick={() => { addVisionItem(s, 'vision'); toast.success('Added') }}
+                        className="callout rounded-full border border-[color-mix(in_srgb,var(--accent)_30%,transparent)] bg-[var(--accent-bg)] px-3 py-2 text-[var(--accent)] hover:bg-[rgba(10,132,255,0.2)] transition-colors"
                       >{s}</button>
                     ))}
                   </div>
@@ -185,7 +192,7 @@ export default function VisionPage() {
                 <motion.div variants={stagger} initial="hidden" animate="visible" className="space-y-2">
                   {visions.map(v => (
                     <motion.div key={v.id} variants={fadeUp} className={`${card} flex items-center justify-between group`}>
-                      <p className="text-sm text-white">{v.text}</p>
+                      <p className="body">{v.text}</p>
                       <button onClick={() => { deleteVisionItem(v.id); toast('Removed') }}
                         className="text-slate-600 hover:text-rose-400 opacity-0 group-hover:opacity-100 transition text-sm ml-2">✕</button>
                     </motion.div>
@@ -196,23 +203,23 @@ export default function VisionPage() {
                 <input value={visionInput} onChange={e => setVisionInput(e.target.value)}
                   onKeyDown={e => e.key === 'Enter' && addVision(visionInput, 'vision')}
                   placeholder="Add a vision..."
-                  className="flex-1 bg-[#0e1018] border border-[#1e2338] rounded-[12px] px-3 py-2 text-sm text-white placeholder:text-slate-600 outline-none focus:border-emerald-500/50"
+                  className="min-h-[44px] flex-1 rounded-xl border border-[var(--border)] bg-[var(--bg-secondary)] px-3 py-3 text-[17px] text-[var(--text-primary)] placeholder:text-[var(--text-tertiary)] outline-none transition-[border-color] duration-200 focus:border-[var(--accent)]"
                 />
-                <button onClick={() => addVision(visionInput, 'vision')}
-                  className="text-emerald-400 text-sm font-medium px-3 hover:text-emerald-300 transition">+</button>
+                <button type="button" onClick={() => addVision(visionInput, 'vision')}
+                  className="btn-text min-h-[44px] px-3 text-[22px] font-medium">+</button>
               </div>
             </div>
 
             {/* Anti-Vision */}
             <div className="space-y-3">
-              <p className="text-white font-medium text-sm">Anti-Vision</p>
+              <p className="headline">Anti-vision</p>
               {antiVisions.length === 0 ? (
                 <div className={`${card} border-rose-500/20 space-y-3`}>
-                  <p className="text-xs text-slate-500">Tap to add:</p>
+                  <p className="callout">Tap to add:</p>
                   <div className="flex flex-wrap gap-2">
                     {ANTI_VISION_SEEDS.map(s => (
-                      <button key={s} onClick={() => { addVisionItem(s, 'anti_vision'); toast.success('Added') }}
-                        className="text-xs bg-rose-500/10 text-rose-300 border border-rose-500/20 rounded-full px-3 py-1.5 hover:bg-rose-500/20 transition"
+                      <button key={s} type="button" onClick={() => { addVisionItem(s, 'anti_vision'); toast.success('Added') }}
+                        className="callout rounded-full border border-[color-mix(in_srgb,var(--negative)_35%,transparent)] bg-[rgba(255,69,58,0.1)] px-3 py-2 text-[var(--negative)] hover:bg-[rgba(255,69,58,0.18)] transition-colors"
                       >{s}</button>
                     ))}
                   </div>
@@ -233,10 +240,10 @@ export default function VisionPage() {
                 <input value={antiInput} onChange={e => setAntiInput(e.target.value)}
                   onKeyDown={e => e.key === 'Enter' && addVision(antiInput, 'anti_vision')}
                   placeholder="What you want to avoid..."
-                  className="flex-1 bg-[#0e1018] border border-rose-500/20 rounded-[12px] px-3 py-2 text-sm text-white placeholder:text-slate-600 outline-none focus:border-rose-500/40"
+                  className="min-h-[44px] flex-1 rounded-xl border border-[color-mix(in_srgb,var(--negative)_35%,transparent)] bg-[var(--bg-secondary)] px-3 py-3 text-[17px] text-[var(--text-primary)] placeholder:text-[var(--text-tertiary)] outline-none transition-[border-color] duration-200 focus:border-[var(--negative)]"
                 />
-                <button onClick={() => addVision(antiInput, 'anti_vision')}
-                  className="text-rose-400 text-sm font-medium px-3 hover:text-rose-300 transition">+</button>
+                <button type="button" onClick={() => addVision(antiInput, 'anti_vision')}
+                  className="min-h-[44px] px-3 text-[22px] font-medium text-[var(--negative)] hover:opacity-90">+</button>
               </div>
             </div>
           </div>
@@ -246,16 +253,16 @@ export default function VisionPage() {
         <section className="space-y-4">
           <div>
             <p className={label}>North Star Metrics</p>
-            <p className="text-white font-medium mt-1">The numbers that matter most</p>
+            <p className="headline mt-1">The numbers that matter most</p>
           </div>
 
           {northStars.length === 0 ? (
             <div className={`${card} space-y-3`}>
-              <p className="text-sm text-slate-400">Start tracking what matters:</p>
+              <p className="callout">Start tracking what matters:</p>
               <div className="flex flex-wrap gap-2">
-                {NORTH_STAR_SEEDS.map(s => (
-                  <button key={s.label} onClick={() => { addNorthStar(s); toast.success(`Added: ${s.label}`) }}
-                    className="text-xs bg-blue-500/10 text-blue-300 border border-blue-500/20 rounded-full px-3 py-1.5 hover:bg-blue-500/20 transition"
+                {northStarSuggestions.map(s => (
+                  <button key={s.label} type="button" onClick={() => { addNorthStar(s); toast.success(`Added: ${s.label}`) }}
+                    className="callout rounded-full border border-[color-mix(in_srgb,var(--accent)_30%,transparent)] bg-[var(--accent-bg)] px-3 py-2 text-[var(--accent)] hover:bg-[rgba(10,132,255,0.2)] transition-colors"
                   >{s.label} ({s.unit}{s.current} → {s.unit}{s.target})</button>
                 ))}
               </div>
@@ -267,8 +274,8 @@ export default function VisionPage() {
                 return (
                   <motion.div key={ns.id} variants={fadeUp} className={`${card} space-y-3`}>
                     <div className="flex items-center justify-between">
-                      <p className="text-sm text-white font-medium">{ns.label}</p>
-                      <span className={`${label} text-slate-400`}>{ns.unit}</span>
+                      <p className="headline">{ns.label}</p>
+                      <span className="caption text-[var(--text-tertiary)]">{ns.unit}</span>
                     </div>
                     <div className="flex items-baseline gap-1">
                       {editingNs === ns.id ? (
@@ -276,22 +283,22 @@ export default function VisionPage() {
                           onChange={e => setEditNsVal(e.target.value)}
                           onBlur={() => saveNsEdit(ns.id)}
                           onKeyDown={e => e.key === 'Enter' && saveNsEdit(ns.id)}
-                          className="w-20 bg-transparent border-b border-blue-500 text-white text-lg font-semibold outline-none"
+                          className="data w-24 bg-transparent border-b border-[var(--accent)] text-[var(--text-primary)] text-xl font-semibold outline-none"
                         />
                       ) : (
-                        <span className="text-lg font-semibold text-white cursor-pointer hover:text-blue-400 transition"
+                        <span className="data cursor-pointer text-xl font-semibold text-[var(--text-primary)] hover:text-[var(--accent)] transition-colors"
                           onClick={() => { setEditingNs(ns.id); setEditNsVal(String(ns.current)) }}
                         >{ns.unit === '$' ? `$${ns.current.toLocaleString()}` : ns.current}{ns.unit === '%' ? '%' : ''}</span>
                       )}
-                      <span className="text-sm text-slate-500">/ {ns.unit === '$' ? `$${ns.target.toLocaleString()}` : ns.target}{ns.unit === '%' ? '%' : ''}</span>
+                      <span className="body text-[var(--text-secondary)]">/ {ns.unit === '$' ? `$${ns.target.toLocaleString()}` : ns.target}{ns.unit === '%' ? '%' : ''}</span>
                     </div>
-                    <div className="h-1.5 bg-slate-800 rounded-full overflow-hidden">
+                    <div className="progress-bar">
                       <motion.div initial={{ width: 0 }} animate={{ width: `${pct}%` }}
-                        transition={{ duration: 0.6, ease: 'easeOut' }}
-                        className="h-full rounded-full bg-gradient-to-r from-blue-600 to-blue-400"
+                        transition={{ duration: 0.5, ease: [0.25, 0.1, 0.25, 1] as const }}
+                        className="progress-fill"
                       />
                     </div>
-                    <p className="text-[10px] text-slate-500 text-right">{pct}%</p>
+                    <p className="caption text-right text-[var(--text-tertiary)]">{pct}%</p>
                   </motion.div>
                 )
               })}
@@ -300,20 +307,20 @@ export default function VisionPage() {
 
           {/* Add North Star */}
           <div className={`${card} space-y-3`}>
-            <p className="text-xs text-slate-400 font-medium">Add North Star</p>
+            <p className="footnote font-medium text-[var(--text-secondary)]">Add North Star</p>
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
               <input value={nsForm.label} onChange={e => setNsForm(p => ({ ...p, label: e.target.value }))}
-                placeholder="Label" className="bg-slate-900/50 border border-[#1e2338] rounded-lg px-3 py-2 text-sm text-white placeholder:text-slate-600 outline-none" />
+                placeholder="Label" className="min-h-[44px] rounded-xl border border-[var(--border)] bg-[var(--bg-secondary)] px-3 py-2 text-[17px] text-[var(--text-primary)] placeholder:text-[var(--text-tertiary)] outline-none focus:border-[var(--accent)]" />
               <input value={nsForm.current} onChange={e => setNsForm(p => ({ ...p, current: e.target.value }))}
-                placeholder="Current" type="number" className="bg-slate-900/50 border border-[#1e2338] rounded-lg px-3 py-2 text-sm text-white placeholder:text-slate-600 outline-none" />
+                placeholder="Current" type="number" className="min-h-[44px] rounded-xl border border-[var(--border)] bg-[var(--bg-secondary)] px-3 py-2 text-[17px] text-[var(--text-primary)] placeholder:text-[var(--text-tertiary)] outline-none focus:border-[var(--accent)]" />
               <input value={nsForm.target} onChange={e => setNsForm(p => ({ ...p, target: e.target.value }))}
-                placeholder="Target" type="number" className="bg-slate-900/50 border border-[#1e2338] rounded-lg px-3 py-2 text-sm text-white placeholder:text-slate-600 outline-none" />
+                placeholder="Target" type="number" className="min-h-[44px] rounded-xl border border-[var(--border)] bg-[var(--bg-secondary)] px-3 py-2 text-[17px] text-[var(--text-primary)] placeholder:text-[var(--text-tertiary)] outline-none focus:border-[var(--accent)]" />
               <div className="flex gap-2">
                 <input value={nsForm.unit} onChange={e => setNsForm(p => ({ ...p, unit: e.target.value }))}
-                  placeholder="Unit ($, %)" className="flex-1 bg-slate-900/50 border border-[#1e2338] rounded-lg px-3 py-2 text-sm text-white placeholder:text-slate-600 outline-none" />
-                <motion.button whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}
+                  placeholder="Unit ($, %)" className="min-h-[44px] flex-1 rounded-xl border border-[var(--border)] bg-[var(--bg-secondary)] px-3 py-2 text-[17px] text-[var(--text-primary)] placeholder:text-[var(--text-tertiary)] outline-none focus:border-[var(--accent)]" />
+                <motion.button type="button" whileTap={{ scale: 0.97 }}
                   onClick={submitNorthStar}
-                  className="bg-blue-600 hover:bg-blue-500 text-white text-sm font-medium px-3 rounded-lg transition">+</motion.button>
+                  className="btn-primary shrink-0 !px-5 !py-3">+</motion.button>
               </div>
             </div>
           </div>

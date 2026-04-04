@@ -78,7 +78,7 @@ export default function ReflectionsPage() {
         {!hasCurrentWeek ? (
           <motion.div
             className="rounded-[16px] p-6 mb-8"
-            style={{ background: '#0e1018', border: '1px solid var(--border)' }}
+            style={{ background: 'var(--bg-elevated)', border: '1px solid var(--border)' }}
             initial={{ opacity: 0, y: 12 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.1 }}
@@ -114,7 +114,7 @@ export default function ReflectionsPage() {
                     rows={3}
                     className="w-full rounded-[14px] px-4 py-3 text-[13px] text-[var(--text)] placeholder:text-[var(--text-dim)] resize-none focus:outline-none transition-colors"
                     style={{
-                      background: '#0e1018',
+                      background: 'var(--bg-elevated)',
                       border: `1px solid ${prompt.highlight ? 'rgba(245,158,11,0.25)' : 'var(--border)'}`,
                     }}
                   />
@@ -135,7 +135,7 @@ export default function ReflectionsPage() {
         ) : (
           <motion.div
             className="rounded-[16px] p-6 mb-8 text-center"
-            style={{ background: '#0e1018', border: '1px solid var(--border)' }}
+            style={{ background: 'var(--bg-elevated)', border: '1px solid var(--border)' }}
             initial={{ opacity: 0, y: 12 }}
             animate={{ opacity: 1, y: 0 }}
           >
@@ -153,7 +153,7 @@ export default function ReflectionsPage() {
                 <motion.div
                   key={r.id}
                   className="rounded-[16px] overflow-hidden"
-                  style={{ background: '#0e1018', border: '1px solid var(--border)' }}
+                  style={{ background: 'var(--bg-elevated)', border: '1px solid var(--border)' }}
                   initial={{ opacity: 0, y: 8 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: 0.05 * i }}

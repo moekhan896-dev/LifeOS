@@ -45,13 +45,13 @@ export default function KnowledgePage() {
     <PageTransition>
       <div className="space-y-4 pb-24">
         <div>
-          <h1 className="text-2xl font-bold text-[var(--text)]">Knowledge Vault</h1>
-          <p className="text-sm text-[var(--text-dim)] mt-1">Capture, organize, apply.</p>
+          <h1 className="title">Knowledge Vault</h1>
+          <p className="subheadline mt-1">Capture, organize, apply.</p>
         </div>
 
         {/* Quick Add */}
         <motion.div
-          className="rounded-[16px] border border-[#1e2338] bg-[#0e1018] p-4"
+          className="card rounded-2xl p-4"
           initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}
         >
           {!showForm ? (
@@ -95,7 +95,7 @@ export default function KnowledgePage() {
 
         {/* Entries Grid */}
         {filtered.length === 0 ? (
-          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="rounded-[16px] border border-[#1e2338] bg-[#0e1018] p-8 text-center">
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="card rounded-2xl p-8 text-center">
             <p className="text-sm text-[var(--text-dim)]">Your second brain starts here. Capture something you learned today.</p>
           </motion.div>
         ) : (
@@ -111,7 +111,7 @@ export default function KnowledgePage() {
                     animate={{ opacity: 1, scale: 1 }}
                     exit={{ opacity: 0, scale: 0.97 }}
                     onClick={() => setExpanded(isExpanded ? null : entry.id)}
-                    className="group relative rounded-[16px] border border-[#1e2338] bg-[#0e1018] p-4 cursor-pointer hover:border-[var(--accent)]/40 transition-colors"
+                    className="group relative card cursor-pointer rounded-2xl p-4 transition-[background,border-color] hover:border-[var(--border-hover)] hover:bg-[var(--bg-secondary)]"
                   >
                     {/* Delete */}
                     <button
@@ -136,7 +136,7 @@ export default function KnowledgePage() {
                     )}
 
                     {entry.actionItem && (
-                      <span className="inline-block mt-2 text-[11px] font-medium bg-emerald-500/15 text-emerald-400 px-2 py-0.5 rounded-full">
+                      <span className="badge badge-positive mt-2 inline-block">
                         {entry.actionItem}
                       </span>
                     )}

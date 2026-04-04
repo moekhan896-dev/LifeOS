@@ -1,24 +1,9 @@
-// Prayer times location - Westland, MI
-export const LOCATION = { lat: 42.3243, lng: -83.4002, city: 'Westland', state: 'MI' }
-
-// XP values
-export const XP_VALUES = { crit: 50, high: 30, med: 20, low: 10 } as const
-export const XP_PER_LEVEL = 500
+// XP values (PRD §10.1 / GAP 11)
+export const XP_VALUES = { crit: 25, high: 15, med: 10, low: 5 } as const
+export const XP_PER_LEVEL = 100
 
 // Daily score weights
 export const SCORE_WEIGHTS = { prayer: 0.35, health: 0.25, productivity: 0.40 }
-
-export const FIXED_COSTS = [
-  { name: 'C8 Corvette', amount: 1250 },
-  { name: 'Mercedes-AMG GLE', amount: 575 },
-  { name: 'Tesla Lease', amount: 400 },
-  { name: 'Insurance (avg/mo)', amount: 920 },
-  { name: 'Food', amount: 2000 },
-  { name: 'Subscriptions', amount: 500 },
-  { name: 'Phone', amount: 100 },
-  { name: 'Vaping', amount: 50 },
-  { name: 'Energy Drinks', amount: 150 },
-]
 
 export const TAGS = ['SEO', 'OUTBOUND', 'REVENUE', 'CLIENT', 'EXIT', 'CRITICAL', 'ADS', 'CONTENT', 'MONETIZE', 'SYNERGY', 'BRAND', 'OPS', 'HEALTH'] as const
 
@@ -41,14 +26,6 @@ export const DRIVER_STATUS_COLORS: Record<string, string> = {
   'NEVER TRIED': 'bg-amber/20 text-amber',
 }
 
-export const AUDIENCE_ASSETS = [
-  { name: 'Quattro Labs IG', followers: 150000, platform: 'Instagram', status: 'dormant', daysSincePost: 365 },
-  { name: 'Plumbing IG', followers: 30000, platform: 'Instagram', status: 'passive', daysSincePost: 14 },
-  { name: 'Personal IG', followers: 30000, platform: 'Instagram', status: 'dormant', daysSincePost: 540 },
-  { name: 'Madison Clark', followers: 16000, platform: 'Instagram', status: 'active', daysSincePost: 0 },
-  { name: 'TikTok', followers: 1500, platform: 'TikTok', status: 'dormant', daysSincePost: 30 },
-]
-
 // ── Reference arrays for forms/UI ──
 
 export const BUSINESS_TYPES = [
@@ -70,6 +47,16 @@ export const BUSINESS_STATUSES = [
   { value: 'idea', label: 'Idea' },
 ]
 
-export const COLOR_SWATCHES = ['#10b981', '#06b6d4', '#f59e0b', '#ef4444', '#8b5cf6', '#3b82f6', '#ec4899', '#eab308']
+/** Business / entity color picks — Apple system palette (green = optional positive accent, not primary UI) */
+export const COLOR_SWATCHES = [
+  '#0A84FF',
+  '#30D158',
+  '#64D2FF',
+  '#FF9F0A',
+  '#FF453A',
+  '#BF5AF2',
+  '#FF375F',
+  '#FFD60A',
+]
 
 export const MEETING_FREQUENCIES = ['Weekly', 'Biweekly', 'Monthly', 'As needed', 'None']

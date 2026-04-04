@@ -6,16 +6,16 @@ import { toast } from 'sonner'
 import { useStore, type ProjectStatus } from '@/stores/store'
 import PageTransition from '@/components/PageTransition'
 
-const card = 'bg-[#0e1018] border border-[#1e2338] rounded-[16px] p-5'
-const label = 'text-[10px] font-mono uppercase tracking-widest text-slate-500'
+const card = 'bg-[var(--bg-elevated)] border border-[var(--border)] rounded-2xl p-5'
+const label = 'label text-[var(--text-secondary)]'
 const stagger = { hidden: {}, visible: { transition: { staggerChildren: 0.05 } } }
 const fadeUp = { hidden: { opacity: 0, y: 8 }, visible: { opacity: 1, y: 0 } }
 
 const STATUS_BADGE: Record<ProjectStatus, string> = {
-  not_started: 'bg-slate-500/15 text-slate-400',
-  in_progress: 'bg-blue-500/15 text-blue-400',
-  blocked: 'bg-rose-500/15 text-rose-400',
-  complete: 'bg-emerald-500/15 text-emerald-400',
+  not_started: 'bg-[rgba(255,255,255,0.06)] text-[var(--text-tertiary)]',
+  in_progress: 'bg-[var(--accent-bg)] text-[var(--accent)]',
+  blocked: 'bg-[rgba(255,69,58,0.12)] text-[var(--negative)]',
+  complete: 'bg-[rgba(48,209,88,0.15)] text-[var(--positive)]',
 }
 
 function ProgressRing({ progress, size = 48 }: { progress: number; size?: number }) {
@@ -24,8 +24,8 @@ function ProgressRing({ progress, size = 48 }: { progress: number; size?: number
   const offset = circ - (progress / 100) * circ
   return (
     <svg width={size} height={size} className="transform -rotate-90">
-      <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="#1e2338" strokeWidth={3} />
-      <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="#8b5cf6" strokeWidth={3}
+      <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="var(--bg-tertiary)" strokeWidth={3} />
+      <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="var(--accent)" strokeWidth={3}
         strokeDasharray={circ} strokeDashoffset={offset} strokeLinecap="round"
         className="transition-all duration-500" />
       <text x={size / 2} y={size / 2} textAnchor="middle" dy="0.35em"
@@ -98,16 +98,15 @@ export default function ProjectsPage() {
 
     return (
       <motion.div key={p.id} variants={fadeUp} layout
-        whileHover={{ scale: 1.005 }}
-        className={`${card} space-y-3 ${isActive ? 'border-l-[3px]' : ''}`}
+        className={`${card} space-y-3 transition-[background,border-color] duration-200 hover:bg-[var(--bg-secondary)] ${isActive ? 'border-l-[3px]' : ''}`}
         style={isActive && biz ? { borderLeftColor: biz.color } : undefined}
       >
         <div className="flex items-start justify-between gap-3">
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 flex-wrap">
               <h3 className={`font-semibold text-white ${isActive ? 'text-[18px]' : 'text-sm'}`}>{p.name}</h3>
-              <span className={`text-[10px] font-mono uppercase px-2 py-0.5 rounded-md ${STATUS_BADGE[p.status]}`}>{p.status.replace('_', ' ')}</span>
-              <span className="text-[10px] font-mono bg-purple-500/15 text-purple-400 rounded-md px-2 py-0.5">
+              <span className={`caption rounded-md px-2 py-0.5 capitalize ${STATUS_BADGE[p.status]}`}>{p.status.replace('_', ' ')}</span>
+              <span className="caption rounded-md bg-[rgba(191,90,242,0.12)] px-2 py-0.5 text-[var(--ai)] data-number">
                 ICE {p.impact}×{p.confidence}×{p.ease} = {ice(p)}
               </span>
             </div>
@@ -129,20 +128,20 @@ export default function ProjectsPage() {
         {/* Actions */}
         <div className="flex items-center gap-2 pt-1">
           {p.status === 'not_started' && (
-            <button onClick={() => startProject(p.id)}
-              className="text-xs bg-blue-600 hover:bg-blue-500 text-white px-3 py-1 rounded-lg transition">Start</button>
+            <button type="button" onClick={() => startProject(p.id)}
+              className="rounded-lg bg-[var(--accent)] px-3 py-2 text-[13px] font-semibold text-white transition hover:bg-[var(--accent-hover)] min-h-[44px]">Start</button>
           )}
           {p.status === 'in_progress' && (
             <>
-              <button onClick={() => updateProject(p.id, { status: 'complete', progress: 100 })}
-                className="text-xs bg-emerald-600 hover:bg-emerald-500 text-white px-3 py-1 rounded-lg transition">Complete</button>
-              <button onClick={() => updateProject(p.id, { status: 'not_started' })}
-                className="text-xs bg-slate-700 hover:bg-slate-600 text-white px-3 py-1 rounded-lg transition">Pause</button>
+              <button type="button" onClick={() => updateProject(p.id, { status: 'complete', progress: 100 })}
+                className="rounded-lg bg-[var(--positive)] px-3 py-2 text-[13px] font-semibold text-white transition hover:opacity-90 min-h-[44px]">Complete</button>
+              <button type="button" onClick={() => updateProject(p.id, { status: 'not_started' })}
+                className="btn-secondary !min-h-[44px] !px-4 !py-2 !text-[13px]">Pause</button>
             </>
           )}
           {p.status === 'blocked' && (
-            <button onClick={() => updateProject(p.id, { status: 'in_progress' })}
-              className="text-xs bg-blue-600 hover:bg-blue-500 text-white px-3 py-1 rounded-lg transition">Unblock</button>
+            <button type="button" onClick={() => updateProject(p.id, { status: 'in_progress' })}
+              className="rounded-lg bg-[var(--accent)] px-3 py-2 text-[13px] font-semibold text-white transition hover:bg-[var(--accent-hover)] min-h-[44px]">Unblock</button>
           )}
           <button onClick={() => setExpanded(isExpanded ? null : p.id)}
             className="text-xs text-slate-400 hover:text-white transition">{isExpanded ? 'Collapse' : 'Expand'}</button>
@@ -161,7 +160,7 @@ export default function ProjectsPage() {
                   <p className={label}>Linked Tasks</p>
                   {linkedTasks.map(t => (
                     <div key={t.id} className="flex items-center gap-2 text-sm">
-                      <span className={`w-1.5 h-1.5 rounded-full ${t.done ? 'bg-emerald-500' : 'bg-slate-600'}`} />
+                      <span className={`w-1.5 h-1.5 rounded-full ${t.done ? 'bg-[var(--positive)]' : 'bg-[var(--bg-tertiary)]'}`} />
                       <span className={t.done ? 'text-slate-500 line-through' : 'text-slate-300'}>{t.text}</span>
                     </div>
                   ))}
@@ -176,7 +175,7 @@ export default function ProjectsPage() {
                   <p className={label}>Progress</p>
                   <input type="range" min={0} max={100} value={p.progress}
                     onChange={e => updateProject(p.id, { progress: Number(e.target.value) })}
-                    className="w-full accent-purple-500" />
+                    className="w-full accent-[var(--accent)]" />
                 </div>
               )}
 
@@ -188,7 +187,7 @@ export default function ProjectsPage() {
                     <input type="range" min={1} max={10}
                       value={p[k]}
                       onChange={e => updateProject(p.id, { [k]: Number(e.target.value) })}
-                      className="w-full accent-purple-500" />
+                      className="w-full accent-[var(--accent)]" />
                     <p className="text-xs text-center text-slate-400">{p[k]}</p>
                   </div>
                 ))}
@@ -206,16 +205,16 @@ export default function ProjectsPage() {
         {/* Header */}
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-semibold text-white">Projects</h1>
-            <p className="text-sm text-slate-400 mt-1">Maximum 3 active at a time.</p>
+            <h1 className="title">Projects</h1>
+            <p className="subheadline mt-1">Maximum 3 active at a time.</p>
           </div>
           <div className="flex items-center gap-3">
-            <span className={`text-xs font-mono px-2 py-1 rounded-lg ${active.length >= 3 ? 'bg-amber-500/15 text-amber-400' : 'bg-blue-500/15 text-blue-400'}`}>
+            <span className={`caption rounded-lg px-2 py-1 ${active.length >= 3 ? 'bg-[rgba(255,159,10,0.12)] text-[var(--warning)]' : 'bg-[var(--accent-bg)] text-[var(--accent)]'}`}>
               {active.length}/3 active
             </span>
-            <motion.button whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}
+            <motion.button type="button" whileTap={{ scale: 0.97 }}
               onClick={() => setShowForm(!showForm)}
-              className="bg-purple-600 hover:bg-purple-500 text-white text-sm font-medium px-4 py-2 rounded-[12px] transition"
+              className="btn-primary !px-5 !py-3 !text-[15px]"
             >{showForm ? 'Cancel' : '+ New Project'}</motion.button>
           </div>
         </div>
@@ -260,15 +259,15 @@ export default function ProjectsPage() {
                       <p className={label}>{k}</p>
                       <input type="range" min={1} max={10} value={form[k]}
                         onChange={e => setForm(p => ({ ...p, [k]: Number(e.target.value) }))}
-                        className="w-full accent-purple-500" />
+                        className="w-full accent-[var(--accent)]" />
                       <p className="text-xs text-center text-slate-400">{form[k]}</p>
                     </div>
                   ))}
                 </div>
-                <p className="text-xs text-purple-400 font-mono">ICE Score: {form.impact} × {form.confidence} × {form.ease} = {form.impact * form.confidence * form.ease}</p>
-                <motion.button whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }}
+                <p className="footnote data-number text-[var(--ai)]">ICE score: {form.impact} × {form.confidence} × {form.ease} = {form.impact * form.confidence * form.ease}</p>
+                <motion.button type="button" whileTap={{ scale: 0.97 }}
                   onClick={submitProject}
-                  className="bg-purple-600 hover:bg-purple-500 text-white text-sm font-medium px-5 py-2 rounded-[12px] transition">Add to Backlog</motion.button>
+                  className="btn-primary">Add to backlog</motion.button>
               </div>
             </motion.div>
           )}

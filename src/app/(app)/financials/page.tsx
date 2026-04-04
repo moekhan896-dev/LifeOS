@@ -2,20 +2,46 @@
 
 import { useMemo } from 'react'
 import { useStore, getAgencyTotals, getClientNet } from '@/stores/store'
-import { FIXED_COSTS } from '@/lib/constants'
 import PageTransition from '@/components/PageTransition'
 import { StaggerContainer, StaggerItem } from '@/components/Stagger'
-import { motion, AnimatePresence } from 'framer-motion'
-import { toast } from 'sonner'
+import { motion } from 'framer-motion'
 import { BarChart, Bar, AreaChart, Area, ResponsiveContainer, XAxis, YAxis, Tooltip, CartesianGrid, Legend } from 'recharts'
 
 function fmt(n: number) {
   return '$' + n.toLocaleString('en-US', { maximumFractionDigits: 0 })
 }
 
+/** Typical federal estimated tax due dates (illustrative). */
+function nextFederalEstimatedDeadlines(from: Date, count = 4): { label: string; date: Date }[] {
+  const out: { label: string; date: Date }[] = []
+  const y0 = from.getFullYear()
+  for (let i = 0; i < 5; i++) {
+    const yy = y0 + i
+    const batch = [
+      { label: 'Q1 — Apr 15', d: new Date(yy, 3, 15, 12, 0, 0) },
+      { label: 'Q2 — Jun 15', d: new Date(yy, 5, 15, 12, 0, 0) },
+      { label: 'Q3 — Sep 15', d: new Date(yy, 8, 15, 12, 0, 0) },
+      { label: 'Q4 — Jan 15', d: new Date(yy + 1, 0, 15, 12, 0, 0) },
+    ]
+    for (const b of batch) {
+      if (b.d >= from) out.push({ label: b.label, date: b.d })
+    }
+  }
+  return out.sort((a, b) => a.date.getTime() - b.date.getTime()).slice(0, count)
+}
+
 export default function FinancialsPage() {
-  const { businesses, clients, expenseEntries, streaks } = useStore()
-  const savings = 35000
+  const {
+    businesses,
+    clients,
+    expenseEntries,
+    streaks,
+    savingsRange,
+    profitFirstPct,
+    setProfitFirstPct,
+    estimatedIncomeTaxRatePct,
+  } = useStore()
+  const savingsLabel = savingsRange || '—'
   const noGambleStreak = streaks.find(s => s.habit === 'no_gamble')
 
   const agencyTotals = getAgencyTotals(clients)
@@ -35,7 +61,7 @@ export default function FinancialsPage() {
   }, [businesses, clients])
 
   const TOTAL_INCOME = incomeStreams.reduce((s, i) => s + i.net, 0)
-  const TOTAL_COSTS = FIXED_COSTS.reduce((s, c) => s + c.amount, 0)
+  const TOTAL_COSTS = expenseEntries.filter((e) => e.recurring).reduce((s, e) => s + e.amount, 0)
   const NET_TAKE_HOME = TOTAL_INCOME - TOTAL_COSTS
 
   // Build scenarios from top revenue sources
@@ -50,37 +76,57 @@ export default function FinancialsPage() {
 
   // P&L chart placeholder (static shape scaled to real totals)
   const plData = useMemo(() => {
-    const months = ['Oct', 'Nov', 'Dec', 'Jan', 'Feb', 'Mar']
-    return months.map((m, i) => ({
-      m,
-      income: Math.round(TOTAL_INCOME * (0.85 + Math.sin(i) * 0.1 + i * 0.02)),
-      expenses: Math.round(TOTAL_COSTS * (0.95 + Math.cos(i) * 0.05)),
-    }))
+    return [
+      {
+        m: 'Now',
+        income: Math.round(TOTAL_INCOME),
+        expenses: Math.round(TOTAL_COSTS),
+      },
+    ]
   }, [TOTAL_INCOME, TOTAL_COSTS])
   const plTrend = plData.map((d) => ({ ...d, profit: d.income - d.expenses }))
+
+  const pf = profitFirstPct
+  const taxSnapshot = useMemo(() => {
+    const now = new Date()
+    const next = nextFederalEstimatedDeadlines(now, 1)[0]
+    const ms = next ? next.date.getTime() - now.getTime() : 0
+    const days = Math.max(0, Math.ceil(ms / 86400000))
+    const start = new Date(now.getFullYear(), 0, 1)
+    const dayFrac = (now.getTime() - start.getTime()) / (365.25 * 24 * 3600 * 1000)
+    const ytd = TOTAL_INCOME * (estimatedIncomeTaxRatePct / 100) * Math.min(1, Math.max(0, dayFrac))
+    return { next, days, ytd }
+  }, [TOTAL_INCOME, estimatedIncomeTaxRatePct])
+
+  const pfBuckets: { key: keyof typeof pf; label: string; color: string }[] = [
+    { key: 'ownersPay', label: "Owner's pay", color: 'var(--positive)' },
+    { key: 'tax', label: 'Tax', color: '#FF9F0A' },
+    { key: 'operating', label: 'Operating', color: '#0A84FF' },
+    { key: 'profit', label: 'Profit', color: '#BF5AF2' },
+  ]
 
   return (
     <PageTransition>
       <div className="space-y-4 pb-24">
-        <h1 className="text-2xl font-bold text-[var(--text)]">Financials</h1>
+        <h1 className="page-title">Financials</h1>
 
         <StaggerContainer className="space-y-4">
           {/* Income */}
           <StaggerItem>
-            <div className="card p-4">
-              <span className="label text-[10px] tracking-widest text-[var(--accent)]">MONTHLY INCOME</span>
+            <div className="card px-5 py-4">
+              <span className="label text-[var(--accent)]">Monthly income</span>
               <div className="mt-3 space-y-3">
                 {incomeStreams.map((i) => (
                   <div key={i.label} className="flex items-center justify-between">
                     <div>
-                      <p className="text-sm font-medium text-[var(--text)]">{i.label}</p>
-                      <p className="text-xs text-[var(--text-dim)]">{i.detail}</p>
+                      <p className="text-[17px] font-medium text-[var(--text)]">{i.label}</p>
+                      <p className="text-[15px] text-[rgba(255,255,255,0.55)]">{i.detail}</p>
                     </div>
                     <span className="data text-lg font-semibold text-[var(--accent)]">{fmt(i.net)}</span>
                   </div>
                 ))}
                 <div className="border-t border-[var(--border)] pt-3 flex items-center justify-between">
-                  <span className="label text-sm font-bold text-[var(--text)]">Total Income</span>
+                  <span className="text-[15px] font-semibold text-[var(--text)]">Total income</span>
                   <span className="data text-xl font-bold text-[var(--accent)]">{fmt(TOTAL_INCOME)}</span>
                 </div>
               </div>
@@ -89,17 +135,22 @@ export default function FinancialsPage() {
 
           {/* Fixed Costs */}
           <StaggerItem>
-            <div className="card p-4">
-              <span className="label text-[10px] tracking-widest text-[var(--rose)]">FIXED COSTS</span>
+            <div className="card px-5 py-4">
+              <span className="label text-[#FF453A]">Fixed costs</span>
               <div className="mt-3 space-y-2">
-                {FIXED_COSTS.map((c) => (
-                  <div key={c.name} className="flex items-center justify-between text-sm">
-                    <span className="text-[var(--text-mid)]">{c.name}</span>
+                {expenseEntries.length === 0 && (
+                  <p className="text-[17px] text-[rgba(255,255,255,0.55)]">
+                    No expenses logged yet. Add them from onboarding follow-up or manual entry.
+                  </p>
+                )}
+                {expenseEntries.map((c) => (
+                  <div key={c.id} className="flex items-center justify-between text-[17px]">
+                    <span className="text-[rgba(255,255,255,0.55)]">{c.category}</span>
                     <span className="data text-[var(--rose)]">{fmt(c.amount)}</span>
                   </div>
                 ))}
                 <div className="border-t border-[var(--border)] pt-3 flex items-center justify-between">
-                  <span className="label text-sm font-bold text-[var(--text)]">Total Expenses</span>
+                  <span className="text-[15px] font-semibold text-[var(--text)]">Total expenses</span>
                   <span className="data text-lg font-bold text-[var(--rose)]">{fmt(TOTAL_COSTS)}</span>
                 </div>
               </div>
@@ -109,26 +160,28 @@ export default function FinancialsPage() {
           {/* P&L Summary */}
           <StaggerItem>
             <motion.div
-              whileHover={{ y: -1, boxShadow: '0 4px 12px rgba(0,0,0,0.08)' }}
-              className="card border-[var(--accent)]/30 bg-[var(--accent)]/5 p-4"
+              whileHover={{ filter: 'brightness(1.05)' }}
+              className="card border-[var(--accent)]/25 bg-[var(--accent-bg)] px-5 py-4"
             >
-              <span className="label text-[10px] tracking-widest text-[var(--accent)]">NET TAKE-HOME</span>
+              <span className="label text-[var(--accent)]">Net take-home</span>
               <div className="mt-2 flex items-baseline gap-3">
                 <span className="data text-3xl font-bold text-[var(--accent)]">{fmt(NET_TAKE_HOME)}</span>
-                <span className="text-sm text-[var(--text-dim)]">/ month</span>
+                <span className="text-[17px] text-[rgba(255,255,255,0.55)]">/ month</span>
               </div>
-              <div className="mt-3 grid grid-cols-3 gap-3 text-center text-xs">
+              <div className="mt-3 grid grid-cols-3 gap-3 text-center">
                 <div>
-                  <p className="text-[var(--text-dim)]">Income</p>
+                  <p className="label">Income</p>
                   <p className="data font-semibold text-[var(--text)]">{fmt(TOTAL_INCOME)}</p>
                 </div>
                 <div>
-                  <p className="text-[var(--text-dim)]">Expenses</p>
+                  <p className="label">Expenses</p>
                   <p className="data font-semibold text-[var(--rose)]">{fmt(TOTAL_COSTS)}</p>
                 </div>
                 <div>
-                  <p className="text-[var(--text-dim)]">Margin</p>
-                  <p className="data font-semibold text-[var(--accent)]">{((NET_TAKE_HOME / TOTAL_INCOME) * 100).toFixed(0)}%</p>
+                  <p className="label">Margin</p>
+                  <p className="data font-semibold text-[var(--accent)]">
+                    {TOTAL_INCOME > 0 ? ((NET_TAKE_HOME / TOTAL_INCOME) * 100).toFixed(0) : '—'}%
+                  </p>
                 </div>
               </div>
             </motion.div>
@@ -136,8 +189,8 @@ export default function FinancialsPage() {
 
           {/* Income vs Expenses BarChart */}
           <StaggerItem>
-            <motion.div whileHover={{ y: -2 }} className="card p-4">
-              <span className="label text-[10px] tracking-widest text-[var(--text-dim)]">INCOME VS EXPENSES</span>
+            <motion.div whileHover={{ filter: 'brightness(1.05)' }} className="card px-5 py-4">
+              <span className="label">Income vs expenses</span>
               <div className="mt-3">
                 <ResponsiveContainer width="100%" height={220}>
                   <BarChart data={plData}>
@@ -146,8 +199,8 @@ export default function FinancialsPage() {
                     <YAxis tick={{ fill: 'var(--text-dim)', fontSize: 10 }} />
                     <Tooltip contentStyle={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 12, fontSize: 12 }} />
                     <Legend wrapperStyle={{ fontSize: 10 }} />
-                    <Bar dataKey="income" fill="#10b981" radius={[4, 4, 0, 0]} />
-                    <Bar dataKey="expenses" fill="#f43f5e" radius={[4, 4, 0, 0]} />
+                    <Bar dataKey="income" fill="var(--positive)" radius={[4, 4, 0, 0]} />
+                    <Bar dataKey="expenses" fill="#FF453A" radius={[4, 4, 0, 0]} />
                   </BarChart>
                 </ResponsiveContainer>
               </div>
@@ -156,22 +209,22 @@ export default function FinancialsPage() {
 
           {/* P&L Trend */}
           <StaggerItem>
-            <motion.div whileHover={{ y: -2 }} className="card p-4">
-              <span className="label text-[10px] tracking-widest text-[var(--text-dim)]">P&L TREND</span>
+            <motion.div whileHover={{ filter: 'brightness(1.05)' }} className="card px-5 py-4">
+              <span className="label">P&amp;L trend</span>
               <div className="mt-3">
                 <ResponsiveContainer width="100%" height={180}>
                   <AreaChart data={plTrend}>
                     <defs>
                       <linearGradient id="profitGrad" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="#10b981" stopOpacity={0.3} />
-                        <stop offset="95%" stopColor="#10b981" stopOpacity={0} />
+                        <stop offset="5%" stopColor="var(--positive)" stopOpacity={0.3} />
+                        <stop offset="95%" stopColor="var(--positive)" stopOpacity={0} />
                       </linearGradient>
                     </defs>
                     <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
                     <XAxis dataKey="m" tick={{ fill: 'var(--text-dim)', fontSize: 10 }} />
                     <YAxis tick={{ fill: 'var(--text-dim)', fontSize: 10 }} />
                     <Tooltip contentStyle={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 12, fontSize: 12 }} />
-                    <Area type="monotone" dataKey="profit" stroke="#10b981" fill="url(#profitGrad)" strokeWidth={2} />
+                    <Area type="monotone" dataKey="profit" stroke="var(--positive)" fill="url(#profitGrad)" strokeWidth={2} />
                   </AreaChart>
                 </ResponsiveContainer>
               </div>
@@ -180,22 +233,22 @@ export default function FinancialsPage() {
 
           {/* Emergency Scenario Planner */}
           <StaggerItem>
-            <div className="card p-4">
-              <span className="label text-[10px] tracking-widest text-[var(--amber)]">EMERGENCY SCENARIO PLANNER</span>
+            <div className="card px-5 py-4">
+              <span className="label text-[#FF9F0A]">Emergency scenario planner</span>
               <div className="mt-3 grid gap-3 sm:grid-cols-2">
                 {scenarios.map((s) => {
                   const newIncome = TOTAL_INCOME - s.lostIncome
                   const deficit = newIncome - TOTAL_COSTS
-                  const runway = deficit < 0 ? Math.floor(savings / Math.abs(deficit)) : Infinity
+                  const runwayMonths = deficit < 0 ? NaN : Infinity
                   return (
                     <motion.div
                       key={s.name}
-                      whileHover={{ y: -1, boxShadow: '0 4px 12px rgba(0,0,0,0.08)' }}
-                      className="rounded-[12px] border border-[var(--border)] bg-[var(--bg)] p-3"
+                      whileHover={{ filter: 'brightness(1.05)' }}
+                      className="rounded-[12px] border border-[rgba(255,255,255,0.08)] bg-[#2C2C2E] p-4"
                     >
-                      <p className="text-sm font-semibold text-[var(--text)]">{s.name}</p>
-                      <p className="text-xs text-[var(--text-dim)] mb-2">{s.description}</p>
-                      <div className="space-y-1 text-xs">
+                      <p className="text-[17px] font-semibold text-[var(--text)]">{s.name}</p>
+                      <p className="text-[15px] text-[rgba(255,255,255,0.55)] mb-2">{s.description}</p>
+                      <div className="space-y-1.5 text-[15px]">
                         <div className="flex justify-between">
                           <span className="text-[var(--text-dim)]">New Income</span>
                           <span className="data text-[var(--text)]">{fmt(newIncome)}</span>
@@ -208,8 +261,16 @@ export default function FinancialsPage() {
                         </div>
                         <div className="flex justify-between">
                           <span className="text-[var(--text-dim)]">Runway</span>
-                          <span className={`data font-semibold ${runway < 6 ? 'text-[var(--rose)]' : 'text-[var(--accent)]'}`}>
-                            {runway === Infinity ? 'Safe' : `${runway} months`}
+                          <span
+                            className={`data font-semibold ${
+                              Number.isNaN(runwayMonths) ? 'text-[var(--text-dim)]' : 'text-[var(--accent)]'
+                            }`}
+                          >
+                            {Number.isNaN(runwayMonths)
+                              ? '—'
+                              : runwayMonths === Infinity
+                                ? 'Safe'
+                                : `${runwayMonths} months`}
                           </span>
                         </div>
                       </div>
@@ -220,49 +281,105 @@ export default function FinancialsPage() {
             </div>
           </StaggerItem>
 
-          {/* Profit First Allocations */}
+          {/* Profit First + Tax liability (PRD §12.1 §6–7) */}
           <StaggerItem>
-            <div className="card p-4">
-              <span className="label text-[10px] tracking-widest text-[var(--accent)]">PROFIT FIRST ALLOCATIONS</span>
-              <div className="mt-3 flex gap-1 h-3 rounded-full overflow-hidden">
-                <div className="bg-emerald-500 rounded-l-full" style={{ width: '50%' }} />
-                <div className="bg-amber-500" style={{ width: '15%' }} />
-                <div className="bg-blue-500" style={{ width: '30%' }} />
-                <div className="bg-purple-500 rounded-r-full" style={{ width: '5%' }} />
-              </div>
-              <div className="mt-3 grid grid-cols-4 gap-2">
-                {[
-                  { label: "Owner's Pay", pct: 50, color: 'text-emerald-400' },
-                  { label: 'Taxes', pct: 15, color: 'text-amber-400' },
-                  { label: 'OpEx', pct: 30, color: 'text-blue-400' },
-                  { label: 'Profit', pct: 5, color: 'text-purple-400' },
-                ].map(a => (
-                  <motion.div key={a.label} whileHover={{ y: -1 }} className="rounded-[12px] border border-[var(--border)] bg-[var(--bg)] p-3 text-center">
-                    <p className="text-[10px] text-[var(--text-dim)]">{a.label}</p>
-                    <p className={`text-xs font-semibold ${a.color} mt-0.5`}>{a.pct}%</p>
-                    <p className="data text-sm font-bold text-[var(--text)] mt-1">{fmt(Math.round(TOTAL_INCOME * a.pct / 100))}</p>
-                  </motion.div>
+            <div className="card px-5 py-4">
+              <span className="label text-[var(--accent)]">Profit First allocations</span>
+              <p className="mt-1 text-[13px] text-[rgba(255,255,255,0.5)]">
+                Four buckets — percentages renormalize to 100%. Dollar amounts use monthly net take-home ({fmt(NET_TAKE_HOME)}).
+              </p>
+              <div className="mt-3 flex h-3 gap-0.5 overflow-hidden rounded-full">
+                {pfBuckets.map((b) => (
+                  <div
+                    key={b.key}
+                    className="h-full min-w-[4px]"
+                    style={{ width: `${pf[b.key]}%`, background: b.color }}
+                  />
                 ))}
+              </div>
+              <div className="mt-4 grid gap-4 sm:grid-cols-2">
+                {pfBuckets.map((b) => (
+                  <div key={b.key} className="rounded-[12px] border border-[rgba(255,255,255,0.08)] bg-[#2C2C2E] p-3">
+                    <div className="flex items-center justify-between">
+                      <span className="label">{b.label}</span>
+                      <span className="data font-mono text-[15px]" style={{ color: b.color }}>
+                        {pf[b.key].toFixed(1)}%
+                      </span>
+                    </div>
+                    <input
+                      type="range"
+                      min={0}
+                      max={100}
+                      step={0.5}
+                      value={pf[b.key]}
+                      onChange={(e) => setProfitFirstPct({ [b.key]: Number(e.target.value) })}
+                      className="mt-2 w-full accent-[var(--accent)]"
+                    />
+                    <p className="data mt-1 font-mono text-[17px] text-[var(--text)]">
+                      {fmt(Math.round(NET_TAKE_HOME * (pf[b.key] / 100)))}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </StaggerItem>
+
+          <StaggerItem>
+            <div className="card px-5 py-4">
+              <span className="label text-[#FF9F0A]">Tax liability (estimated)</span>
+              <p className="mt-1 text-[13px] text-[rgba(255,255,255,0.5)]">
+                Illustrative only — not tax advice. Adjust assumed income tax rate in Settings.
+              </p>
+              <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                <div className="rounded-[12px] border border-[rgba(255,255,255,0.08)] bg-[#2C2C2E] p-4">
+                  <p className="label">Next typical estimated deadline</p>
+                  {taxSnapshot.next ? (
+                    <>
+                      <p className="data mt-1 text-[17px] font-semibold text-[var(--text)]">{taxSnapshot.next.label}</p>
+                      <p className="mt-1 font-mono text-[15px] text-[var(--accent)]">
+                        {taxSnapshot.next.date.toLocaleDateString(undefined, {
+                          weekday: 'short',
+                          month: 'short',
+                          day: 'numeric',
+                          year: 'numeric',
+                        })}
+                      </p>
+                      <p className="mt-2 text-[14px] text-[var(--text-mid)]">
+                        ~{taxSnapshot.days} day{taxSnapshot.days === 1 ? '' : 's'} remaining
+                      </p>
+                    </>
+                  ) : (
+                    <p className="text-[var(--text-dim)]">—</p>
+                  )}
+                </div>
+                <div className="rounded-[12px] border border-[rgba(255,255,255,0.08)] bg-[#2C2C2E] p-4">
+                  <p className="label">Year-to-date est. tax (accrual)</p>
+                  <p className="data mt-1 font-mono text-2xl font-bold text-[var(--text)]">{fmt(Math.round(taxSnapshot.ytd))}</p>
+                  <p className="mt-2 text-[12px] text-[rgba(255,255,255,0.45)]">
+                    Based on net take-home × {estimatedIncomeTaxRatePct}% × fraction of year elapsed.
+                  </p>
+                </div>
               </div>
             </div>
           </StaggerItem>
 
           {/* Agency Valuation */}
           <StaggerItem>
-            <motion.div whileHover={{ y: -1 }} className="card p-4">
-              <span className="label text-[10px] tracking-widest text-[var(--cyan)]">ESTIMATED NET WORTH</span>
+            <motion.div whileHover={{ filter: 'brightness(1.05)' }} className="card px-5 py-4">
+              <span className="label text-[#5AC8FA]">Estimated net worth</span>
               <div className="mt-3 space-y-2">
-                <div className="flex justify-between text-sm">
-                  <span className="text-[var(--text-dim)]">Savings</span>
-                  <span className="data text-[var(--text)]">{fmt(savings)}</span>
+                <div className="flex justify-between text-[17px]">
+                  <span className="text-[rgba(255,255,255,0.55)]">Savings (range)</span>
+                  <span className="data text-[var(--text)]">{savingsLabel}</span>
                 </div>
-                <div className="flex justify-between text-sm">
-                  <span className="text-[var(--text-dim)]">Agency Valuation (Net MRR x 12 x 3.5)</span>
+                <div className="flex justify-between text-[17px]">
+                  <span className="text-[rgba(255,255,255,0.55)]">Agency valuation (net MRR × 12 × 3.5)</span>
                   <span className="data text-[var(--text)]">{fmt(Math.round(agencyTotals.net * 12 * 3.5))}</span>
                 </div>
-                <div className="border-t border-[var(--border)] pt-2 flex justify-between">
-                  <span className="text-sm font-bold text-[var(--text)]">Estimated Net Worth</span>
-                  <span className="data text-lg font-bold text-[var(--accent)]">{fmt(savings + Math.round(agencyTotals.net * 12 * 3.5))}</span>
+                <div className="border-t border-[var(--border)] pt-2">
+                  <p className="text-[15px] text-[rgba(255,255,255,0.45)]">
+                    Add asset values in Settings to combine savings + business valuation into a full net worth figure.
+                  </p>
                 </div>
               </div>
             </motion.div>
@@ -270,8 +387,8 @@ export default function FinancialsPage() {
 
           {/* Time vs Money Matrix */}
           <StaggerItem>
-            <div className="card p-4">
-              <span className="label text-[10px] tracking-widest text-[var(--cyan)]">TIME VS MONEY MATRIX</span>
+            <div className="card px-5 py-4">
+              <span className="label text-[#5AC8FA]">Time vs money matrix</span>
               <div className="mt-3 space-y-3">
                 {businesses.map((b) => {
                   const bizClients = clients.filter(c => c.businessId === b.id && c.active)
@@ -283,8 +400,8 @@ export default function FinancialsPage() {
                     <div key={b.id} className="flex items-center gap-4">
                       <div className="w-3 h-3 rounded-full shrink-0" style={{ background: b.color }} />
                       <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium text-[var(--text)]">{b.name}</p>
-                        <p className="text-xs text-[var(--text-dim)]">{fmt(income)}/mo</p>
+                        <p className="text-[17px] font-medium text-[var(--text)]">{b.name}</p>
+                        <p className="text-[15px] text-[rgba(255,255,255,0.55)]">{fmt(income)}/mo</p>
                       </div>
                       <div className="text-right">
                         <p className="data text-sm font-semibold text-[var(--text)]">{income > 0 ? `${fmt(Math.round(perHour))}/hr` : '—'}</p>
@@ -298,11 +415,11 @@ export default function FinancialsPage() {
           {/* Days Clean */}
           {noGambleStreak && (
             <StaggerItem>
-              <motion.div whileHover={{ y: -1 }} className="card p-3 flex items-center gap-3 opacity-70 hover:opacity-100 transition-opacity">
-                <div className="w-8 h-8 rounded-full bg-emerald-500/10 flex items-center justify-center text-xs text-emerald-400 font-bold">{noGambleStreak.currentStreak}</div>
+              <motion.div whileHover={{ filter: 'brightness(1.05)' }} className="card px-5 py-4 flex items-center gap-3 opacity-90 hover:opacity-100 transition-opacity">
+                <div className="data flex h-9 w-9 items-center justify-center rounded-full bg-[rgba(48,209,88,0.15)] text-[15px] font-bold text-[var(--positive)]">{noGambleStreak.currentStreak}</div>
                 <div>
-                  <p className="text-xs font-medium text-[var(--text-mid)]">Days clean</p>
-                  <p className="text-[10px] text-[var(--text-dim)]">Longest: {noGambleStreak.longestStreak}d</p>
+                  <p className="text-[15px] font-medium text-[rgba(255,255,255,0.55)]">Days clean</p>
+                  <p className="text-[13px] text-[rgba(255,255,255,0.45)]">Longest: {noGambleStreak.longestStreak}d</p>
                 </div>
               </motion.div>
             </StaggerItem>

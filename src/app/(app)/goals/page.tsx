@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { toast } from 'sonner'
 import { BarChart, Bar, ResponsiveContainer, XAxis, Tooltip } from 'recharts'
@@ -24,10 +24,11 @@ function progressColor(pct: number) {
   return 'var(--rose)'
 }
 
+/** PRD §1 — suggestions are generic; users define real metrics in the form. */
 const SUGGESTED_GOALS = [
-  { title: 'Sign 3 new agency clients', metric: '+$6K MRR', target: 3 },
-  { title: 'Sign office lease, convert GMBs', metric: '3+ calls/day', target: 3 },
-  { title: 'Get execution score to 70+ average', metric: 'Avg score', target: 70 },
+  { title: 'Hit a measurable revenue milestone', metric: 'Your target metric', target: 100 },
+  { title: 'Raise average weekly execution score', metric: 'Avg score', target: 70 },
+  { title: 'Ship one major milestone per month', metric: 'Milestones', target: 3 },
 ]
 
 function ChartTooltip({ active, payload, label }: any) {
@@ -57,11 +58,15 @@ export default function GoalsPage() {
   const currentCycle = activeGoals.length > 0 ? activeGoals[0] : null
   const weekNum = currentCycle ? getCycleWeek(currentCycle.cycleStart) : 0
 
-  // Mock weekly execution data
-  const weeklyData = Array.from({ length: 12 }, (_, i) => ({
-    name: `W${i + 1}`,
-    rate: i < weekNum ? Math.round(40 + Math.random() * 50) : 0,
-  }))
+  const weeklyData = useMemo(() => {
+    return Array.from({ length: 12 }, (_, i) => ({
+      name: `W${i + 1}`,
+      rate:
+        i < weekNum && Array.isArray(scorecards) && scorecards[i] != null && typeof scorecards[i]?.rate === 'number'
+          ? scorecards[i].rate
+          : 0,
+    }))
+  }, [weekNum, scorecards])
 
   const handleAdd = () => {
     if (!form.title.trim()) { toast.error('Goal title required'); return }
@@ -113,11 +118,11 @@ export default function GoalsPage() {
         {/* Add Goal Form */}
         <AnimatePresence>
           {showForm && (
-            <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} className="rounded-[16px] border border-[#1e2338] bg-[#0e1018] p-5 space-y-4 overflow-hidden">
+            <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} className="rounded-[16px] border border-[var(--border)] bg-[var(--bg-elevated)] p-5 space-y-4 overflow-hidden">
               <h3 className="text-[14px] font-semibold text-[var(--text)]">New Goal</h3>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <input placeholder="Goal title" value={form.title} onChange={e => setForm({ ...form, title: e.target.value })} className="px-3 py-2 rounded-[8px] bg-[var(--surface2)] border border-[var(--border)] text-[13px] text-[var(--text)] outline-none" />
-                <input placeholder="Target metric (e.g. +$6K MRR)" value={form.targetMetric} onChange={e => setForm({ ...form, targetMetric: e.target.value })} className="px-3 py-2 rounded-[8px] bg-[var(--surface2)] border border-[var(--border)] text-[13px] text-[var(--text)] outline-none" />
+                <input placeholder="Target metric (measurable)" value={form.targetMetric} onChange={e => setForm({ ...form, targetMetric: e.target.value })} className="px-3 py-2 rounded-[8px] bg-[var(--surface2)] border border-[var(--border)] text-[13px] text-[var(--text)] outline-none" />
                 <input type="number" placeholder="Current value" value={form.currentValue || ''} onChange={e => setForm({ ...form, currentValue: +e.target.value })} className="px-3 py-2 rounded-[8px] bg-[var(--surface2)] border border-[var(--border)] text-[13px] text-[var(--text)] outline-none" />
                 <input type="number" placeholder="Target value" value={form.targetValue || ''} onChange={e => setForm({ ...form, targetValue: +e.target.value })} className="px-3 py-2 rounded-[8px] bg-[var(--surface2)] border border-[var(--border)] text-[13px] text-[var(--text)] outline-none" />
                 <input type="date" value={form.cycleStart} onChange={e => setForm({ ...form, cycleStart: e.target.value })} className="px-3 py-2 rounded-[8px] bg-[var(--surface2)] border border-[var(--border)] text-[13px] text-[var(--text)] outline-none" />
@@ -133,7 +138,7 @@ export default function GoalsPage() {
 
         {/* Goals List */}
         {goals.length === 0 ? (
-          <motion.div {...cardAnim(0.1)} className="rounded-[16px] border border-[#1e2338] bg-[#0e1018] p-8 text-center space-y-5">
+          <motion.div {...cardAnim(0.1)} className="rounded-[16px] border border-[var(--border)] bg-[var(--bg-elevated)] p-8 text-center space-y-5">
             <div className="text-[40px]">🎯</div>
             <h2 className="text-[16px] font-semibold text-[var(--text)]">Start your first 12-week cycle</h2>
             <p className="text-[13px] text-[var(--text-dim)] max-w-md mx-auto">Set 3-5 goals. Focus beats breadth. Each goal should have a measurable target.</p>
@@ -152,7 +157,7 @@ export default function GoalsPage() {
               const pct = goal.targetValue > 0 ? Math.round((goal.currentValue / goal.targetValue) * 100) : 0
               const linkedCount = projects.filter(p => goal.linkedProjectIds.includes(p.id)).length
               return (
-                <motion.div key={goal.id} {...cardAnim(0.05 * i)} className="rounded-[16px] border border-[#1e2338] bg-[#0e1018] p-5 space-y-3">
+                <motion.div key={goal.id} {...cardAnim(0.05 * i)} className="rounded-[16px] border border-[var(--border)] bg-[var(--bg-elevated)] p-5 space-y-3">
                   <div className="flex items-start justify-between gap-3">
                     <div className="flex-1">
                       <h3 className="text-[16px] font-semibold text-[var(--text)]">{goal.title}</h3>
@@ -183,6 +188,23 @@ export default function GoalsPage() {
                     <p className="text-[11px] text-[var(--text-dim)]">{linkedCount} linked project{linkedCount !== 1 ? 's' : ''}</p>
                   )}
 
+                  {weekNum > 0 &&
+                    Array.isArray(scorecards) &&
+                    scorecards[weekNum - 1]?.aiByGoal &&
+                    (() => {
+                      const g = scorecards[weekNum - 1]!.aiByGoal!.find((x) => x.goalId === goal.id)
+                      if (!g) return null
+                      return (
+                        <div className="mt-2 rounded-xl border border-[var(--border)] bg-[var(--surface2)] p-3">
+                          <p className="text-[10px] uppercase tracking-wide text-[var(--text-dim)]">
+                            Weekly AI grade
+                          </p>
+                          <p className="text-[22px] font-bold text-[var(--accent)] mt-0.5">{g.grade}</p>
+                          <p className="text-[12px] text-[var(--text-secondary)] mt-1 leading-snug">{g.feedback}</p>
+                        </div>
+                      )
+                    })()}
+
                   {/* Inline edit */}
                   <AnimatePresence>
                     {editingId === goal.id && (
@@ -201,7 +223,7 @@ export default function GoalsPage() {
 
         {/* Weekly Execution Chart */}
         {goals.length > 0 && (
-          <motion.div {...cardAnim(0.2)} className="rounded-[16px] border border-[#1e2338] bg-[#0e1018] p-5 space-y-3">
+          <motion.div {...cardAnim(0.2)} className="rounded-[16px] border border-[var(--border)] bg-[var(--bg-elevated)] p-5 space-y-3">
             <h3 className="text-[14px] font-semibold text-[var(--text)]">Weekly Execution Rate</h3>
             <div className="h-[180px]">
               <ResponsiveContainer width="100%" height="100%">

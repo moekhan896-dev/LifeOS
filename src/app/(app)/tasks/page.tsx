@@ -1,11 +1,21 @@
 'use client'
 
-import { useState, useMemo } from 'react'
+import { Suspense, useEffect, useMemo, useState } from 'react'
+import { useSearchParams } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
 import { toast } from 'sonner'
 import { useStore, type Task, type Priority } from '@/stores/store'
-import { TAGS, XP_VALUES, PRIORITY_COLORS } from '@/lib/constants'
+import { TAGS, XP_VALUES } from '@/lib/constants'
+import { applyTaskDollarEstimateAfterCreate } from '@/lib/task-dollar-client'
+import { buildTaskSuggestContext } from '@/lib/ai-context'
+import TaskDollarHint from '@/components/TaskDollarHint'
 import PageTransition from '@/components/PageTransition'
+import TaskDetailDrawer from '@/components/TaskDetailDrawer'
+import TaskSkipDrawer from '@/components/TaskSkipDrawer'
+import TaskKanbanBoard from '@/components/TaskKanbanBoard'
+import SwipeableTaskRow from '@/components/SwipeableTaskRow'
+import { useIsMobileViewport } from '@/hooks/useIsMobileViewport'
+import { taskKanbanColumn, type KanbanColumnId } from '@/lib/task-kanban'
 
 const PRIORITY_ORDER: Priority[] = ['crit', 'high', 'med', 'low']
 
@@ -40,45 +50,50 @@ function parseTaskInput(text: string): { text: string; priority: Priority; tag: 
 }
 
 const PRIORITY_BAR_COLORS: Record<Priority, string> = {
-  crit: 'bg-rose-500',
-  high: 'bg-amber-500',
-  med: 'bg-blue-500',
-  low: 'bg-slate-600',
+  crit: 'bg-[var(--negative)]',
+  high: 'bg-[var(--warning)]',
+  med: 'bg-[var(--accent)]',
+  low: 'bg-[var(--bg-tertiary)]',
 }
 
 const PRIORITY_PILL: Record<Priority, string> = {
-  crit: 'bg-rose-500/15 text-rose-400',
-  high: 'bg-amber-500/15 text-amber-400',
-  med: 'bg-blue-500/15 text-blue-400',
-  low: 'bg-slate-500/15 text-slate-400',
+  crit: 'bg-[rgba(255,69,58,0.15)] text-[var(--negative)]',
+  high: 'bg-[rgba(255,159,10,0.15)] text-[var(--warning)]',
+  med: 'bg-[var(--accent-bg)] text-[var(--accent)]',
+  low: 'bg-[rgba(255,255,255,0.06)] text-[var(--text-tertiary)]',
 }
 
-export default function TasksPage() {
-  const { tasks, businesses, addTask, toggleTask, deleteTask, updateTask } = useStore()
+function TasksPageInner() {
+  const searchParams = useSearchParams()
+  const { tasks, businesses, addTask, toggleTask, deleteTask, updateTask, anthropicKey } = useStore()
+  const mobile = useIsMobileViewport()
 
   const [search, setSearch] = useState('')
   const [filterBusiness, setFilterBusiness] = useState<string>('all')
   const [filterPriority, setFilterPriority] = useState<string>('all')
   const [filterTag, setFilterTag] = useState<string>('all')
+  const [viewMode, setViewMode] = useState<'list' | 'board'>('list')
 
-  // New task flow
   const [showNewTask, setShowNewTask] = useState(false)
   const [newText, setNewText] = useState('')
   const [newBusiness, setNewBusiness] = useState<string>('')
   const [newPriority, setNewPriority] = useState<Priority>('med')
   const [newTag, setNewTag] = useState<string>('')
 
-  // Inline edit
-  const [editingId, setEditingId] = useState<string | null>(null)
-  const [editText, setEditText] = useState('')
-
-  // Completed section
   const [showCompleted, setShowCompleted] = useState(false)
-
-  // XP animation
   const [xpAnimId, setXpAnimId] = useState<string | null>(null)
+  const [suggestLoading, setSuggestLoading] = useState(false)
 
-  // Stats
+  const [detailTaskId, setDetailTaskId] = useState<string | null>(null)
+  const [skipTaskId, setSkipTaskId] = useState<string | null>(null)
+
+  const detailTask = detailTaskId ? tasks.find((t) => t.id === detailTaskId) ?? null : null
+
+  useEffect(() => {
+    const tid = searchParams.get('task')
+    if (tid) setDetailTaskId(tid)
+  }, [searchParams])
+
   const totalTasks = tasks.length
   const doneTasks = tasks.filter((t) => t.done).length
   const todayStr = new Date().toISOString().split('T')[0]
@@ -89,7 +104,6 @@ export default function TasksPage() {
   const doneToday = tasks.filter((t) => t.done && t.completedAt?.startsWith(todayStr))
   const xpToday = doneToday.reduce((s, t) => s + t.xpValue, 0)
 
-  // Filtering
   const filtered = useMemo(() => {
     let result = tasks
     if (search) {
@@ -103,9 +117,16 @@ export default function TasksPage() {
   }, [tasks, search, filterBusiness, filterPriority, filterTag])
 
   const incompleteTasks = useMemo(() => sortTasks(filtered.filter((t) => !t.done)), [filtered])
-  const completedTasks = useMemo(() => filtered.filter((t) => t.done).sort((a, b) =>
-    new Date(b.completedAt || b.createdAt).getTime() - new Date(a.completedAt || a.createdAt).getTime()
-  ), [filtered])
+  const completedTasks = useMemo(
+    () =>
+      filtered
+        .filter((t) => t.done)
+        .sort(
+          (a, b) =>
+            new Date(b.completedAt || b.createdAt).getTime() - new Date(a.completedAt || a.createdAt).getTime()
+        ),
+    [filtered]
+  )
 
   const handleNewTask = () => {
     const raw = newText.trim()
@@ -114,13 +135,60 @@ export default function TasksPage() {
     const priority = newPriority !== 'med' ? newPriority : parsed.priority
     const tag = newTag || parsed.tag
     const businessId = newBusiness || businesses[0]?.id || ''
-    addTask({ businessId, text: parsed.text, priority, tag, done: false, xpValue: XP_VALUES[priority] })
+    const id = addTask({ businessId, text: parsed.text, priority, tag, done: false, xpValue: XP_VALUES[priority] })
+    void applyTaskDollarEstimateAfterCreate(id, parsed.text)
     setNewText('')
     setNewPriority('med')
     setNewTag('')
     setNewBusiness('')
     setShowNewTask(false)
     toast.success('Task added')
+  }
+
+  const handleSuggestTasks = async () => {
+    if (!anthropicKey?.trim()) {
+      toast.error('Add an Anthropic API key in Settings first.')
+      return
+    }
+    setSuggestLoading(true)
+    try {
+      const context = buildTaskSuggestContext(useStore.getState())
+      const res = await fetch('/api/tasks/suggest', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ context, apiKey: anthropicKey }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Suggest failed')
+      const rows = (data.tasks ?? []) as { text: string; priority: Priority; tag: string; rationale: string }[]
+      if (rows.length === 0) {
+        toast.message('No tasks returned — try again.')
+        return
+      }
+      const biz = businesses[0]?.id || ''
+      if (!biz) {
+        toast.error('Add a business first.')
+        return
+      }
+      for (const row of rows) {
+        const pr = (['crit', 'high', 'med', 'low'] as const).includes(row.priority) ? row.priority : 'med'
+        const id = addTask({
+          businessId: biz,
+          text: row.text,
+          tag: row.tag || 'AI',
+          priority: pr,
+          done: false,
+          xpValue: XP_VALUES[pr],
+          aiSuggested: true,
+        })
+        void applyTaskDollarEstimateAfterCreate(id, row.text)
+      }
+      toast.success(`Added ${rows.length} AI-suggested tasks`)
+    } catch (e: unknown) {
+      toast.error(e instanceof Error ? e.message : 'Suggest failed')
+    } finally {
+      setSuggestLoading(false)
+    }
   }
 
   const handleToggle = (task: Task) => {
@@ -132,128 +200,146 @@ export default function TasksPage() {
     }
   }
 
-  const handleInlineEdit = (task: Task) => {
-    setEditingId(task.id)
-    setEditText(task.text)
-  }
+  const handleColumnChange = (taskId: string, col: KanbanColumnId) => {
+    const t = useStore.getState().tasks.find((x) => x.id === taskId)
+    if (!t) return
+    if (taskKanbanColumn(t) === col) return
 
-  const saveInlineEdit = (id: string) => {
-    if (editText.trim()) {
-      updateTask(id, { text: editText.trim() })
+    if (col === 'done') {
+      if (!t.done) toggleTask(taskId)
+      return
     }
-    setEditingId(null)
+
+    if (t.done) toggleTask(taskId)
+    const fresh = useStore.getState().tasks.find((x) => x.id === taskId)
+    if (!fresh || fresh.done) return
+    if (col === 'todo') updateTask(taskId, { kanbanLane: undefined })
+    else updateTask(taskId, { kanbanLane: 'in_progress' })
   }
 
   const getBusiness = (id: string) => businesses.find((b) => b.id === id)
 
   const stats = [
-    { label: 'TODAY', value: todayUndone, color: 'text-white' },
-    { label: 'THIS WEEK', value: thisWeekCount, color: 'text-white' },
-    { label: 'DONE RATE', value: `${completionPct}%`, color: completionPct > 50 ? 'text-emerald-400' : 'text-amber-400' },
-    { label: 'XP TODAY', value: `+${xpToday}`, color: 'text-purple-400' },
+    { label: 'Today', value: todayUndone, color: 'text-[var(--text-primary)]' },
+    { label: 'This week', value: thisWeekCount, color: 'text-[var(--text-primary)]' },
+    { label: 'Done rate', value: `${completionPct}%`, color: completionPct > 50 ? 'text-[var(--positive)]' : 'text-[var(--warning)]' },
+    { label: 'XP today', value: `+${xpToday}`, color: 'text-[var(--ai)]' },
   ]
 
   const renderTaskCard = (task: Task, index: number) => {
     const biz = getBusiness(task.businessId)
-    const isEditing = editingId === task.id
+    const subs = task.subtasks ?? []
+    const doneSubs = subs.filter((s) => s.done).length
+    const totalSubs = subs.length
 
-    return (
-      <motion.div
-        key={task.id}
-        layout
-        initial={{ opacity: 0, y: 12 }}
-        animate={{ opacity: 1, y: 0 }}
-        exit={{ opacity: 0, height: 0, marginBottom: 0, overflow: 'hidden' }}
-        transition={{ duration: 0.2, delay: index * 0.04, ease: [0.25, 0.1, 0.25, 1] }}
-        className="group bg-[#0e1018] border border-[#1e2338] rounded-[14px] px-[18px] py-[14px] mb-2 flex items-center gap-[14px] hover:border-[#2d3450] hover:bg-[#111520] hover:-translate-y-[1px] hover:shadow-lg transition-all duration-150 relative"
-      >
-        {/* Priority bar */}
+    const rowInner = (
+      <>
         <div className={`w-1 h-10 rounded-full flex-shrink-0 ${PRIORITY_BAR_COLORS[task.priority]}`} />
 
-        {/* Checkbox */}
         <motion.button
-          whileTap={{ scale: 0.85 }}
+          whileTap={{ scale: 0.97 }}
           onClick={() => handleToggle(task)}
-          className={`w-5 h-5 rounded-full border-2 flex-shrink-0 flex items-center justify-center transition-colors ${
-            task.done
-              ? 'bg-emerald-500 border-emerald-500'
-              : 'border-[#2d3450] bg-transparent hover:border-emerald-500'
-          }`}
+          type="button"
+          className="min-h-[44px] min-w-[44px] shrink-0 flex items-center justify-center rounded-full"
+          aria-label={task.done ? 'Mark incomplete' : 'Mark complete'}
         >
-          {task.done && (
-            <motion.svg
-              width="10" height="10" viewBox="0 0 12 12" fill="none"
-              initial={{ pathLength: 0 }}
-              animate={{ pathLength: 1 }}
-              transition={{ duration: 0.2 }}
-            >
-              <motion.path
-                d="M2 6L5 9L10 3"
-                stroke="white"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
+          <span
+            className={`w-5 h-5 rounded-full border-2 flex items-center justify-center transition-colors ${
+              task.done
+                ? 'bg-[var(--positive)] border-[var(--positive)]'
+                : 'border-[var(--border)] bg-transparent hover:border-[var(--accent)]'
+            }`}
+          >
+            {task.done && (
+              <motion.svg
+                width="10"
+                height="10"
+                viewBox="0 0 12 12"
+                fill="none"
                 initial={{ pathLength: 0 }}
                 animate={{ pathLength: 1 }}
                 transition={{ duration: 0.2 }}
-              />
-            </motion.svg>
-          )}
+              >
+                <motion.path
+                  d="M2 6L5 9L10 3"
+                  stroke="white"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  initial={{ pathLength: 0 }}
+                  animate={{ pathLength: 1 }}
+                  transition={{ duration: 0.2 }}
+                />
+              </motion.svg>
+            )}
+          </span>
         </motion.button>
 
-        {/* Content */}
-        <div className="flex-1 min-w-0">
-          {isEditing ? (
-            <input
-              autoFocus
-              value={editText}
-              onChange={(e) => setEditText(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') saveInlineEdit(task.id)
-                if (e.key === 'Escape') setEditingId(null)
-              }}
-              onBlur={() => saveInlineEdit(task.id)}
-              className="w-full bg-transparent text-[14px] font-medium text-white outline-none border-b border-emerald-500/40 pb-0.5"
-            />
-          ) : (
+        <SwipeableTaskRow
+          className="min-w-0 flex-1"
+          enabled={mobile && !task.done}
+          onSwipeComplete={() => handleToggle(task)}
+          onSwipeSkip={() => setSkipTaskId(task.id)}
+        >
+          <button
+            type="button"
+            onClick={() => setDetailTaskId(task.id)}
+            className="flex w-full min-w-0 flex-col items-start gap-1 text-left"
+          >
             <p
-              onClick={() => !task.done && handleInlineEdit(task)}
-              className={`text-[14px] font-medium text-white truncate cursor-text ${
+              className={`w-full text-[17px] font-medium text-[var(--text-primary)] ${
                 task.done ? 'opacity-40 line-through' : ''
               }`}
             >
               {task.text}
             </p>
-          )}
-          <div className="flex items-center gap-2 mt-1.5">
-            <span className={`text-[9px] font-mono uppercase rounded-md px-2 py-0.5 ${PRIORITY_PILL[task.priority]}`}>
-              {task.priority}
-            </span>
-            {task.tag && (
-              <span className="text-[9px] font-mono uppercase rounded-md px-2 py-0.5 bg-cyan-500/15 text-cyan-400">
-                {task.tag}
+            {totalSubs > 0 ? (
+              <p className="text-[13px] text-[var(--text-secondary)]">
+                {doneSubs}/{totalSubs} subtasks
+              </p>
+            ) : null}
+            <div className="flex flex-wrap items-center gap-2">
+              <span className={`caption rounded-md px-2 py-0.5 capitalize ${PRIORITY_PILL[task.priority]}`}>
+                {task.priority}
               </span>
-            )}
-            {biz && (
-              <span className="flex items-center gap-1.5 text-[11px] text-[#8892b0]">
-                <span className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ backgroundColor: biz.color }} />
-                {biz.name}
-              </span>
-            )}
-          </div>
-        </div>
+              {task.tag && (
+                <span className="caption rounded-md px-2 py-0.5 bg-[rgba(100,210,255,0.12)] text-[var(--info)]">
+                  {task.tag}
+                </span>
+              )}
+              {biz && (
+                <span className="flex items-center gap-1.5 footnote text-[var(--text-secondary)]">
+                  <span className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ backgroundColor: biz.color }} />
+                  {biz.name}
+                </span>
+              )}
+            </div>
+          </button>
+        </SwipeableTaskRow>
 
-        {/* Delete button */}
+        <TaskDollarHint task={task} hasAiKey={!!anthropicKey?.trim()} />
+
+        {!task.done ? (
+          <button
+            type="button"
+            onClick={() => setSkipTaskId(task.id)}
+            className="shrink-0 rounded-lg px-2 py-1 text-[12px] font-medium text-[var(--warning)] opacity-80 hover:opacity-100 md:opacity-0 md:group-hover:opacity-100"
+          >
+            Skip
+          </button>
+        ) : null}
+
         <button
           onClick={() => deleteTask(task.id)}
-          className="w-8 h-8 rounded-lg flex items-center justify-center opacity-0 group-hover:opacity-100 hover:bg-[#1a1f2e] text-rose-400 transition-all flex-shrink-0"
+          type="button"
+          className="min-h-[44px] min-w-[44px] rounded-xl flex items-center justify-center opacity-0 group-hover:opacity-100 hover:bg-[var(--bg-secondary)] text-[var(--negative)] transition-all flex-shrink-0"
         >
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-            <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
+            <line x1="18" y1="6" x2="6" y2="18" />
+            <line x1="6" y1="6" x2="18" y2="18" />
           </svg>
         </button>
 
-        {/* XP animation */}
         <AnimatePresence>
           {xpAnimId === task.id && (
             <motion.span
@@ -261,12 +347,26 @@ export default function TasksPage() {
               animate={{ opacity: 0, y: -30 }}
               exit={{ opacity: 0 }}
               transition={{ duration: 0.7 }}
-              className="absolute right-12 top-2 text-emerald-400 text-[12px] font-mono font-bold pointer-events-none"
+              className="absolute right-12 top-2 text-[var(--positive)] text-sm data-number font-bold pointer-events-none"
             >
               +{task.xpValue} XP
             </motion.span>
           )}
         </AnimatePresence>
+      </>
+    )
+
+    return (
+      <motion.div
+        key={task.id}
+        layout
+        initial={{ opacity: 0, y: 8 }}
+        animate={{ opacity: 1, y: 0 }}
+        exit={{ opacity: 0, height: 0, marginBottom: 0, overflow: 'hidden' }}
+        transition={{ duration: 0.2, delay: index * 0.04, ease: [0.25, 0.1, 0.25, 1] as const }}
+        className="group bg-[var(--bg-elevated)] border border-[var(--border)] rounded-2xl px-5 py-3.5 mb-2 flex items-center gap-[14px] hover:border-[var(--border-hover)] hover:bg-[var(--bg-secondary)] transition-[background,border-color] duration-150 relative"
+      >
+        {rowInner}
       </motion.div>
     )
   }
@@ -274,65 +374,93 @@ export default function TasksPage() {
   return (
     <PageTransition>
       <div className="p-6 max-w-5xl mx-auto space-y-5">
-
-        {/* Header */}
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <h1 className="text-[24px] font-semibold text-white">Tasks</h1>
-            <p className="text-[13px] text-[#8892b0]">{totalTasks} total &middot; {doneTasks} done</p>
+            <h1 className="title">Tasks</h1>
+            <p className="subheadline mt-1">
+              {totalTasks} total &middot; {doneTasks} done
+            </p>
           </div>
-          <motion.button
-            whileHover={{ scale: 1.03 }}
-            whileTap={{ scale: 0.97 }}
-            onClick={() => {
-              setNewBusiness(businesses[0]?.id || '')
-              setShowNewTask(true)
-            }}
-            className="bg-gradient-to-r from-emerald-500 to-emerald-600 text-white rounded-[12px] px-5 py-2.5 text-[13px] font-semibold"
-          >
-            + New Task
-          </motion.button>
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="inline-flex rounded-xl border border-[var(--border)] bg-[var(--bg-secondary)] p-1">
+              <button
+                type="button"
+                onClick={() => setViewMode('list')}
+                className={`rounded-lg px-4 py-2 text-[14px] font-medium ${
+                  viewMode === 'list' ? 'bg-[var(--accent-bg)] text-[var(--accent)]' : 'text-[var(--text-secondary)]'
+                }`}
+              >
+                List
+              </button>
+              <button
+                type="button"
+                onClick={() => setViewMode('board')}
+                className={`rounded-lg px-4 py-2 text-[14px] font-medium ${
+                  viewMode === 'board' ? 'bg-[var(--accent-bg)] text-[var(--accent)]' : 'text-[var(--text-secondary)]'
+                }`}
+              >
+                Board
+              </button>
+            </div>
+            <motion.button
+              whileTap={{ scale: 0.97 }}
+              onClick={() => {
+                setNewBusiness(businesses[0]?.id || '')
+                setShowNewTask(true)
+              }}
+              type="button"
+              className="btn-primary !px-8 !py-4"
+            >
+              + New Task
+            </motion.button>
+          </div>
         </div>
 
-        {/* Stats Row */}
         <div className="grid grid-cols-4 gap-3">
           {stats.map((s, i) => (
             <motion.div
               key={s.label}
-              initial={{ opacity: 0, y: 12 }}
+              initial={{ opacity: 0, y: 8 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.25, delay: i * 0.05 }}
-              className="bg-[#0e1018] border border-[#1e2338] rounded-[14px] p-4"
+              transition={{ duration: 0.25, delay: i * 0.03, ease: [0.25, 0.1, 0.25, 1] as const }}
+              className="bg-[var(--bg-elevated)] border border-[var(--border)] rounded-2xl p-4"
             >
-              <p className="text-[10px] font-mono uppercase tracking-[2px] text-[#4a5278]">{s.label}</p>
-              <p className={`text-[28px] font-mono font-bold ${s.color}`}>{s.value}</p>
+              <p className="footnote text-[var(--text-secondary)]">{s.label}</p>
+              <p className={`data mt-1 text-[28px] font-bold ${s.color}`}>{s.value}</p>
             </motion.div>
           ))}
         </div>
 
-        {/* Filter Bar */}
         <div className="flex flex-wrap items-center gap-3">
-          {/* Search */}
           <div className="relative">
-            <svg className="absolute left-3 top-1/2 -translate-y-1/2 text-[#4a5278]" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-              <circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" />
+            <svg
+              className="absolute left-3 top-1/2 -translate-y-1/2 text-[#4a5278]"
+              width="14"
+              height="14"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+            >
+              <circle cx="11" cy="11" r="8" />
+              <line x1="21" y1="21" x2="16.65" y2="16.65" />
             </svg>
             <input
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Search tasks..."
-              className="w-64 bg-[#0e1018] border border-[#1e2338] rounded-[12px] pl-9 pr-3 py-2 text-[13px] text-white placeholder:text-[#4a5278] outline-none focus:border-[#2d3450] transition-colors"
+              className="w-64 min-h-[44px] bg-[var(--bg-secondary)] border border-[var(--border)] rounded-xl pl-9 pr-3 py-2 text-[17px] text-[var(--text-primary)] placeholder:text-[var(--text-tertiary)] outline-none focus:border-[var(--accent)] transition-colors"
             />
           </div>
 
-          {/* Business pills */}
           <div className="flex flex-wrap items-center gap-1.5">
             <button
               onClick={() => setFilterBusiness('all')}
-              className={`rounded-full px-4 py-2 text-[12px] border transition-all ${
+              className={`rounded-full px-4 py-2 text-[13px] border transition-all min-h-[44px] ${
                 filterBusiness === 'all'
-                  ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
-                  : 'text-[#8892b0] border-transparent hover:bg-[#1a1f2e]'
+                  ? 'bg-[var(--accent-bg)] text-[var(--accent)] border-[color-mix(in_srgb,var(--accent)_25%,transparent)]'
+                  : 'text-[var(--text-secondary)] border-transparent hover:bg-[var(--bg-secondary)]'
               }`}
             >
               All
@@ -342,15 +470,17 @@ export default function TasksPage() {
                 key={b.id}
                 onClick={() => setFilterBusiness(b.id)}
                 className={`rounded-full px-4 py-2 text-[12px] border transition-all flex items-center gap-1.5 ${
-                  filterBusiness === b.id
-                    ? `border-opacity-20 bg-opacity-10`
-                    : 'text-[#8892b0] border-transparent hover:bg-[#1a1f2e]'
+                  filterBusiness === b.id ? `border-opacity-20 bg-opacity-10` : 'text-[#8892b0] border-transparent hover:bg-[#1a1f2e]'
                 }`}
-                style={filterBusiness === b.id ? {
-                  backgroundColor: `${b.color}15`,
-                  color: b.color,
-                  borderColor: `${b.color}33`,
-                } : undefined}
+                style={
+                  filterBusiness === b.id
+                    ? {
+                        backgroundColor: `${b.color}15`,
+                        color: b.color,
+                        borderColor: `${b.color}33`,
+                      }
+                    : undefined
+                }
               >
                 <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: b.color }} />
                 {b.name}
@@ -358,107 +488,121 @@ export default function TasksPage() {
             ))}
           </div>
 
-          {/* Priority dropdown */}
           <select
             value={filterPriority}
             onChange={(e) => setFilterPriority(e.target.value)}
-            className="bg-[#0e1018] border border-[#1e2338] rounded-[10px] px-3 py-2 text-[12px] text-white outline-none"
+            className="bg-[var(--bg-secondary)] border border-[var(--border)] rounded-[10px] px-3 py-2 min-h-[44px] text-[15px] text-[var(--text-primary)] outline-none focus:border-[var(--accent)]"
           >
             <option value="all">Priority</option>
             {PRIORITY_ORDER.map((p) => (
-              <option key={p} value={p}>{p.toUpperCase()}</option>
+              <option key={p} value={p}>
+                {p.toUpperCase()}
+              </option>
             ))}
           </select>
 
-          {/* Tag dropdown */}
           <select
             value={filterTag}
             onChange={(e) => setFilterTag(e.target.value)}
-            className="bg-[#0e1018] border border-[#1e2338] rounded-[10px] px-3 py-2 text-[12px] text-white outline-none"
+            className="bg-[var(--bg-secondary)] border border-[var(--border)] rounded-[10px] px-3 py-2 min-h-[44px] text-[15px] text-[var(--text-primary)] outline-none focus:border-[var(--accent)]"
           >
             <option value="all">Tag</option>
             {TAGS.map((t) => (
-              <option key={t} value={t}>{t}</option>
+              <option key={t} value={t}>
+                {t}
+              </option>
             ))}
           </select>
+
+          <motion.button
+            type="button"
+            whileTap={{ scale: 0.98 }}
+            disabled={suggestLoading}
+            onClick={() => void handleSuggestTasks()}
+            className="min-h-[44px] rounded-xl border border-[var(--border)] px-4 text-[15px] font-medium text-[var(--text-primary)] hover:border-[var(--accent)] disabled:opacity-40"
+          >
+            {suggestLoading ? 'Suggesting…' : 'Let AI suggest tasks'}
+          </motion.button>
         </div>
 
-        {/* Task List */}
-        <div>
-          <AnimatePresence initial={false}>
-            {/* New Task Card */}
-            {showNewTask && (
-              <motion.div
-                initial={{ y: -20, opacity: 0 }}
-                animate={{ y: 0, opacity: 1 }}
-                exit={{ y: -20, opacity: 0 }}
-                transition={{ duration: 0.2, ease: [0.25, 0.1, 0.25, 1] }}
-                className="bg-[#0e1018] border border-emerald-500/20 rounded-[14px] px-[18px] py-[14px] mb-2"
-              >
-                <input
-                  autoFocus
-                  value={newText}
-                  onChange={(e) => setNewText(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') handleNewTask()
-                    if (e.key === 'Escape') setShowNewTask(false)
-                  }}
-                  placeholder="What needs to get done?"
-                  className="w-full bg-transparent text-[14px] font-medium text-white placeholder:text-[#4a5278] outline-none mb-3"
-                />
-                <div className="flex items-center gap-2 flex-wrap">
-                  {/* Business dropdown */}
-                  <select
-                    value={newBusiness}
-                    onChange={(e) => setNewBusiness(e.target.value)}
-                    className="bg-[#0e1018] border border-[#1e2338] rounded-[10px] px-3 py-1.5 text-[12px] text-white outline-none"
-                  >
-                    {businesses.map((b) => (
-                      <option key={b.id} value={b.id}>{b.name}</option>
-                    ))}
-                  </select>
-
-                  {/* Priority toggle buttons */}
-                  {PRIORITY_ORDER.map((p) => (
-                    <button
-                      key={p}
-                      onClick={() => setNewPriority(p)}
-                      className={`text-[11px] font-mono uppercase rounded-md px-3 py-1.5 border transition-all ${
-                        newPriority === p
-                          ? PRIORITY_PILL[p] + ' border-current/20'
-                          : 'text-[#8892b0] border-[#1e2338] hover:bg-[#1a1f2e]'
-                      }`}
+        {viewMode === 'list' ? (
+          <div>
+            <AnimatePresence initial={false}>
+              {showNewTask && (
+                <motion.div
+                  initial={{ y: -20, opacity: 0 }}
+                  animate={{ y: 0, opacity: 1 }}
+                  exit={{ y: -20, opacity: 0 }}
+                  transition={{ duration: 0.2, ease: [0.25, 0.1, 0.25, 1] }}
+                  className="bg-[var(--bg-elevated)] border border-[color-mix(in_srgb,var(--accent)_30%,transparent)] rounded-2xl px-5 py-3.5 mb-2"
+                >
+                  <input
+                    autoFocus
+                    value={newText}
+                    onChange={(e) => setNewText(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') handleNewTask()
+                      if (e.key === 'Escape') setShowNewTask(false)
+                    }}
+                    placeholder="What needs to get done?"
+                    className="w-full bg-transparent text-[17px] font-medium text-[var(--text-primary)] placeholder:text-[var(--text-tertiary)] outline-none mb-3"
+                  />
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <select
+                      value={newBusiness}
+                      onChange={(e) => setNewBusiness(e.target.value)}
+                      className="bg-[var(--bg-secondary)] border border-[var(--border)] rounded-[10px] px-3 py-1.5 min-h-[44px] text-[15px] text-[var(--text-primary)] outline-none focus:border-[var(--accent)]"
                     >
-                      {p}
-                    </button>
-                  ))}
-
-                  {/* Tag dropdown */}
-                  <select
-                    value={newTag}
-                    onChange={(e) => setNewTag(e.target.value)}
-                    className="bg-[#0e1018] border border-[#1e2338] rounded-[10px] px-3 py-1.5 text-[12px] text-white outline-none"
-                  >
-                    <option value="">No tag</option>
-                    {TAGS.map((t) => (
-                      <option key={t} value={t}>{t}</option>
+                      {businesses.map((b) => (
+                        <option key={b.id} value={b.id}>
+                          {b.name}
+                        </option>
+                      ))}
+                    </select>
+                    {PRIORITY_ORDER.map((p) => (
+                      <button
+                        key={p}
+                        onClick={() => setNewPriority(p)}
+                        className={`caption rounded-md px-3 py-2 min-h-[44px] border transition-all capitalize ${
+                          newPriority === p
+                            ? PRIORITY_PILL[p] + ' border-current/20'
+                            : 'text-[var(--text-secondary)] border-[var(--border)] hover:bg-[var(--bg-secondary)]'
+                        }`}
+                      >
+                        {p}
+                      </button>
                     ))}
-                  </select>
-                </div>
-              </motion.div>
+                    <select
+                      value={newTag}
+                      onChange={(e) => setNewTag(e.target.value)}
+                      className="bg-[var(--bg-secondary)] border border-[var(--border)] rounded-[10px] px-3 py-1.5 min-h-[44px] text-[15px] text-[var(--text-primary)] outline-none focus:border-[var(--accent)]"
+                    >
+                      <option value="">No tag</option>
+                      {TAGS.map((t) => (
+                        <option key={t} value={t}>
+                          {t}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </motion.div>
+              )}
+
+              {incompleteTasks.map((task, i) => renderTaskCard(task, i))}
+            </AnimatePresence>
+
+            {incompleteTasks.length === 0 && !showNewTask && (
+              <p className="text-center text-[13px] text-[#4a5278] py-8">No tasks to show</p>
             )}
+          </div>
+        ) : (
+          <TaskKanbanBoard
+            tasks={filtered}
+            onColumnChange={handleColumnChange}
+            onTaskClick={(t) => setDetailTaskId(t.id)}
+          />
+        )}
 
-            {/* Incomplete tasks */}
-            {incompleteTasks.map((task, i) => renderTaskCard(task, i))}
-          </AnimatePresence>
-
-          {/* Empty state */}
-          {incompleteTasks.length === 0 && !showNewTask && (
-            <p className="text-center text-[13px] text-[#4a5278] py-8">No tasks to show</p>
-          )}
-        </div>
-
-        {/* Completed Section */}
         {completedTasks.length > 0 && (
           <div>
             <button
@@ -466,7 +610,13 @@ export default function TasksPage() {
               className="flex items-center gap-2 text-[13px] text-[#8892b0] hover:text-white transition-colors mb-2"
             >
               <motion.svg
-                width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"
+                width="14"
+                height="14"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
                 animate={{ rotate: showCompleted ? 0 : -90 }}
                 transition={{ duration: 0.2 }}
               >
@@ -484,9 +634,7 @@ export default function TasksPage() {
                   transition={{ duration: 0.25, ease: [0.25, 0.1, 0.25, 1] }}
                   className="overflow-hidden"
                 >
-                  <div className="opacity-50">
-                    {completedTasks.map((task, i) => renderTaskCard(task, i))}
-                  </div>
+                  <div className="opacity-50">{completedTasks.map((task, i) => renderTaskCard(task, i))}</div>
                   <button
                     onClick={() => {
                       completedTasks.forEach((t) => deleteTask(t.id))
@@ -501,7 +649,32 @@ export default function TasksPage() {
             </AnimatePresence>
           </div>
         )}
+
+        <TaskDetailDrawer
+          task={detailTask}
+          open={detailTask != null}
+          onOpenChange={(o) => {
+            if (!o) setDetailTaskId(null)
+          }}
+          onRequestSkip={(id) => setSkipTaskId(id)}
+        />
+
+        <TaskSkipDrawer taskId={skipTaskId} onDismiss={() => setSkipTaskId(null)} />
       </div>
     </PageTransition>
+  )
+}
+
+export default function TasksPage() {
+  return (
+    <Suspense
+      fallback={
+        <PageTransition>
+          <div className="p-6 text-[var(--text-dim)]">Loading tasks…</div>
+        </PageTransition>
+      }
+    >
+      <TasksPageInner />
+    </Suspense>
   )
 }

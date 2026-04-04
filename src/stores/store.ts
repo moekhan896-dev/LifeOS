@@ -1,5 +1,8 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
+import { newId } from '@/lib/id'
+import { advanceRecurringDue, initialNextDue, type TaskRecurring } from '@/lib/task-recurring'
+import { buildProactiveCandidates } from '@/lib/proactive-engine'
 
 // ── Types ──
 export type Priority = 'crit' | 'high' | 'med' | 'low'
@@ -7,6 +10,16 @@ export type InsightType = 'revenue' | 'risk' | 'efficiency'
 export type DriverStatus = 'LIVE' | 'BUILD' | 'TEST' | 'PLAN' | 'IDEA' | 'STALE' | 'NEVER TRIED'
 export type BusinessType = 'agency' | 'service' | 'app' | 'content' | 'real_estate' | 'coaching' | 'other'
 export type BusinessStatus = 'active_healthy' | 'active_slow' | 'active_prerevenue' | 'dormant' | 'backburner' | 'idea'
+
+export interface TeamMember {
+  id: string
+  name: string
+  title: string
+  whatTheyDo: string
+  compensation: string
+  createdAt: string
+  updatedAt: string
+}
 
 export interface Business {
   id: string
@@ -17,7 +30,16 @@ export interface Business {
   color: string
   icon: string
   notes?: string
+  dayToDay?: string
+  bottleneck?: string
+  tools?: string
+  revenueModel?: string
+  roleDetail?: string
+  teamMembers?: TeamMember[]
+  avgJobValue?: number
+  jobsPerMonth?: number
   createdAt: string
+  updatedAt?: string
 }
 
 export interface Client {
@@ -28,10 +50,19 @@ export interface Client {
   adSpend: number
   serviceType: string
   meetingFrequency: string
+  relationshipHealth?: string
   startDate?: string
   active: boolean
   createdAt: string
+  updatedAt?: string
 }
+
+/** PRD GAP 13 — AI task value lane */
+export type TaskValueCategory =
+  | 'direct_revenue'
+  | 'revenue_generating'
+  | 'infrastructure'
+  | 'health_correlation'
 
 export interface Task {
   id: string
@@ -44,8 +75,29 @@ export interface Task {
   xpValue: number
   drip?: DripZone
   projectId?: string
+  dollarValue?: number
+  dollarReasoning?: string
+  /** PRD GAP 13 */
+  taskValueCategory?: TaskValueCategory
+  skipReason?: string
+  skipCount?: number
+  aiSuggested?: boolean
+  subtasks?: Array<{ text: string; done: boolean }>
+  /** PRD §10.1 — recurring; nextDue ISO */
+  recurring?: TaskRecurring
+  /** PRD §10.5 — open tasks only; todo vs in progress */
+  kanbanLane?: 'todo' | 'in_progress'
   createdAt: string
   completedAt?: string
+  updatedAt?: string
+}
+
+/** PRD Batch 2 — weekly AI goal grades (12-week chart slot) */
+export interface WeeklyScorecardSlot {
+  rate: number
+  aiByGoal?: { goalId: string; grade: string; feedback: string }[]
+  weekKey?: string
+  generatedAt?: string
 }
 
 export interface Insight { id: string; type: InsightType; priority: string; title: string; body: string; rating?: 'up' | 'down' | null; snoozedUntil?: string; createdAt: string }
@@ -82,7 +134,19 @@ export interface Goal {
 export interface Project {
   id: string; name: string; description: string; businessId?: string; goalId?: string
   impact: number; confidence: number; ease: number
-  status: ProjectStatus; progress: number; deadline?: string; createdAt: string
+  status: ProjectStatus; progress: number
+  /** Optional explicit start; else roadmap uses createdAt (GAP 9). */
+  startDate?: string
+  deadline?: string
+  createdAt: string
+}
+
+/** PRD §12.1 §6 — Profit First bucket percentages (should sum to 100). */
+export interface ProfitFirstPct {
+  ownersPay: number
+  tax: number
+  operating: number
+  profit: number
 }
 
 export interface FocusSession {
@@ -96,8 +160,14 @@ export interface KnowledgeEntry {
 }
 
 export interface AiReport {
-  id: string; level: 'daily' | 'weekly' | 'monthly' | 'quarterly' | 'annual'
-  content: string; date: string; grade?: string; createdAt: string
+  id: string
+  level: 'daily' | 'weekly' | 'monthly' | 'quarterly' | 'annual' | 'custom'
+  content: string
+  date: string
+  grade?: string
+  /** For custom on-demand reports */
+  topic?: string
+  createdAt: string
 }
 
 // ── V2 Intelligence Types ──
@@ -114,9 +184,17 @@ export interface SkillLevel {
   id: string; category: string; skill: string; level: number; xp: number
 }
 
+export type DecisionOutcomeRating = 'better' | 'as_expected' | 'worse' | 'much_worse'
+
 export interface DecisionEntry {
-  id: string; decision: string; reasoning: string; expectedOutcome: string
-  actualOutcome?: string; reviewDate?: string; createdAt: string
+  id: string
+  decision: string
+  reasoning: string
+  expectedOutcome: string
+  actualOutcome?: string
+  outcomeRating?: DecisionOutcomeRating
+  reviewDate?: string
+  createdAt: string
 }
 
 export interface TimeCapsule {
@@ -128,19 +206,80 @@ export interface AccountabilityContract {
 }
 
 export interface WeeklyReflection {
-  id: string; weekStart: string; worked: string; didnt: string; avoided: string; change: string; grateful: string; createdAt: string
+  id: string
+  weekStart: string
+  worked: string
+  didnt: string
+  avoided: string
+  change: string
+  grateful: string
+  /** PRD §20.5 — end-of-day voice transcript */
+  eveningVoiceTranscript?: string
+  reflectionKind?: 'standard' | 'evening_voice'
+  createdAt: string
 }
 
 export interface ContactEntry {
   id: string; name: string; role: string; lastContact?: string; notes?: string
 }
 
+export interface BalanceSheetAsset {
+  id: string
+  name: string
+  assetType: string
+  value: number
+  createdAt: string
+  updatedAt?: string
+}
+
+export interface BalanceSheetDebt {
+  id: string
+  label: string
+  balance: number
+  monthlyPayment: number
+  createdAt: string
+  updatedAt?: string
+}
+
 export type BusinessHealth = 'strong' | 'weak' | 'flatline'
+
+export type ProactivePriority = 'critical' | 'important' | 'informational'
+
+/** AI inbox item — template or API-generated (PRD §8.3, GAP 5–6) */
+export interface ProactiveMessage {
+  id: string
+  triggerId: string
+  priority: ProactivePriority
+  body: string
+  createdAt: string
+  read: boolean
+  /** Optional deep link (e.g. decision review) */
+  ctaHref?: string
+}
+
+export interface DailyNetSnapshot {
+  date: string
+  net: number
+}
+
+export interface MentorPersona {
+  id: string
+  name: string
+  description: string
+  isBuiltin: boolean
+  sourceUrls: string[]
+  createdAt: string
+}
 
 interface AppState {
   // ── Auth & Onboarding ──
   authenticated: boolean
+  /** Legacy plaintext PIN — cleared after migration to pinHash */
   pin: string
+  pinHash: string
+  pinFailedAttempts: number
+  pinLockoutUntil: number
+  lastOpenedAt: string | null
   onboardingComplete: boolean
   userName: string
   userLocation: string
@@ -154,6 +293,8 @@ interface AppState {
   northStarMetric: string
   wakeUpTime: string
   actualWakeTime: string
+  workDayStart: string
+  workDayEnd: string
   exercise: string
   dietQuality: string
   caffeineType: string
@@ -177,12 +318,44 @@ interface AppState {
   savingsRange: string
   anthropicKey: string
   stripeKey: string
+  idealDay: string
+  whatNeedsToBeTrue: string
+  aiFrequency: string
+  aiReasoningDisplay: string
+  factorHealthInBusiness: boolean
+  smokingStatus: string
+  habitsToBuild: string[]
+  faithDashboardVisibility: string
+  calendarConnected: boolean
+  plaidConnected: boolean
+  exitIntent: string
+  /** GAP 4 — geocoded from userLocation for adhan.js */
+  userLat: number | null
+  userLng: number | null
+  /** GAP 4 — CalculationMethod key, default ISNA */
+  prayerCalcMethod: string
+  /** GAP 4 — Hanafi vs Shafi for Asr */
+  prayerAsrHanafi: boolean
+  /** PRD §12.1 §6 */
+  profitFirstPct: ProfitFirstPct
+  /** PRD §12.1 §7 — estimated income tax rate for quarterly liability */
+  estimatedIncomeTaxRatePct: number
+  setProfitFirstPct: (p: Partial<ProfitFirstPct>) => void
+  /** In-app notification toggles (browser push is future). PRD — notification preferences. */
+  notificationPrefs: { proactiveInbox: boolean; morningBrief: boolean; weeklyDigest: boolean }
   trackingPrefs: { prayers: boolean; gym: boolean; sleep: boolean; meals: boolean; energyDrinks: boolean; screenTime: boolean; gambling: boolean; coldEmail: boolean }
   setAuthenticated: (v: boolean) => void
-  setPin: (v: string) => void
+  setPinHash: (hex: string) => void
+  recordPinFailure: () => void
+  resetPinSecurity: () => void
+  /** Last execution score zone label — used to emit `score_zone_changed` once per boundary cross (GAP 26). */
+  lastScoreZoneLabel: string | null
+  syncScoreZoneFromExecution: () => void
+  touchLastOpened: () => void
   completeOnboarding: () => void
-  updateProfile: (updates: Partial<Pick<AppState, 'userName' | 'userLocation' | 'userAge' | 'userSituation' | 'incomeTarget' | 'targetDate' | 'incomeWhy' | 'exitTarget' | 'exitBusinessId' | 'northStarMetric' | 'wakeUpTime' | 'actualWakeTime' | 'exercise' | 'dietQuality' | 'caffeineType' | 'caffeineAmount' | 'phoneScreenTime' | 'energyLevel' | 'stressLevel' | 'hasFaith' | 'faithTradition' | 'trackPrayers' | 'faithConsistency' | 'faithRoleModel' | 'procrastination' | 'patterns' | 'biggestDistraction' | 'tryingToQuit' | 'lockedInMemory' | 'aiAvoidanceStyle' | 'aiPushStyle' | 'aiMotivators' | 'savingsRange' | 'anthropicKey' | 'stripeKey'>>) => void
+  updateProfile: (updates: Partial<Pick<AppState, 'userName' | 'userLocation' | 'userAge' | 'userSituation' | 'incomeTarget' | 'targetDate' | 'incomeWhy' | 'exitTarget' | 'exitBusinessId' | 'northStarMetric' | 'wakeUpTime' | 'actualWakeTime' | 'workDayStart' | 'workDayEnd' | 'exercise' | 'dietQuality' | 'caffeineType' | 'caffeineAmount' | 'phoneScreenTime' | 'energyLevel' | 'stressLevel' | 'hasFaith' | 'faithTradition' | 'trackPrayers' | 'faithConsistency' | 'faithRoleModel' | 'procrastination' | 'patterns' | 'biggestDistraction' | 'tryingToQuit' | 'lockedInMemory' | 'aiAvoidanceStyle' | 'aiPushStyle' | 'aiMotivators' | 'savingsRange' | 'anthropicKey' | 'stripeKey' | 'idealDay' | 'whatNeedsToBeTrue' | 'aiFrequency' | 'aiReasoningDisplay' | 'factorHealthInBusiness' | 'smokingStatus' | 'habitsToBuild' | 'faithDashboardVisibility' | 'calendarConnected' | 'plaidConnected' | 'exitIntent' | 'userLat' | 'userLng' | 'prayerCalcMethod' | 'prayerAsrHanafi' | 'profitFirstPct' | 'estimatedIncomeTaxRatePct'>>) => void
   setTrackingPrefs: (prefs: Partial<AppState['trackingPrefs']>) => void
+  setNotificationPrefs: (prefs: Partial<AppState['notificationPrefs']>) => void
   resetAll: () => void
   seedDefaultData: () => void
 
@@ -200,6 +373,13 @@ interface AppState {
   updateBusiness: (id: string, updates: Partial<Business>) => void
   deleteBusiness: (id: string) => void
 
+  // ── Net worth (user data only) ──
+  balanceSheetAssets: BalanceSheetAsset[]
+  balanceSheetDebts: BalanceSheetDebt[]
+  setBalanceSheet: (assets: BalanceSheetAsset[], debts: BalanceSheetDebt[]) => void
+  updateBalanceSheetAsset: (id: string, updates: Partial<BalanceSheetAsset>) => void
+  updateBalanceSheetDebt: (id: string, updates: Partial<BalanceSheetDebt>) => void
+
   // ── Clients ──
   clients: Client[]
   addClient: (c: Omit<Client, 'id' | 'createdAt'>) => void
@@ -208,10 +388,12 @@ interface AppState {
 
   // ── Tasks ──
   tasks: Task[]
-  addTask: (t: Omit<Task, 'id' | 'createdAt'>) => void
+  addTask: (t: Omit<Task, 'id' | 'createdAt'>) => string
   toggleTask: (id: string) => void
   deleteTask: (id: string) => void
   updateTask: (id: string, updates: Partial<Task>) => void
+  /** PRD §10.5 — skip flow: increments skipCount, sets skipReason */
+  recordTaskSkip: (id: string, reason: string) => void
 
   // ── Insights ──
   insights: Insight[]
@@ -251,7 +433,7 @@ interface AppState {
 
   // ── Commitments ──
   commitments: Commitment[]
-  addCommitment: (text: string, source: string, dueDate?: string) => void
+  addCommitment: (text: string, source: string, dueDate?: string) => string
   fulfillCommitment: (id: string) => void
 
   // ── Wins ──
@@ -309,7 +491,13 @@ interface AppState {
   addVoiceMemo: (transcript: string) => void
 
   // ── Scorecards ──
-  scorecards: any[]
+  scorecards: (WeeklyScorecardSlot | null)[]
+  /** ISO week key (Sunday date) of last auto AI weekly grading */
+  lastWeeklyScorecardWeekKey: string | null
+  /** PRD §22 — last auto weekly report week (same Sunday key pattern as scorecard) */
+  lastWeeklyReportWeekKey: string | null
+  setLastWeeklyReportWeekKey: (key: string | null) => void
+  applyWeeklyScorecard: (weekIndex: number, slot: WeeklyScorecardSlot) => void
 
   // ── Identity & Vision ──
   identityStatements: IdentityStatement[]
@@ -358,7 +546,7 @@ interface AppState {
   skillLevels: SkillLevel[]
   addSkillXp: (category: string, skill: string, xp: number) => void
   decisionJournal: DecisionEntry[]
-  addDecision: (d: Omit<DecisionEntry, 'id' | 'createdAt'>) => void
+  addDecision: (d: Omit<DecisionEntry, 'id' | 'createdAt'>) => string
   updateDecision: (id: string, updates: Partial<DecisionEntry>) => void
   deleteDecision: (id: string) => void
   timeCapsules: TimeCapsule[]
@@ -373,25 +561,87 @@ interface AppState {
   updateContact: (id: string, updates: Partial<ContactEntry>) => void
   deleteContact: (id: string) => void
   contextualQuotes: string[]
+
+  // ── Proactive AI inbox & net history (PRD §8.3, GAP 6, GAP 18) ──
+  proactiveMessages: ProactiveMessage[]
+  lastProactiveCheck: string | null
+  proactiveDayKey: string
+  proactiveGeneratedToday: number
+  dailyNetSnapshots: DailyNetSnapshot[]
+  markProactiveRead: (id: string) => void
+  dismissProactive: (id: string) => void
+  runProactiveEvaluation: () => void
+  appendDailyNetSnapshot: () => void
+
+  // ── Mentors (PRD §7.4) ──
+  mentorPersonas: MentorPersona[]
+  addMentorPersona: (m: Omit<MentorPersona, 'id' | 'createdAt'>) => void
+  removeMentorPersona: (id: string) => void
 }
 
-const uid = () => Math.random().toString(36).slice(2, 10) + Date.now().toString(36)
+const uid = () => newId()
 const today = () => new Date().toISOString().split('T')[0]
 
+const PRAYER_TIME_OF_DAY: Record<string, string> = {
+  fajr: 'morning',
+  dhuhr: 'midday',
+  asr: 'afternoon',
+  maghrib: 'evening',
+  isha: 'night',
+}
+
+function builtinMentors(): MentorPersona[] {
+  const t = new Date().toISOString()
+  return [
+    { id: 'm-op', name: 'The Operator', description: 'Scale systems, hire, delegate.', isBuiltin: true, sourceUrls: [], createdAt: t },
+    { id: 'm-inv', name: 'The Investor', description: "What's the ROI? Show the numbers.", isBuiltin: true, sourceUrls: [], createdAt: t },
+    { id: 'm-bld', name: 'The Builder', description: 'Ship fast, iterate, avoid overthinking.', isBuiltin: true, sourceUrls: [], createdAt: t },
+    { id: 'm-min', name: 'The Minimalist', description: 'Do less, better. Cut non-essentials.', isBuiltin: true, sourceUrls: [], createdAt: t },
+  ]
+}
+
 const INITIAL_TRACKING = { prayers: true, gym: true, sleep: true, meals: true, energyDrinks: true, screenTime: true, gambling: true, coldEmail: true }
+const INITIAL_NOTIFICATIONS = { proactiveInbox: true, morningBrief: false, weeklyDigest: false }
+
+export function getClientNet(c: Client) {
+  return c.grossMonthly - c.adSpend - c.grossMonthly * 0.03
+}
+
+/** Aligns with Financial Command: client net when present, else business MRR. */
+export function computeMonthlyMoneySnapshot(s: {
+  businesses: Business[]
+  clients: Client[]
+  expenseEntries: ExpenseEntry[]
+}) {
+  const incomeStreams = s.businesses
+    .filter((b) => b.monthlyRevenue > 0 || s.clients.some((c) => c.businessId === b.id && c.active))
+    .map((b) => {
+      const bizClients = s.clients.filter((c) => c.businessId === b.id && c.active)
+      const clientNet = bizClients.reduce((acc, c) => acc + getClientNet(c), 0)
+      return clientNet > 0 ? clientNet : b.monthlyRevenue
+    })
+  const totalIncome = incomeStreams.reduce((a, n) => a + n, 0)
+  const recurringCosts = s.expenseEntries.filter((e) => e.recurring).reduce((a, e) => a + e.amount, 0)
+  return { totalIncome, recurringCosts, net: totalIncome - recurringCosts }
+}
 
 export const useStore = create<AppState>()(
   persist(
     (set, get) => ({
       // ── Auth & Onboarding ──
       authenticated: false,
-      pin: '1234',
+      pin: '',
+      pinHash: '',
+      pinFailedAttempts: 0,
+      pinLockoutUntil: 0,
+      lastOpenedAt: null,
+      lastScoreZoneLabel: null,
       onboardingComplete: false,
       userName: '',
       userLocation: '',
       userAge: 0,
       userSituation: '',
-      incomeTarget: 50000,
+      incomeTarget: 0,
       targetDate: '',
       incomeWhy: '',
       exitTarget: 0,
@@ -399,6 +649,8 @@ export const useStore = create<AppState>()(
       northStarMetric: '',
       wakeUpTime: '07:00',
       actualWakeTime: '08:00',
+      workDayStart: '',
+      workDayEnd: '',
       exercise: '',
       dietQuality: '',
       caffeineType: '',
@@ -422,19 +674,143 @@ export const useStore = create<AppState>()(
       savingsRange: '',
       anthropicKey: '',
       stripeKey: '',
+      idealDay: '',
+      whatNeedsToBeTrue: '',
+      aiFrequency: '',
+      aiReasoningDisplay: '',
+      factorHealthInBusiness: true,
+      smokingStatus: '',
+      habitsToBuild: [],
+      faithDashboardVisibility: '',
+      calendarConnected: false,
+      plaidConnected: false,
+      exitIntent: '',
+      userLat: null,
+      userLng: null,
+      prayerCalcMethod: 'north_america',
+      prayerAsrHanafi: false,
+      profitFirstPct: { ownersPay: 50, tax: 15, operating: 30, profit: 5 },
+      estimatedIncomeTaxRatePct: 30,
+      setProfitFirstPct: (p) =>
+        set((s) => {
+          const next = { ...s.profitFirstPct, ...p }
+          const sum = next.ownersPay + next.tax + next.operating + next.profit
+          if (sum <= 0) return {}
+          const f = 100 / sum
+          return {
+            profitFirstPct: {
+              ownersPay: Math.round(next.ownersPay * f * 10) / 10,
+              tax: Math.round(next.tax * f * 10) / 10,
+              operating: Math.round(next.operating * f * 10) / 10,
+              profit: Math.round(next.profit * f * 10) / 10,
+            },
+          }
+        }),
+      notificationPrefs: { ...INITIAL_NOTIFICATIONS },
       trackingPrefs: { ...INITIAL_TRACKING },
       setAuthenticated: (v) => set({ authenticated: v }),
-      setPin: (v) => set({ pin: v }),
+      setPinHash: (hex) => set({ pinHash: hex, pin: '' }),
+      recordPinFailure: () =>
+        set((s) => {
+          const n = s.pinFailedAttempts + 1
+          let until = s.pinLockoutUntil
+          if (n >= 10) until = Math.max(until, Date.now() + 30 * 60 * 1000)
+          else if (n >= 5) until = Math.max(until, Date.now() + 5 * 60 * 1000)
+          else if (n >= 3) until = Math.max(until, Date.now() + 30 * 1000)
+          return { pinFailedAttempts: n, pinLockoutUntil: until }
+        }),
+      resetPinSecurity: () => set({ pinFailedAttempts: 0, pinLockoutUntil: 0 }),
+      syncScoreZoneFromExecution: () => {
+        const s = get()
+        const day = s.todayHealth.date
+        const tasksDoneToday = s.tasks.filter((t) => t.done && t.completedAt?.startsWith(day)).length
+        const todayFocusCount = s.focusSessions.filter((f) => f.startedAt?.startsWith(day)).length
+        const tasksCommitted = s.tasks.filter(
+          (t) => t.createdAt.startsWith(day) || (!t.done && t.priority !== 'low')
+        ).length
+        const score = getExecutionScore(
+          s.todayHealth,
+          tasksCommitted,
+          tasksDoneToday,
+          todayFocusCount,
+          s.trackPrayers
+        )
+        const newZone = getScoreZone(score).label
+        const prev = s.lastScoreZoneLabel
+        if (prev != null && prev !== newZone) {
+          get().logEvent('score_zone_changed', { oldZone: prev, newZone, score })
+        }
+        if (prev !== newZone) set({ lastScoreZoneLabel: newZone })
+      },
+      touchLastOpened: () => {
+        const prev = get().lastOpenedAt
+        const daysSinceLastOpen = prev
+          ? Math.floor((Date.now() - new Date(prev).getTime()) / 86400000)
+          : 0
+        set({ lastOpenedAt: new Date().toISOString() })
+        queueMicrotask(() => {
+          get().logEvent('app_opened', { daysSinceLastOpen })
+        })
+      },
       completeOnboarding: () => set({ onboardingComplete: true }),
       updateProfile: (updates) => set(updates),
       setTrackingPrefs: (prefs) => set((s) => ({ trackingPrefs: { ...s.trackingPrefs, ...prefs } })),
-      resetAll: () => set({ onboardingComplete: false, authenticated: false, businesses: [], clients: [], tasks: [], insights: [], ideas: [], drivers: [], wins: [], commitments: [], pipeline: [], sops: [], gmbProfiles: [], revenueEntries: [], expenseEntries: [], aiMessages: [], xp: 0, level: 1, streaks: [
+      setNotificationPrefs: (prefs) =>
+        set((s) => ({ notificationPrefs: { ...s.notificationPrefs, ...prefs } })),
+      resetAll: () =>
+        set({
+          onboardingComplete: false,
+          authenticated: false,
+          pin: '',
+          pinHash: '',
+          pinFailedAttempts: 0,
+          pinLockoutUntil: 0,
+          lastOpenedAt: null,
+          lastScoreZoneLabel: null,
+          plaidConnected: false,
+          calendarConnected: false,
+          balanceSheetAssets: [],
+          balanceSheetDebts: [],
+          proactiveMessages: [],
+          lastProactiveCheck: null,
+          proactiveDayKey: '',
+          proactiveGeneratedToday: 0,
+          dailyNetSnapshots: [],
+          userLat: null,
+          userLng: null,
+          prayerCalcMethod: 'north_america',
+          prayerAsrHanafi: false,
+          profitFirstPct: { ownersPay: 50, tax: 15, operating: 30, profit: 5 },
+          estimatedIncomeTaxRatePct: 30,
+          notificationPrefs: { ...INITIAL_NOTIFICATIONS },
+          mentorPersonas: builtinMentors(),
+          businesses: [],
+          clients: [],
+          tasks: [],
+          insights: [],
+          ideas: [],
+          drivers: [],
+          wins: [],
+          commitments: [],
+          pipeline: [],
+          sops: [],
+          gmbProfiles: [],
+          revenueEntries: [],
+          expenseEntries: [],
+          aiMessages: [],
+          xp: 0,
+          level: 1,
+          streaks: [
         { habit: 'prayer', currentStreak: 0, longestStreak: 0 },
         { habit: 'gym', currentStreak: 0, longestStreak: 0 },
         { habit: 'sleep', currentStreak: 0, longestStreak: 0 },
         { habit: 'no_gamble', currentStreak: 0, longestStreak: 0 },
         { habit: 'cold_email', currentStreak: 0, longestStreak: 0 },
-      ] }),
+      ],
+          scorecards: Array.from({ length: 12 }, () => null) as (WeeklyScorecardSlot | null)[],
+          lastWeeklyScorecardWeekKey: null,
+          lastWeeklyReportWeekKey: null,
+        }),
 
       seedDefaultData: () => {
         // No-op: all data comes from onboarding. Kept for interface compatibility.
@@ -450,43 +826,243 @@ export const useStore = create<AppState>()(
 
       // ── Businesses ──
       businesses: [],
-      addBusiness: (b) => set((s) => ({ businesses: [...s.businesses, { ...b, id: uid(), createdAt: new Date().toISOString() }] })),
-      updateBusiness: (id, updates) => set((s) => ({ businesses: s.businesses.map((b) => b.id === id ? { ...b, ...updates } : b) })),
+      addBusiness: (b) =>
+        set((s) => ({
+          businesses: [
+            ...s.businesses,
+            {
+              ...b,
+              id: newId(),
+              createdAt: new Date().toISOString(),
+              updatedAt: new Date().toISOString(),
+            },
+          ],
+        })),
+      updateBusiness: (id, updates) =>
+        set((s) => ({
+          businesses: s.businesses.map((b) =>
+            b.id === id ? { ...b, ...updates, updatedAt: new Date().toISOString() } : b
+          ),
+        })),
       deleteBusiness: (id) => set((s) => ({ businesses: s.businesses.filter((b) => b.id !== id) })),
+
+      balanceSheetAssets: [],
+      balanceSheetDebts: [],
+      setBalanceSheet: (assets, debts) => set({ balanceSheetAssets: assets, balanceSheetDebts: debts }),
+      updateBalanceSheetAsset: (id, updates) =>
+        set((s) => ({
+          balanceSheetAssets: s.balanceSheetAssets.map((a) =>
+            a.id === id ? { ...a, ...updates, updatedAt: new Date().toISOString() } : a
+          ),
+        })),
+      updateBalanceSheetDebt: (id, updates) =>
+        set((s) => ({
+          balanceSheetDebts: s.balanceSheetDebts.map((d) =>
+            d.id === id ? { ...d, ...updates, updatedAt: new Date().toISOString() } : d
+          ),
+        })),
 
       // ── Clients ──
       clients: [],
-      addClient: (c) => set((s) => ({ clients: [...s.clients, { ...c, id: uid(), createdAt: new Date().toISOString() }] })),
-      updateClient: (id, updates) => set((s) => ({ clients: s.clients.map((c) => c.id === id ? { ...c, ...updates } : c) })),
+      addClient: (c) =>
+        set((s) => ({
+          clients: [
+            ...s.clients,
+            {
+              ...c,
+              id: newId(),
+              createdAt: new Date().toISOString(),
+              updatedAt: new Date().toISOString(),
+            },
+          ],
+        })),
+      updateClient: (id, updates) =>
+        set((s) => ({
+          clients: s.clients.map((c) =>
+            c.id === id ? { ...c, ...updates, updatedAt: new Date().toISOString() } : c
+          ),
+        })),
       deleteClient: (id) => set((s) => ({ clients: s.clients.filter((c) => c.id !== id) })),
 
       // ── Tasks ──
       tasks: [],
-      addTask: (t) => set((s) => ({ tasks: [...s.tasks, { ...t, id: uid(), createdAt: new Date().toISOString() }] })),
-      toggleTask: (id) => set((s) => {
-        const tasks = s.tasks.map((t) => {
-          if (t.id !== id) return t
-          const done = !t.done
-          if (done) { const xp = s.xp + t.xpValue; setTimeout(() => set({ xp, level: Math.floor(xp / 500) + 1 }), 0) }
-          return { ...t, done, completedAt: done ? new Date().toISOString() : undefined }
+      addTask: (t) => {
+        const id = uid()
+        set((s) => ({
+          tasks: [
+            ...s.tasks,
+            {
+              ...t,
+              skipCount: t.skipCount ?? 0,
+              aiSuggested: t.aiSuggested ?? false,
+              id,
+              createdAt: new Date().toISOString(),
+            },
+          ],
+        }))
+        get().logEvent('task_created', {
+          taskId: id,
+          priority: t.priority,
+          businessId: t.businessId,
+          aiSuggested: t.aiSuggested ?? false,
         })
-        return { tasks }
-      }),
+        return id
+      },
+      toggleTask: (id) => {
+        set((s) => {
+          const target = s.tasks.find((t) => t.id === id)
+          if (!target) return {}
+          const willComplete = !target.done
+          let xp = s.xp
+          let level = s.level
+
+          if (willComplete) {
+            xp += target.xpValue
+            while (xp >= 100) {
+              xp -= 100
+              level += 1
+            }
+          } else if (target.done) {
+            xp = Math.max(0, xp - target.xpValue)
+          }
+
+          let tasks = s.tasks.map((t) => {
+            if (t.id !== id) return t
+            if (willComplete) {
+              const row = {
+                ...t,
+                done: true,
+                completedAt: new Date().toISOString(),
+                kanbanLane: undefined as Task['kanbanLane'],
+              }
+              if (t.recurring) {
+                return { ...row, recurring: undefined }
+              }
+              return row
+            }
+            return { ...t, done: false, completedAt: undefined }
+          })
+
+          if (willComplete && target.recurring) {
+            const nextDue = advanceRecurringDue(target.recurring)
+            const nid = uid()
+            const spawned: Task = {
+              id: nid,
+              businessId: target.businessId,
+              text: target.text,
+              tag: target.tag,
+              priority: target.priority,
+              done: false,
+              xpValue: target.xpValue,
+              dueDate: target.dueDate,
+              drip: target.drip,
+              projectId: target.projectId,
+              dollarValue: target.dollarValue,
+              dollarReasoning: target.dollarReasoning,
+              taskValueCategory: target.taskValueCategory,
+              skipReason: undefined,
+              skipCount: 0,
+              aiSuggested: target.aiSuggested,
+              subtasks: target.subtasks?.map((st) => ({ text: st.text, done: false })),
+              recurring: { frequency: target.recurring.frequency, nextDue },
+              kanbanLane: 'todo',
+              createdAt: new Date().toISOString(),
+            }
+            tasks = [...tasks, spawned]
+            queueMicrotask(() => {
+              get().logEvent('task_created', {
+                taskId: nid,
+                priority: spawned.priority,
+                businessId: spawned.businessId,
+                aiSuggested: false,
+              })
+            })
+          }
+
+          return { tasks, xp, level }
+        })
+        const task = get().tasks.find((x) => x.id === id)
+        if (task?.done) {
+          get().logEvent('task_completed', {
+            taskId: id,
+            xpValue: task.xpValue,
+            dollarValue: task.dollarValue,
+            priority: task.priority,
+            businessId: task.businessId,
+          })
+        }
+      },
       deleteTask: (id) => set((s) => ({ tasks: s.tasks.filter((t) => t.id !== id) })),
-      updateTask: (id, updates) => set((s) => ({ tasks: s.tasks.map((t) => t.id === id ? { ...t, ...updates } : t) })),
+      updateTask: (id, updates) => {
+        set((s) => ({
+          tasks: s.tasks.map((t) => (t.id === id ? { ...t, ...updates, updatedAt: new Date().toISOString() } : t)),
+        }))
+        if (updates.skipReason != null && String(updates.skipReason).length > 0) {
+          const t = get().tasks.find((x) => x.id === id)
+          if (t)
+            get().logEvent('task_skipped', {
+              taskId: id,
+              reason: updates.skipReason,
+              skipCount: t.skipCount ?? 0,
+            })
+        }
+      },
+      recordTaskSkip: (id, reason) => {
+        set((s) => ({
+          tasks: s.tasks.map((t) =>
+            t.id === id
+              ? {
+                  ...t,
+                  skipReason: reason,
+                  skipCount: (t.skipCount ?? 0) + 1,
+                  updatedAt: new Date().toISOString(),
+                }
+              : t
+          ),
+        }))
+        const t = get().tasks.find((x) => x.id === id)
+        get().logEvent('task_skipped', {
+          taskId: id,
+          reason,
+          skipCount: t?.skipCount ?? 0,
+        })
+      },
 
       // ── Insights ──
       insights: [],
       addInsight: (i) => set((s) => ({ insights: [{ ...i, id: uid(), createdAt: new Date().toISOString() }, ...s.insights] })),
-      rateInsight: (id, rating) => set((s) => ({ insights: s.insights.map((i) => i.id === id ? { ...i, rating } : i) })),
+      rateInsight: (id, rating) => {
+        set((s) => ({ insights: s.insights.map((i) => (i.id === id ? { ...i, rating } : i)) }))
+        get().logEvent('ai_feedback', { messageId: id, rating })
+      },
       snoozeInsight: (id) => { const d = new Date(); d.setDate(d.getDate() + 7); set((s) => ({ insights: s.insights.map((i) => i.id === id ? { ...i, snoozedUntil: d.toISOString() } : i) })) },
       dismissInsight: (id) => set((s) => ({ insights: s.insights.filter((i) => i.id !== id) })),
 
       // ── Health ──
       todayHealth: { date: today(), prayers: { fajr: false, dhuhr: false, asr: false, maghrib: false, isha: false }, gym: false, energyDrinks: 0, screenTimeHours: 0, dailyScore: 0 },
       healthHistory: [],
-      updateHealth: (updates) => set((s) => ({ todayHealth: { ...s.todayHealth, ...updates } })),
-      togglePrayer: (prayer) => set((s) => ({ todayHealth: { ...s.todayHealth, prayers: { ...s.todayHealth.prayers, [prayer]: !s.todayHealth.prayers[prayer] } } })),
+      updateHealth: (updates) => {
+        const prevGym = get().todayHealth.gym
+        set((s) => ({ todayHealth: { ...s.todayHealth, ...updates } }))
+        if (updates.gym === true && !prevGym) get().updateStreak('gym', true)
+        else if (updates.gym === false && prevGym) get().updateStreak('gym', false)
+      },
+      togglePrayer: (prayer) => {
+        const was = get().todayHealth.prayers[prayer as keyof HealthLog['prayers']]
+        set((s) => ({
+          todayHealth: {
+            ...s.todayHealth,
+            prayers: { ...s.todayHealth.prayers, [prayer]: !s.todayHealth.prayers[prayer] },
+          },
+        }))
+        const on = get().todayHealth.prayers[prayer as keyof HealthLog['prayers']]
+        if (on && !was) {
+          get().logEvent('prayer_completed', {
+            prayer,
+            timeOfDay: PRAYER_TIME_OF_DAY[prayer] ?? 'day',
+          })
+        }
+      },
       saveHealthDay: () => set((s) => ({ healthHistory: [...s.healthHistory.filter((h) => h.date !== s.todayHealth.date), s.todayHealth] })),
 
       // ── Streaks ──
@@ -497,17 +1073,35 @@ export const useStore = create<AppState>()(
         { habit: 'no_gamble', currentStreak: 0, longestStreak: 0 },
         { habit: 'cold_email', currentStreak: 0, longestStreak: 0 },
       ],
-      updateStreak: (habit, completed) => set((s) => ({
-        streaks: s.streaks.map((st) => {
-          if (st.habit !== habit) return st
-          if (completed) { const n = st.currentStreak + 1; return { ...st, currentStreak: n, longestStreak: Math.max(n, st.longestStreak), lastCompleted: today() } }
-          return { ...st, currentStreak: 0 }
-        }),
-      })),
+      updateStreak: (habit, completed) => {
+        set((s) => ({
+          streaks: s.streaks.map((st) => {
+            if (st.habit !== habit) return st
+            if (completed) {
+              const n = st.currentStreak + 1
+              return { ...st, currentStreak: n, longestStreak: Math.max(n, st.longestStreak), lastCompleted: today() }
+            }
+            return { ...st, currentStreak: 0 }
+          }),
+        }))
+        if (completed) {
+          const st = get().streaks.find((x) => x.habit === habit)
+          get().logEvent('habit_completed', { habit, streakCount: st?.currentStreak ?? 0 })
+        }
+      },
 
       // ── Gamification ──
       xp: 0, level: 1,
-      addXp: (amount) => set((s) => { const xp = s.xp + amount; return { xp, level: Math.floor(xp / 500) + 1 } }),
+      addXp: (amount) =>
+        set((s) => {
+          let xp = s.xp + amount
+          let level = s.level
+          while (xp >= 100) {
+            xp -= 100
+            level += 1
+          }
+          return { xp, level }
+        }),
 
       // ── Ideas ──
       ideas: [],
@@ -524,8 +1118,35 @@ export const useStore = create<AppState>()(
 
       // ── Commitments ──
       commitments: [],
-      addCommitment: (text, source, dueDate) => set((s) => ({ commitments: [...s.commitments, { id: uid(), text, source, dueDate, fulfilled: false, createdAt: new Date().toISOString() }] })),
-      fulfillCommitment: (id) => set((s) => ({ commitments: s.commitments.map((c) => c.id === id ? { ...c, fulfilled: true, fulfilledDate: today() } : c) })),
+      addCommitment: (text, source, dueDate) => {
+        const cid = uid()
+        set((s) => ({
+          commitments: [
+            ...s.commitments,
+            { id: cid, text, source, dueDate, fulfilled: false, createdAt: new Date().toISOString() },
+          ],
+        }))
+        get().logEvent('commitment_made', { commitmentId: cid, source })
+        return cid
+      },
+      fulfillCommitment: (id) => {
+        const before = get().commitments.find((c) => c.id === id)
+        set((s) => ({
+          commitments: s.commitments.map((c) =>
+            c.id === id ? { ...c, fulfilled: true, fulfilledDate: today() } : c
+          ),
+        }))
+        const after = get().commitments.find((c) => c.id === id)
+        if (after?.fulfilled && before && !before.fulfilled) {
+          const daysToFulfill = Math.max(
+            0,
+            Math.floor(
+              (new Date(after.fulfilledDate!).getTime() - new Date(before.createdAt).getTime()) / 86400000
+            )
+          )
+          get().logEvent('commitment_fulfilled', { commitmentId: id, daysToFulfill })
+        }
+      },
 
       // ── Wins ──
       wins: [],
@@ -584,7 +1205,20 @@ export const useStore = create<AppState>()(
       addVoiceMemo: (transcript) => set((s) => ({ voiceMemos: [...s.voiceMemos, { id: uid(), transcript, createdAt: new Date().toISOString() }] })),
 
       // ── Scorecards ──
-      scorecards: [],
+      scorecards: Array.from({ length: 12 }, () => null) as (WeeklyScorecardSlot | null)[],
+      lastWeeklyScorecardWeekKey: null,
+      applyWeeklyScorecard: (weekIndex, slot) =>
+        set((s) => {
+          const sc = [...s.scorecards]
+          while (sc.length < 12) sc.push(null)
+          if (weekIndex >= 0 && weekIndex < 12) sc[weekIndex] = slot
+          return {
+            scorecards: sc,
+            lastWeeklyScorecardWeekKey: slot.weekKey ?? s.lastWeeklyScorecardWeekKey,
+          }
+        }),
+      lastWeeklyReportWeekKey: null,
+      setLastWeeklyReportWeekKey: (key) => set({ lastWeeklyReportWeekKey: key }),
 
       // ── Identity & Vision ──
       identityStatements: [],
@@ -600,20 +1234,55 @@ export const useStore = create<AppState>()(
 
       // ── Goals ──
       goals: [],
-      addGoal: (g) => set((s) => ({ goals: [...s.goals, { ...g, id: uid(), createdAt: new Date().toISOString() }] })),
+      addGoal: (g) => {
+        const gid = uid()
+        set((s) => ({ goals: [...s.goals, { ...g, id: gid, createdAt: new Date().toISOString() }] }))
+        get().logEvent('goal_created', {
+          goalId: gid,
+          targetMetric: g.targetMetric,
+          targetValue: g.targetValue,
+        })
+      },
       updateGoal: (id, updates) => set((s) => ({ goals: s.goals.map((g) => g.id === id ? { ...g, ...updates } : g) })),
       deleteGoal: (id) => set((s) => ({ goals: s.goals.filter((g) => g.id !== id) })),
 
       // ── Projects ──
       projects: [],
       addProject: (p) => set((s) => ({ projects: [...s.projects, { ...p, id: uid(), createdAt: new Date().toISOString() }] })),
-      updateProject: (id, updates) => set((s) => ({ projects: s.projects.map((p) => p.id === id ? { ...p, ...updates } : p) })),
+      updateProject: (id, updates) => {
+        const prev = get().projects.find((p) => p.id === id)
+        set((s) => ({ projects: s.projects.map((p) => (p.id === id ? { ...p, ...updates } : p)) }))
+        if (updates.status != null && prev && updates.status !== prev.status) {
+          get().logEvent('project_status_changed', {
+            projectId: id,
+            oldStatus: prev.status,
+            newStatus: updates.status,
+          })
+        }
+      },
       deleteProject: (id) => set((s) => ({ projects: s.projects.filter((p) => p.id !== id) })),
 
       // ── Focus Sessions ──
       focusSessions: [],
-      addFocusSession: (s_) => set((s) => ({ focusSessions: [...s.focusSessions, { ...s_, id: uid() }] })),
-      updateFocusSession: (id, updates) => set((s) => ({ focusSessions: s.focusSessions.map((f) => f.id === id ? { ...f, ...updates } : f) })),
+      addFocusSession: (s_) => {
+        const fid = uid()
+        set((s) => ({ focusSessions: [...s.focusSessions, { ...s_, id: fid }] }))
+        get().logEvent('focus_session_started', { taskId: s_.taskId, projectId: s_.projectId })
+      },
+      updateFocusSession: (id, updates) => {
+        const prev = get().focusSessions.find((f) => f.id === id)
+        set((s) => ({
+          focusSessions: s.focusSessions.map((f) => (f.id === id ? { ...f, ...updates } : f)),
+        }))
+        const next = get().focusSessions.find((f) => f.id === id)
+        if (updates.endedAt && prev && !prev.endedAt && next) {
+          get().logEvent('focus_session_ended', {
+            duration: next.duration,
+            quality: next.quality,
+            distractions: next.distractions,
+          })
+        }
+      },
 
       // ── Knowledge Vault ──
       knowledgeEntries: [],
@@ -627,29 +1296,37 @@ export const useStore = create<AppState>()(
 
       // ── V2 Intelligence ──
       behavioralEvents: [],
-      logEvent: (eventType, eventData) => set((s) => {
-        const score = getDailyScore(s.todayHealth, s.tasks.filter(t => t.done && t.completedAt?.startsWith(today())).length)
-        return { behavioralEvents: [...s.behavioralEvents.slice(-500), { id: uid(), eventType, eventData, timestamp: new Date().toISOString(), dayScoreAtTime: score }] }
-      }),
+      logEvent: (eventType, eventData) =>
+        set((s) => {
+          const day = s.todayHealth.date
+          const tasksDoneToday = s.tasks.filter((t) => t.done && t.completedAt?.startsWith(day)).length
+          const todayFocusCount = s.focusSessions.filter((f) => f.startedAt?.startsWith(day)).length
+          const tasksCommitted = s.tasks.filter(
+            (t) => t.createdAt.startsWith(day) || (!t.done && t.priority !== 'low')
+          ).length
+          const score = getExecutionScore(
+            s.todayHealth,
+            tasksCommitted,
+            tasksDoneToday,
+            todayFocusCount,
+            s.trackPrayers
+          )
+          return {
+            behavioralEvents: [
+              ...s.behavioralEvents.slice(-500),
+              {
+                id: uid(),
+                eventType,
+                eventData,
+                timestamp: new Date().toISOString(),
+                dayScoreAtTime: score,
+              },
+            ],
+          }
+        }),
       obstacleResponses: [],
       addObstacle: (o) => set((s) => ({ obstacleResponses: [...s.obstacleResponses, { ...o, id: uid(), createdAt: new Date().toISOString() }] })),
-      skillLevels: [
-        { id: '1', category: 'Marketing', skill: 'Cold Email', level: 8, xp: 0 },
-        { id: '2', category: 'Marketing', skill: 'GMB/SEO', level: 9, xp: 0 },
-        { id: '3', category: 'Marketing', skill: 'Paid Ads', level: 2, xp: 0 },
-        { id: '4', category: 'Marketing', skill: 'Content', level: 4, xp: 0 },
-        { id: '5', category: 'Marketing', skill: 'Branding', level: 3, xp: 0 },
-        { id: '6', category: 'Business', skill: 'Sales', level: 7, xp: 0 },
-        { id: '7', category: 'Business', skill: 'Finance', level: 2, xp: 0 },
-        { id: '8', category: 'Business', skill: 'Hiring', level: 1, xp: 0 },
-        { id: '9', category: 'Business', skill: 'SOPs', level: 1, xp: 0 },
-        { id: '10', category: 'Business', skill: 'Systems', level: 3, xp: 0 },
-        { id: '11', category: 'Personal', skill: 'Discipline', level: 2, xp: 0 },
-        { id: '12', category: 'Personal', skill: 'Fitness', level: 1, xp: 0 },
-        { id: '13', category: 'Personal', skill: 'Faith', level: 2, xp: 0 },
-        { id: '14', category: 'Personal', skill: 'Nutrition', level: 1, xp: 0 },
-        { id: '15', category: 'Personal', skill: 'Focus', level: 2, xp: 0 },
-      ],
+      skillLevels: [],
       addSkillXp: (category, skill, amount) => set((s) => ({
         skillLevels: s.skillLevels.map(sl => {
           if (sl.category === category && sl.skill === skill) {
@@ -661,7 +1338,13 @@ export const useStore = create<AppState>()(
         })
       })),
       decisionJournal: [],
-      addDecision: (d) => set((s) => ({ decisionJournal: [...s.decisionJournal, { ...d, id: uid(), createdAt: new Date().toISOString() }] })),
+      addDecision: (d) => {
+        const did = uid()
+        set((s) => ({
+          decisionJournal: [...s.decisionJournal, { ...d, id: did, createdAt: new Date().toISOString() }],
+        }))
+        return did
+      },
       updateDecision: (id, updates) => set((s) => ({ decisionJournal: s.decisionJournal.map(d => d.id === id ? { ...d, ...updates } : d) })),
       deleteDecision: (id) => set((s) => ({ decisionJournal: s.decisionJournal.filter(d => d.id !== id) })),
       timeCapsules: [],
@@ -676,13 +1359,92 @@ export const useStore = create<AppState>()(
       updateContact: (id, updates) => set((s) => ({ contacts: s.contacts.map(c => c.id === id ? { ...c, ...updates } : c) })),
       deleteContact: (id) => set((s) => ({ contacts: s.contacts.filter(c => c.id !== id) })),
       contextualQuotes: [],
+
+      proactiveMessages: [],
+      lastProactiveCheck: null,
+      proactiveDayKey: '',
+      proactiveGeneratedToday: 0,
+      dailyNetSnapshots: [],
+      markProactiveRead: (id) =>
+        set((s) => ({
+          proactiveMessages: s.proactiveMessages.map((m) => (m.id === id ? { ...m, read: true } : m)),
+        })),
+      dismissProactive: (id) =>
+        set((s) => ({ proactiveMessages: s.proactiveMessages.filter((m) => m.id !== id) })),
+      runProactiveEvaluation: () => {
+        const s = get()
+        const now = Date.now()
+        const fourH = 4 * 3600000
+        if (s.lastProactiveCheck && now - new Date(s.lastProactiveCheck).getTime() < fourH) return
+        const dayKey = today()
+        let gen = s.proactiveGeneratedToday
+        if (s.proactiveDayKey !== dayKey) gen = 0
+        const { net: monthlyNet } = computeMonthlyMoneySnapshot(s)
+        const candidates = buildProactiveCandidates({
+          clients: s.clients,
+          businesses: s.businesses,
+          tasks: s.tasks,
+          commitments: s.commitments,
+          revenueEntries: s.revenueEntries,
+          proactiveMessages: s.proactiveMessages,
+          anthropicKey: s.anthropicKey,
+          monthlyNet,
+          decisionJournal: s.decisionJournal,
+        })
+        const toAdd: ProactiveMessage[] = []
+        for (const c of candidates) {
+          if (gen >= 5) break
+          const dedupMs = (c.dedupHours ?? 24) * 3600000
+          const dup = s.proactiveMessages.some(
+            (m) => m.triggerId === c.triggerId && now - new Date(m.createdAt).getTime() < dedupMs
+          )
+          if (dup) continue
+          toAdd.push({
+            id: uid(),
+            triggerId: c.triggerId,
+            priority: c.priority,
+            body: c.body,
+            createdAt: new Date().toISOString(),
+            read: false,
+            ctaHref: c.ctaHref,
+          })
+          gen++
+        }
+        set({
+          proactiveMessages: [...toAdd, ...s.proactiveMessages],
+          lastProactiveCheck: new Date().toISOString(),
+          proactiveDayKey: dayKey,
+          proactiveGeneratedToday: gen,
+        })
+      },
+      appendDailyNetSnapshot: () =>
+        set((s) => {
+          const { net } = computeMonthlyMoneySnapshot(s)
+          const day = today()
+          const rest = s.dailyNetSnapshots.filter((x) => x.date !== day)
+          return { dailyNetSnapshots: [...rest, { date: day, net }].slice(-30) }
+        }),
+      mentorPersonas: builtinMentors(),
+      addMentorPersona: (m) =>
+        set((s) => ({
+          mentorPersonas: [...s.mentorPersonas, { ...m, id: uid(), createdAt: new Date().toISOString() }],
+        })),
+      removeMentorPersona: (id) =>
+        set((s) => ({
+          mentorPersonas: s.mentorPersonas.filter((m) => m.id !== id || m.isBuiltin),
+        })),
     }),
-    { name: 'art-os-store' }
+    {
+      name: 'art-os-store',
+      partialize: (state) => {
+        const { authenticated: _a, ...rest } = state
+        return rest as unknown as AppState
+      },
+    }
   )
 )
 
 // ── Computed helpers (call with store state) ──
-export function getClientNet(c: Client) { return c.grossMonthly - c.adSpend - (c.grossMonthly * 0.03) }
 export function getAgencyTotals(clients: Client[]) {
   const active = clients.filter((c) => c.active)
   const gross = active.reduce((s, c) => s + c.grossMonthly, 0)
@@ -698,23 +1460,44 @@ export function getDailyScore(health: HealthLog, tasksDoneToday: number) {
   return Math.round(prayer + h + prod)
 }
 
-export function getExecutionScore(health: HealthLog, tasksCommitted: number, tasksDone: number, focusSessionsToday: number) {
-  const commitment = tasksCommitted > 0 ? (tasksDone / tasksCommitted) * 35 : 0
-  const energy = (health.gym ? 10 : 0) + (health.mealQuality === 'good' ? 5 : 0) + (health.energyDrinks < 2 ? 5 : 0) + ((health.sleepTime && health.wakeTime) ? 5 : 0)
-  const focus = Math.min(20, focusSessionsToday * 5)
-  const prayerCount = Object.values(health.prayers).filter(Boolean).length
-  const faith = prayerCount * 4
-  return Math.round(Math.min(100, commitment + energy + focus + faith))
+/** PRD §19 + GAP 12 — when prayer tracking is off, faith points are removed and other components scale to 100. */
+export function getExecutionScore(
+  health: HealthLog,
+  tasksCommitted: number,
+  tasksDone: number,
+  focusSessionsToday: number,
+  prayerEnabled: boolean
+) {
+  if (prayerEnabled) {
+    const commitment = tasksCommitted > 0 ? (tasksDone / tasksCommitted) * 35 : 0
+    const energy =
+      (health.gym ? 10 : 0) +
+      (health.mealQuality === 'good' ? 5 : 0) +
+      (health.energyDrinks < 2 ? 5 : 0) +
+      (health.sleepTime && health.wakeTime ? 5 : 0)
+    const focus = Math.min(20, focusSessionsToday * 5)
+    const prayerCount = Object.values(health.prayers).filter(Boolean).length
+    const faith = prayerCount * 4
+    return Math.round(Math.min(100, commitment + energy + focus + faith))
+  }
+  const commitment = tasksCommitted > 0 ? (tasksDone / tasksCommitted) * 43.75 : 0
+  const energy =
+    (health.gym ? 12.5 : 0) +
+    (health.mealQuality === 'good' ? 6.25 : 0) +
+    (health.energyDrinks < 2 ? 6.25 : 0) +
+    (health.sleepTime && health.wakeTime ? 6.25 : 0)
+  const focus = Math.min(25, focusSessionsToday * 6.25)
+  return Math.round(Math.min(100, commitment + energy + focus))
 }
 
 export function getProjectIce(p: Project) { return p.impact * p.confidence * p.ease }
 
 export function getScoreZone(score: number) {
-  if (score >= 86) return { label: 'Peak performance', color: '#10b981', emoji: '✨' }
-  if (score >= 71) return { label: 'Locked in', color: '#10b981', emoji: '🟢' }
-  if (score >= 51) return { label: 'Solid day', color: '#3b82f6', emoji: '🔵' }
-  if (score >= 31) return { label: 'Getting there', color: '#f59e0b', emoji: '🟡' }
-  return { label: 'Restart tomorrow', color: '#ef4444', emoji: '🔴' }
+  if (score >= 86) return { label: 'Peak performance', color: 'var(--positive)', emoji: '✨' }
+  if (score >= 71) return { label: 'Locked in', color: 'var(--positive)', emoji: '🟢' }
+  if (score >= 51) return { label: 'Solid day', color: 'var(--accent)', emoji: '🔵' }
+  if (score >= 31) return { label: 'Getting there', color: 'var(--warning)', emoji: '🟡' }
+  return { label: 'Restart tomorrow', color: 'var(--negative)', emoji: '🔴' }
 }
 
 export function getBusinessHealth(biz: Business, tasks: Task[], revenueEntries: RevenueEntry[]): BusinessHealth {

@@ -44,7 +44,7 @@ export default function DripPage() {
         </motion.div>
 
         {/* Matrix */}
-        <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.05, duration: 0.35 }} className="rounded-[16px] border border-[#1e2338] bg-[#0e1018] p-5 space-y-2">
+        <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.05, duration: 0.35 }} className="rounded-[16px] border border-[var(--border)] bg-[var(--bg-elevated)] p-5 space-y-2">
           {/* Axis labels */}
           <div className="text-center text-[11px] text-[var(--text-dim)] font-semibold tracking-wide uppercase">High $</div>
 
@@ -74,7 +74,7 @@ export default function DripPage() {
             {ZONES.map(z => {
               const count = tasksByZone(z.key).length
               return (
-                <div key={z.key} className="rounded-[12px] border border-[#1e2338] bg-[#0e1018] p-4 text-center">
+                <div key={z.key} className="rounded-[12px] border border-[var(--border)] bg-[var(--bg-elevated)] p-4 text-center">
                   <p className="data text-[20px] font-bold" style={{ color: z.color }}>{count}</p>
                   <p className="text-[11px] text-[var(--text-dim)] mt-1">{z.label}</p>
                 </div>
@@ -84,7 +84,7 @@ export default function DripPage() {
         )}
 
         {hasAnyClassified && eliminateCount > 0 && (
-          <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.15, duration: 0.35 }} className="rounded-[12px] border border-[#1e2338] bg-[#0e1018] p-4">
+          <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.15, duration: 0.35 }} className="rounded-[12px] border border-[var(--border)] bg-[var(--bg-elevated)] p-4">
             <p className="text-[13px] text-[var(--text-dim)]">
               You have <span className="font-semibold text-[var(--rose)]">{eliminateCount} tasks</span> in ELIMINATE — consider dropping or delegating these.
               {doubleDownCount > 0 && <> Your zone of genius has <span className="font-semibold text-[var(--accent)]">{doubleDownCount} tasks</span> — protect this time.</>}
@@ -93,7 +93,7 @@ export default function DripPage() {
         )}
 
         {/* Unclassified Tasks */}
-        <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2, duration: 0.35 }} className="rounded-[16px] border border-[#1e2338] bg-[#0e1018] p-5 space-y-3">
+        <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2, duration: 0.35 }} className="rounded-[16px] border border-[var(--border)] bg-[var(--bg-elevated)] p-5 space-y-3">
           <h3 className="text-[14px] font-semibold text-[var(--text)]">
             {unclassified.length > 0 ? `Unclassified Tasks (${unclassified.length})` : 'All tasks classified'}
           </h3>

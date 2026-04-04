@@ -5,19 +5,19 @@ import { useSearchParams } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
 import { toast } from 'sonner'
 import { useStore } from '@/stores/store'
+import { buildFullSystemPrompt } from '@/lib/ai-context'
+import { extractCommitmentsFromUserMessage } from '@/lib/extract-commitment'
 
 const SUGGESTED_PROMPTS = [
   'What should I focus on this week?',
-  'How do I get to $50K/mo fastest?',
-  'Analyze my revenue concentration risk',
-  'Should I restart cold email for the agency?',
-  "What's the ROI of signing the office lease?",
-  'How should I monetize Madison Clark?',
-  'Give me a brutal honest assessment',
+  'Where is my biggest revenue concentration risk?',
+  'Analyze my pipeline vs my stated income goal',
   'What am I avoiding right now?',
+  'Give me a direct assessment of my execution score drivers',
+  'How should I prioritize my top three businesses?',
+  'What would make this week a win?',
+  'Compare my commitments to my calendar reality',
 ]
-
-// Business labels are now derived from store data at runtime
 
 function renderMarkdown(text: string) {
   return text.split('\n').map((line, i) => {
@@ -40,62 +40,6 @@ function renderMarkdown(text: string) {
   })
 }
 
-function buildContextSnapshot(state: ReturnType<typeof useStore.getState>) {
-  const activeCommitments = state.commitments.filter(c => !c.fulfilled)
-  const recentTasks = state.tasks.slice(-10)
-  const activeStreaks = state.streaks
-
-  // Compute financials from businesses, clients, revenue/expense entries
-  const totalRevenue = state.revenueEntries.reduce((s, r) => s + r.amount, 0)
-  const totalExpenses = state.expenseEntries.reduce((s, e) => s + e.amount, 0)
-  const bizSummary = state.businesses.map(b => `${b.name}: $${b.monthlyRevenue.toLocaleString()}/mo`).join(', ')
-
-  return `=== ART OS - BUSINESS CONTEXT SNAPSHOT ===
-Date: ${new Date().toLocaleDateString()}
-
---- FINANCIALS (Computed) ---
-Businesses: ${bizSummary || 'N/A'}
-Total Logged Revenue: $${totalRevenue.toLocaleString()}
-Total Logged Expenses: $${totalExpenses.toLocaleString()}
-
---- BUSINESS UNITS ---
-${state.businesses.map((b, i) => `${i + 1}. ${b.name}: $${b.monthlyRevenue.toLocaleString()}/mo, status: ${b.status}${b.notes ? ' — ' + b.notes : ''}`).join('\n')}
-
---- STREAKS ---
-${activeStreaks.map(s => `${s.habit}: ${s.currentStreak} day streak (best: ${s.longestStreak})`).join('\n')}
-
---- ACTIVE COMMITMENTS ---
-${activeCommitments.length ? activeCommitments.map(c => `- ${c.text} (source: ${c.source}${c.dueDate ? ', due: ' + c.dueDate : ''})`).join('\n') : 'None'}
-
---- RECENT TASKS ---
-${recentTasks.map(t => `- [${t.done ? 'x' : ' '}] ${t.text} (${t.priority})`).join('\n') || 'None'}
-
---- PIPELINE ---
-${state.pipeline.map(d => `- ${d.companyName}: ${d.stage}${d.dealValue ? ' ($' + d.dealValue.toLocaleString() + ')' : ''}`).join('\n') || 'Empty'}
-
---- ACTIVE SPRINT ---
-${state.sprints.filter(s => s.status === 'active').map(s => `Sprint ${s.sprintNumber}:\n${s.deliverables.map(d => `  - [${d.done ? 'x' : ' '}] ${d.text}`).join('\n')}`).join('\n') || 'None'}
-
---- XP / LEVEL ---
-Level ${state.level} | ${state.xp} XP
-
---- PROJECTS ---
-${state.projects.map(p => `- ${p.name}: ${p.status}${p.description ? ' — ' + p.description : ''}`).join('\n') || 'None'}
-
---- GOALS (12-Week Year) ---
-${state.goals.map(g => `- ${g.title}: ${g.currentValue}/${g.targetValue} ${g.targetMetric}`).join('\n') || 'None'}
-
---- IDENTITY STATEMENTS ---
-${state.identityStatements.map(i => `- "${i.text}" [${i.status}]`).join('\n') || 'None'}
-
---- SKILL LEVELS ---
-${state.skillLevels.map(s => `- ${s.category} > ${s.skill}: Level ${s.level} (${s.xp} XP)`).join('\n') || 'None'}
-
---- RECENT BEHAVIORAL EVENTS ---
-${state.behavioralEvents.slice(-10).map(e => `- ${e.eventType} @ ${new Date(e.timestamp).toLocaleString()} (score: ${e.dayScoreAtTime})`).join('\n') || 'None'}
-`
-}
-
 const messageVariants = {
   hidden: { opacity: 0, y: 12, scale: 0.97 },
   visible: { opacity: 1, y: 0, scale: 1, transition: { duration: 0.25, ease: [0.25, 0.1, 0.25, 1] as const } },
@@ -108,7 +52,9 @@ function AIPageInner() {
   const {
     aiMessages, addAiMessage, clearAiMessages,
     businesses, clients, tasks, commitments, streaks, pipeline, sprints, level, xp,
-    projects, goals, identityStatements, skillLevels, behavioralEvents
+    projects, goals, identityStatements, skillLevels, behavioralEvents,
+    addCommitment,
+    addAiReport,
   } = useStore()
 
   const [input, setInput] = useState('')
@@ -136,9 +82,18 @@ function AIPageInner() {
     if (!text.trim() || loading) return
     setError(null)
 
+    const raw = text.trim()
+    const extracted = extractCommitmentsFromUserMessage(raw)
+    if (extracted.length > 0) {
+      for (const line of extracted) {
+        addCommitment(line, 'ai_chat')
+      }
+      toast.success(extracted.length === 1 ? 'Commitment saved from your message' : `${extracted.length} commitments saved`)
+    }
+
     const userContent = businessFilter && businesses.find(b => b.id === businessFilter)?.name
-      ? `Context: ${businesses.find(b => b.id === businessFilter)?.name}\n\n${text.trim()}`
-      : text.trim()
+      ? `Context: ${businesses.find(b => b.id === businessFilter)?.name}\n\n${raw}`
+      : raw
 
     addAiMessage({ role: 'user', content: userContent, businessContext: businessFilter || undefined })
     setInput('')
@@ -146,6 +101,45 @@ function AIPageInner() {
     if (textareaRef.current) textareaRef.current.style.height = 'auto'
 
     setLoading(true)
+
+    const reportMatch = raw.match(/\b(?:generate\s+(?:a\s+)?report\s+on|report\s+on)\s+(.+)/i)
+    if (reportMatch) {
+      const topic = reportMatch[1].trim()
+      try {
+        const st = useStore.getState()
+        const res = await fetch('/api/reports/generate', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            reportType: 'custom',
+            customTopic: topic,
+            context: buildFullSystemPrompt(st),
+            apiKey: st.anthropicKey || undefined,
+          }),
+        })
+        const data = (await res.json()) as { content?: string; grade?: string; error?: string }
+        if (!res.ok) throw new Error(data.error || 'Report failed')
+        const content = data.content || ''
+        addAiReport({
+          level: 'custom',
+          content,
+          topic,
+          date: new Date().toISOString().split('T')[0],
+          grade: data.grade,
+        })
+        addAiMessage({
+          role: 'assistant',
+          content: `**Custom report saved** (Reports → history). Topic: ${topic}\n\n${content}`,
+        })
+        toast.success('Report generated and saved')
+      } catch (e: unknown) {
+        const msg = e instanceof Error ? e.message : 'Report failed'
+        addAiMessage({ role: 'assistant', content: `Could not generate report: ${msg}` })
+      } finally {
+        setLoading(false)
+      }
+      return
+    }
 
     const currentMessages = useStore.getState().aiMessages
     const apiMessages = currentMessages.map(m => ({ role: m.role, content: m.content }))
@@ -156,7 +150,8 @@ function AIPageInner() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           messages: apiMessages,
-          context: buildContextSnapshot(useStore.getState()),
+          context: buildFullSystemPrompt(useStore.getState()),
+          fullPrdSystemPrompt: true,
           apiKey: useStore.getState().anthropicKey || undefined,
         }),
       })
@@ -188,7 +183,7 @@ function AIPageInner() {
   }
 
   const copyContext = () => {
-    const snap = buildContextSnapshot(useStore.getState())
+    const snap = buildFullSystemPrompt(useStore.getState())
     navigator.clipboard.writeText(snap)
     setCopied(true)
     toast.success('Context copied to clipboard')

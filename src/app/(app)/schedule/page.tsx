@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useMemo } from 'react'
 import { useStore, type ScheduleBlock } from '@/stores/store'
+import { prayerRecordTo24, type PrayerNameKey } from '@/lib/prayer-times'
 import PageTransition from '@/components/PageTransition'
 import { StaggerContainer, StaggerItem } from '@/components/Stagger'
 import { motion, AnimatePresence } from 'framer-motion'
@@ -40,6 +41,14 @@ const DEFAULT_BLOCKS: ScheduleBlock[] = [
 const HOURS = Array.from({ length: 19 }, (_, i) => i + 5) // 5 AM to 11 PM
 const DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
 
+const TITLE_TO_PRAYER: Record<string, PrayerNameKey> = {
+  Fajr: 'fajr',
+  Dhuhr: 'dhuhr',
+  Asr: 'asr',
+  Maghrib: 'maghrib',
+  Isha: 'isha',
+}
+
 function timeToMinutes(time: string): number {
   const [h, m] = time.split(':').map(Number)
   return h * 60 + m
@@ -51,7 +60,8 @@ function formatHour(hour: number): string {
 }
 
 export default function SchedulePage() {
-  const { todaySchedule, setSchedule, toggleScheduleBlock } = useStore()
+  const { todaySchedule, setSchedule, toggleScheduleBlock, userLat, userLng, prayerCalcMethod, prayerAsrHanafi } =
+    useStore()
   const [view, setView] = useState<'today' | 'week'>('today')
   const [now, setNow] = useState(new Date())
 
@@ -61,6 +71,22 @@ export default function SchedulePage() {
       setSchedule(DEFAULT_BLOCKS)
     }
   }, [todaySchedule.length, setSchedule])
+
+  // Replace hardcoded prayer row times with adhan.js when coordinates exist (GAP 4).
+  useEffect(() => {
+    if (userLat == null || userLng == null) return
+    const t24 = prayerRecordTo24(userLat, userLng, new Date(), prayerCalcMethod, prayerAsrHanafi)
+    const prev = useStore.getState().todaySchedule
+    let changed = false
+    const next = prev.map((b) => {
+      if (b.type !== 'prayer') return b
+      const k = TITLE_TO_PRAYER[b.title]
+      if (!k || !t24[k] || b.time === t24[k]) return b
+      changed = true
+      return { ...b, time: t24[k] }
+    })
+    if (changed) setSchedule(next)
+  }, [userLat, userLng, prayerCalcMethod, prayerAsrHanafi, setSchedule])
 
   // Update clock every minute
   useEffect(() => {

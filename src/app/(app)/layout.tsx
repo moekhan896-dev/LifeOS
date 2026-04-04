@@ -3,17 +3,52 @@
 import { useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { useStore } from '@/stores/store'
+import { runWeeklyAiScorecardIfDue } from '@/lib/weekly-scorecard'
+import { runWeeklyReportIfDue } from '@/lib/weekly-report'
 import Sidebar from '@/components/Sidebar'
 import CommandPalette from '@/components/CommandPalette'
-import VoiceButton from '@/components/VoiceButton'
+import VoiceCommandFab from '@/components/VoiceCommandFab'
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
-  const { authenticated, theme } = useStore()
+  const {
+    authenticated,
+    theme,
+    touchLastOpened,
+    appendDailyNetSnapshot,
+    runProactiveEvaluation,
+    notificationPrefs,
+    syncScoreZoneFromExecution,
+    todayHealth,
+    tasks,
+    focusSessions,
+    trackPrayers,
+  } = useStore()
   const router = useRouter()
 
   useEffect(() => {
     if (!authenticated) router.replace('/')
   }, [authenticated, router])
+
+  useEffect(() => {
+    if (authenticated) touchLastOpened()
+  }, [authenticated, touchLastOpened])
+
+  useEffect(() => {
+    if (!authenticated) return
+    syncScoreZoneFromExecution()
+  }, [authenticated, syncScoreZoneFromExecution, todayHealth, tasks, focusSessions, trackPrayers])
+
+  useEffect(() => {
+    if (!authenticated) return
+    void runWeeklyAiScorecardIfDue()
+    void runWeeklyReportIfDue()
+  }, [authenticated])
+
+  useEffect(() => {
+    if (!authenticated) return
+    appendDailyNetSnapshot()
+    if (notificationPrefs.proactiveInbox) runProactiveEvaluation()
+  }, [authenticated, appendDailyNetSnapshot, runProactiveEvaluation, notificationPrefs.proactiveInbox])
 
   useEffect(() => {
     document.documentElement.classList.toggle('light', theme === 'light')
@@ -30,7 +65,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         </div>
       </main>
       <CommandPalette />
-      <VoiceButton />
+      <VoiceCommandFab />
     </div>
   )
 }

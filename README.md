@@ -1,5 +1,9 @@
 This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
 
+## Product specification
+
+All product requirements, design system rules, build phases, and gap resolutions are defined in **[ART-OS-PRD-FINAL.md](./ART-OS-PRD-FINAL.md)**. That document is the source of truth for features and compliance (including **Rule 1: zero hardcoded user-specific data**).
+
 ## Getting Started
 
 First, run the development server:

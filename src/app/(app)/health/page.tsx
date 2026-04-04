@@ -2,6 +2,7 @@
 
 import { useMemo } from 'react'
 import { useStore } from '@/stores/store'
+import { prayerRecordTo12 } from '@/lib/prayer-times'
 import PageTransition from '@/components/PageTransition'
 import { StaggerContainer, StaggerItem } from '@/components/Stagger'
 import { motion, AnimatePresence } from 'framer-motion'
@@ -28,14 +29,6 @@ const dailyScoreData = [
   { day: 'Sun', score: 78 },
 ]
 
-const PRAYERS = [
-  { key: 'fajr' as const, name: 'Fajr', time: '5:47 AM' },
-  { key: 'dhuhr' as const, name: 'Dhuhr', time: '1:15 PM' },
-  { key: 'asr' as const, name: 'Asr', time: '4:48 PM' },
-  { key: 'maghrib' as const, name: 'Maghrib', time: '7:52 PM' },
-  { key: 'isha' as const, name: 'Isha', time: '9:15 PM' },
-]
-
 function Section({ title, icon, children }: { title: string; icon: string; children: React.ReactNode }) {
   return (
     <div className="card p-4">
@@ -52,7 +45,25 @@ export default function HealthPage() {
   const {
     todayHealth, updateHealth, togglePrayer,
     streaks, xp, level, tasks, addXp,
+    userLat, userLng, prayerCalcMethod, prayerAsrHanafi,
   } = useStore()
+
+  const prayerTimes12 = useMemo(() => {
+    if (userLat == null || userLng == null) return null
+    return prayerRecordTo12(userLat, userLng, new Date(), prayerCalcMethod, prayerAsrHanafi)
+  }, [userLat, userLng, prayerCalcMethod, prayerAsrHanafi, todayHealth.date])
+
+  const PRAYERS = useMemo(
+    () =>
+      [
+        { key: 'fajr' as const, name: 'Fajr' },
+        { key: 'dhuhr' as const, name: 'Dhuhr' },
+        { key: 'asr' as const, name: 'Asr' },
+        { key: 'maghrib' as const, name: 'Maghrib' },
+        { key: 'isha' as const, name: 'Isha' },
+      ].map((p) => ({ ...p, time: prayerTimes12?.[p.key] ?? '—' })),
+    [prayerTimes12]
+  )
 
   const prayerStreak = streaks.find((s) => s.habit === 'prayer')
   const gymStreak = streaks.find((s) => s.habit === 'gym')

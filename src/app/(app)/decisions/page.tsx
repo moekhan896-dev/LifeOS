@@ -1,9 +1,10 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect, useRef, Suspense } from 'react'
+import { useSearchParams } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
 import { toast } from 'sonner'
-import { useStore } from '@/stores/store'
+import { useStore, type DecisionEntry, type DecisionOutcomeRating } from '@/stores/store'
 import PageTransition from '@/components/PageTransition'
 
 const REVIEW_OPTIONS = [
@@ -12,11 +13,26 @@ const REVIEW_OPTIONS = [
   { label: '90 days', days: 90 },
 ]
 
+const RATING_CHIPS: { id: DecisionOutcomeRating; label: string }[] = [
+  { id: 'better', label: 'Better' },
+  { id: 'as_expected', label: 'As expected' },
+  { id: 'worse', label: 'Worse' },
+  { id: 'much_worse', label: 'Much worse' },
+]
+
 function daysUntil(date: string) {
   return Math.ceil((new Date(date).getTime() - Date.now()) / 86400000)
 }
 
-export default function DecisionsPage() {
+function decisionAccuracyPct(journal: DecisionEntry[]): number | null {
+  const rated = journal.filter((d) => d.outcomeRating)
+  if (rated.length === 0) return null
+  const good = rated.filter((d) => d.outcomeRating === 'better' || d.outcomeRating === 'as_expected').length
+  return Math.round((good / rated.length) * 100)
+}
+
+function DecisionsPageInner() {
+  const searchParams = useSearchParams()
   const { decisionJournal, addDecision, updateDecision, deleteDecision } = useStore()
   const [open, setOpen] = useState(false)
   const [decision, setDecision] = useState('')
@@ -24,6 +40,19 @@ export default function DecisionsPage() {
   const [expected, setExpected] = useState('')
   const [reviewDays, setReviewDays] = useState(30)
   const [reviewTexts, setReviewTexts] = useState<Record<string, string>>({})
+  const [ratings, setRatings] = useState<Record<string, DecisionOutcomeRating | undefined>>({})
+  const scrolled = useRef(false)
+
+  const focusId = searchParams.get('review')
+
+  useEffect(() => {
+    if (!focusId || scrolled.current) return
+    const t = window.setTimeout(() => {
+      document.getElementById(`decision-${focusId}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+      scrolled.current = true
+    }, 400)
+    return () => window.clearTimeout(t)
+  }, [focusId])
 
   const handleSubmit = () => {
     if (!decision.trim()) return
@@ -37,35 +66,51 @@ export default function DecisionsPage() {
   }
 
   const handleReview = (id: string) => {
-    const text = reviewTexts[id]
-    if (!text?.trim()) return
-    updateDecision(id, { actualOutcome: text.trim() })
+    const rating = ratings[id]
+    const text = reviewTexts[id]?.trim()
+    if (!rating) {
+      toast.error('Choose how it played out.')
+      return
+    }
+    updateDecision(id, {
+      outcomeRating: rating,
+      actualOutcome: text || `Rated: ${rating}`,
+    })
     setReviewTexts((p) => ({ ...p, [id]: '' }))
+    setRatings((p) => ({ ...p, [id]: undefined }))
     toast.success('Outcome recorded.')
   }
 
   const sorted = [...decisionJournal].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
   const pendingReviews = sorted.filter((d) => d.reviewDate && !d.actualOutcome && daysUntil(d.reviewDate) <= 0)
   const rest = sorted.filter((d) => !pendingReviews.includes(d))
+  const acc = decisionAccuracyPct(decisionJournal)
 
-  const inputCls = 'w-full bg-[#1a1d2e] border border-[var(--border)] rounded-lg px-3 py-2 text-[13px] text-white placeholder:text-[var(--text-dim)] focus:outline-none focus:border-emerald-500/50 resize-none'
+  const inputCls =
+    'w-full bg-[var(--bg-secondary)] border border-[var(--border)] rounded-xl px-4 py-3 min-h-[44px] text-[17px] text-[var(--text-primary)] placeholder:text-[var(--text-tertiary)] focus:outline-none focus:border-[var(--accent)] resize-none transition-[border-color] duration-200'
 
   return (
     <PageTransition>
       <div className="space-y-6">
-        {/* Header */}
         <div>
-          <h1 style={{ fontSize: 28, fontWeight: 600 }} className="text-white">Decision Journal</h1>
-          <p className="text-[13px] text-[var(--text-mid)] mt-1">Log decisions. Review outcomes. Build judgment.</p>
+          <h1 className="title">Decision Journal</h1>
+          <p className="subheadline mt-1">Log decisions. Review outcomes. Build judgment.</p>
+          {acc != null && (
+            <p className="mt-2 text-[14px] text-[var(--text-secondary)]">
+              Decision accuracy (vs expectation):{' '}
+              <span className="data font-semibold text-[var(--accent)]">{acc}%</span>
+              <span className="text-[var(--text-dim)]"> — from rated outcomes</span>
+            </p>
+          )}
         </div>
 
-        {/* Add Decision Form */}
-        <motion.div className="rounded-[16px] p-5" style={{ background: '#0e1018' }}>
+        <motion.div className="card rounded-2xl p-5">
           <button
+            type="button"
             onClick={() => setOpen(!open)}
-            className="text-[14px] font-semibold text-white flex items-center gap-2 w-full"
+            className="headline flex w-full items-center gap-2 text-left text-[var(--text-primary)]"
           >
-            <span className="text-emerald-400">{open ? '−' : '+'}</span> New Decision
+            <span className="text-[var(--accent)]">{open ? '−' : '+'}</span> New decision
           </button>
           <AnimatePresence>
             {open && (
@@ -77,30 +122,46 @@ export default function DecisionsPage() {
                 className="overflow-hidden"
               >
                 <div className="mt-4 space-y-3">
-                  <textarea className={inputCls} rows={2} placeholder="What did you decide?" value={decision} onChange={(e) => setDecision(e.target.value)} />
-                  <textarea className={inputCls} rows={2} placeholder="Why?" value={reasoning} onChange={(e) => setReasoning(e.target.value)} />
-                  <textarea className={inputCls} rows={2} placeholder="What do you expect to happen?" value={expected} onChange={(e) => setExpected(e.target.value)} />
-                  <div className="flex items-center gap-2">
-                    <span className="text-[12px] text-[var(--text-dim)]">Review in:</span>
+                  <textarea
+                    className={inputCls}
+                    rows={2}
+                    placeholder="What did you decide?"
+                    value={decision}
+                    onChange={(e) => setDecision(e.target.value)}
+                  />
+                  <textarea
+                    className={inputCls}
+                    rows={2}
+                    placeholder="Why?"
+                    value={reasoning}
+                    onChange={(e) => setReasoning(e.target.value)}
+                  />
+                  <textarea
+                    className={inputCls}
+                    rows={2}
+                    placeholder="What do you expect to happen?"
+                    value={expected}
+                    onChange={(e) => setExpected(e.target.value)}
+                  />
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="footnote text-[var(--text-secondary)]">Review in:</span>
                     {REVIEW_OPTIONS.map((opt) => (
                       <button
+                        type="button"
                         key={opt.days}
                         onClick={() => setReviewDays(opt.days)}
-                        className={`text-[11px] px-2.5 py-1 rounded-md border transition-colors ${
+                        className={`min-h-[44px] rounded-lg border px-3 py-2 text-[13px] transition-colors ${
                           reviewDays === opt.days
-                            ? 'border-emerald-500 text-emerald-400 bg-emerald-500/10'
-                            : 'border-[var(--border)] text-[var(--text-dim)] hover:text-white'
+                            ? 'border-[var(--accent)] bg-[var(--accent-bg)] text-[var(--accent)]'
+                            : 'border-[var(--border)] text-[var(--text-secondary)] hover:bg-[var(--bg-secondary)] hover:text-[var(--text-primary)]'
                         }`}
                       >
                         {opt.label}
                       </button>
                     ))}
                   </div>
-                  <button
-                    onClick={handleSubmit}
-                    className="bg-emerald-500 hover:bg-emerald-600 text-white text-[13px] font-medium px-4 py-2 rounded-lg transition-colors"
-                  >
-                    Log Decision
+                  <button type="button" onClick={handleSubmit} className="btn-primary">
+                    Log decision
                   </button>
                 </div>
               </motion.div>
@@ -108,42 +169,52 @@ export default function DecisionsPage() {
           </AnimatePresence>
         </motion.div>
 
-        {/* Pending Reviews */}
         {pendingReviews.length > 0 && (
           <div className="space-y-3">
-            <h2 className="text-[14px] font-semibold text-amber-400">Pending Reviews</h2>
+            <h2 className="headline text-[var(--warning)]">Pending reviews</h2>
             {pendingReviews.map((d, i) => (
               <DecisionCard
                 key={d.id}
                 d={d}
                 i={i}
                 isPending
+                highlight={focusId === d.id}
                 reviewText={reviewTexts[d.id] || ''}
+                rating={ratings[d.id]}
+                onRating={(r) => setRatings((p) => ({ ...p, [d.id]: r }))}
                 onReviewTextChange={(v) => setReviewTexts((p) => ({ ...p, [d.id]: v }))}
                 onReview={() => handleReview(d.id)}
-                onDelete={() => { deleteDecision(d.id); toast('Decision deleted.') }}
+                onDelete={() => {
+                  deleteDecision(d.id)
+                  toast('Decision deleted.')
+                }}
                 inputCls={inputCls}
               />
             ))}
           </div>
         )}
 
-        {/* All Decisions */}
         <div className="space-y-3">
           {rest.map((d, i) => (
             <DecisionCard
               key={d.id}
               d={d}
               i={i}
+              highlight={focusId === d.id}
               reviewText={reviewTexts[d.id] || ''}
+              rating={ratings[d.id]}
+              onRating={(r) => setRatings((p) => ({ ...p, [d.id]: r }))}
               onReviewTextChange={(v) => setReviewTexts((p) => ({ ...p, [d.id]: v }))}
               onReview={() => handleReview(d.id)}
-              onDelete={() => { deleteDecision(d.id); toast('Decision deleted.') }}
+              onDelete={() => {
+                deleteDecision(d.id)
+                toast('Decision deleted.')
+              }}
               inputCls={inputCls}
             />
           ))}
           {sorted.length === 0 && (
-            <p className="text-[13px] text-[var(--text-dim)] text-center py-8">No decisions logged yet.</p>
+            <p className="py-8 text-center text-[13px] text-[var(--text-dim)]">No decisions logged yet.</p>
           )}
         </div>
       </div>
@@ -151,52 +222,110 @@ export default function DecisionsPage() {
   )
 }
 
+export default function DecisionsPage() {
+  return (
+    <Suspense fallback={<PageTransition><p className="p-6 text-[var(--text-dim)]">Loading…</p></PageTransition>}>
+      <DecisionsPageInner />
+    </Suspense>
+  )
+}
+
 function DecisionCard({
-  d, i, isPending, reviewText, onReviewTextChange, onReview, onDelete, inputCls,
+  d,
+  i,
+  isPending,
+  highlight,
+  reviewText,
+  rating,
+  onRating,
+  onReviewTextChange,
+  onReview,
+  onDelete,
+  inputCls,
 }: {
-  d: any; i: number; isPending?: boolean; reviewText: string
-  onReviewTextChange: (v: string) => void; onReview: () => void; onDelete: () => void; inputCls: string
+  d: DecisionEntry
+  i: number
+  isPending?: boolean
+  highlight?: boolean
+  reviewText: string
+  rating?: DecisionOutcomeRating
+  onRating: (r: DecisionOutcomeRating) => void
+  onReviewTextChange: (v: string) => void
+  onReview: () => void
+  onDelete: () => void
+  inputCls: string
 }) {
+  const due = d.reviewDate && daysUntil(d.reviewDate) <= 0 && !d.actualOutcome
+
   return (
     <motion.div
-      initial={{ opacity: 0, y: 10 }}
+      id={`decision-${d.id}`}
+      initial={{ opacity: 0, y: 8 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ delay: i * 0.04 }}
-      className="rounded-[16px] p-5 group relative"
-      style={{ background: '#0e1018' }}
+      transition={{ delay: i * 0.03, ease: [0.25, 0.1, 0.25, 1] as const }}
+      className={`group relative card rounded-2xl p-5 ${highlight ? 'ring-2 ring-[var(--accent)]' : ''}`}
     >
-      <div className="text-[10px] font-mono text-[var(--text-dim)] mb-1">{fmtDate(d.createdAt)}</div>
-      <div className="text-[14px] font-semibold text-white mb-1">{d.decision}</div>
-      {d.reasoning && <div className="text-[13px] text-[var(--text-mid)] mb-1"><span className="text-[var(--text-dim)]">Why:</span> {d.reasoning}</div>}
-      {d.expectedOutcome && <div className="text-[13px] text-[var(--text-mid)] mb-2"><span className="text-[var(--text-dim)]">Expected:</span> {d.expectedOutcome}</div>}
+      <div className="caption data-number mb-1 text-[var(--text-tertiary)]">{fmtDate(d.createdAt)}</div>
+      <div className="headline mb-1">{d.decision}</div>
+      {d.reasoning && (
+        <div className="body mb-1 text-[var(--text-secondary)]">
+          <span className="text-[var(--text-tertiary)]">Why:</span> {d.reasoning}
+        </div>
+      )}
+      {d.expectedOutcome && (
+        <div className="body mb-2 text-[var(--text-secondary)]">
+          <span className="text-[var(--text-tertiary)]">Expected:</span> {d.expectedOutcome}
+        </div>
+      )}
 
       {d.actualOutcome ? (
-        <div className="text-[13px] text-emerald-400 mt-2 border-t border-[var(--border)] pt-2">
-          <span className="text-[var(--text-dim)]">Outcome:</span> {d.actualOutcome}
+        <div className="body mt-2 border-t border-[var(--separator)] pt-2 text-[var(--positive)]">
+          <span className="text-[var(--text-tertiary)]">Outcome:</span> {d.actualOutcome}
+          {d.outcomeRating && (
+            <span className="ml-2 text-[12px] text-[var(--text-dim)]">({d.outcomeRating.replace('_', ' ')})</span>
+          )}
         </div>
-      ) : d.reviewDate && daysUntil(d.reviewDate) <= 0 ? (
-        <div className="mt-3 space-y-2">
-          <span className="text-[11px] bg-amber-500/15 text-amber-400 rounded-md px-2 py-0.5">Review due</span>
+      ) : due ? (
+        <div className="mt-3 space-y-3">
+          <span className="caption rounded-md bg-[rgba(255,159,10,0.12)] px-2 py-1 text-[var(--warning)]">
+            {isPending ? 'Review due (from inbox)' : 'Review due'}
+          </span>
+          <p className="text-[13px] text-[var(--text-secondary)]">How did it play out?</p>
+          <div className="flex flex-wrap gap-2">
+            {RATING_CHIPS.map((c) => (
+              <button
+                key={c.id}
+                type="button"
+                onClick={() => onRating(c.id)}
+                className={`rounded-full border px-3 py-1.5 text-[13px] transition-colors ${
+                  rating === c.id
+                    ? 'border-[var(--accent)] bg-[var(--accent-bg)] text-[var(--accent)]'
+                    : 'border-[var(--border)] text-[var(--text-secondary)] hover:border-[var(--accent)]'
+                }`}
+              >
+                {c.label}
+              </button>
+            ))}
+          </div>
           <textarea
             className={inputCls}
             rows={2}
-            placeholder="How did it play out?"
+            placeholder="Notes (optional)"
             value={reviewText}
             onChange={(e) => onReviewTextChange(e.target.value)}
           />
-          <button onClick={onReview} className="text-[12px] text-emerald-400 hover:text-emerald-300">
-            Save Outcome
+          <button type="button" onClick={onReview} className="btn-text text-[17px]">
+            Save outcome
           </button>
         </div>
       ) : d.reviewDate ? (
-        <div className="text-[10px] text-[var(--text-dim)] mt-2">
-          Review in {daysUntil(d.reviewDate)} days
-        </div>
+        <div className="mt-2 text-[10px] text-[var(--text-dim)]">Review in {daysUntil(d.reviewDate)} days</div>
       ) : null}
 
       <button
         onClick={onDelete}
-        className="absolute top-4 right-4 text-[var(--text-dim)] hover:text-red-400 opacity-0 group-hover:opacity-100 transition-opacity text-[12px]"
+        type="button"
+        className="footnote absolute right-4 top-4 min-h-[44px] px-2 text-[var(--text-tertiary)] opacity-0 transition-opacity hover:text-[var(--negative)] group-hover:opacity-100"
       >
         Delete
       </button>

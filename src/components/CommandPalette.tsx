@@ -8,6 +8,7 @@ import { useStore } from '@/stores/store'
 
 const PAGES = [
   { name: 'Dashboard', href: '/dashboard', icon: '◆' },
+  { name: 'AI Insights', href: '/ai-insights', icon: '✉' },
   { name: 'Schedule', href: '/schedule', icon: '◷' },
   { name: 'Tasks', href: '/tasks', icon: '☐' },
   { name: 'Insights', href: '/insights', icon: '◈' },
@@ -33,15 +34,26 @@ const PAGES = [
   { name: 'AI Reports', href: '/reports', icon: '📈' },
   { name: 'Knowledge Vault', href: '/knowledge', icon: '📚' },
   { name: 'Decision Journal', href: '/decisions', icon: '⚖' },
+  { name: 'Decision Lab', href: '/decision-lab', icon: '⚗' },
+  { name: 'Mentors', href: '/mentors', icon: '🎭' },
+  { name: 'Spending calculator', href: '/spending-calculator', icon: '⧉' },
   { name: 'Time Capsule', href: '/capsule', icon: '💊' },
   { name: 'Reflections', href: '/reflections', icon: '🪞' },
   { name: 'Contacts', href: '/contacts', icon: '👥' },
 ]
 
+const paletteShell =
+  'overflow-hidden rounded-[16px] border border-[rgba(255,255,255,0.06)] bg-[rgba(44,44,46,0.92)] shadow-2xl backdrop-blur-[40px]'
+
+const itemCls =
+  'flex cursor-pointer items-center gap-3 rounded-[12px] px-3 py-2.5 text-[17px] text-[rgba(255,255,255,0.55)] transition-colors data-[selected]:bg-[rgba(255,255,255,0.08)] data-[selected]:text-[#F5F5F7]'
+
 export default function CommandPalette() {
   const [open, setOpen] = useState(false)
+  /** Remount input with pre-filled query from voice ("search for …"). */
+  const [inputBoot, setInputBoot] = useState({ key: 0, q: '' })
   const router = useRouter()
-  const { tasks, businesses, addTask } = useStore()
+  const { tasks, businesses } = useStore()
 
   useEffect(() => {
     const down = (e: KeyboardEvent) => {
@@ -49,12 +61,27 @@ export default function CommandPalette() {
         e.preventDefault()
         setOpen((o) => !o)
       }
+      if (e.key === 'Escape') setOpen(false)
     }
     document.addEventListener('keydown', down)
     return () => document.removeEventListener('keydown', down)
   }, [])
 
-  const go = (href: string) => { router.push(href); setOpen(false) }
+  useEffect(() => {
+    const onVoiceOpen = () => {
+      const q = sessionStorage.getItem('cmdk-q') || ''
+      sessionStorage.removeItem('cmdk-q')
+      setInputBoot((b) => ({ key: b.key + 1, q }))
+      setOpen(true)
+    }
+    window.addEventListener('artos:open-command-palette', onVoiceOpen)
+    return () => window.removeEventListener('artos:open-command-palette', onVoiceOpen)
+  }, [])
+
+  const go = (href: string) => {
+    router.push(href)
+    setOpen(false)
+  }
 
   const recentTasks = tasks.filter((t) => !t.done).slice(0, 5)
 
@@ -66,88 +93,107 @@ export default function CommandPalette() {
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
           transition={{ duration: 0.15 }}
-          className="fixed inset-0 z-[100] flex items-start justify-center pt-[15vh]"
+          className="fixed inset-0 z-[100] flex items-start justify-center pt-[12vh]"
           onClick={() => setOpen(false)}
         >
-          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm" />
+          <div className="fixed inset-0 bg-black/45 backdrop-blur-sm" />
           <motion.div
-            initial={{ opacity: 0, scale: 0.96, y: -8 }}
+            initial={{ opacity: 0, scale: 0.98, y: -6 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.96, y: -8 }}
-            transition={{ duration: 0.15, ease: [0.25, 0.1, 0.25, 1] }}
+            exit={{ opacity: 0, scale: 0.98, y: -6 }}
+            transition={{ duration: 0.18, ease: [0.25, 0.1, 0.25, 1] }}
             onClick={(e) => e.stopPropagation()}
-            className="relative z-10 w-full max-w-[560px] mx-4"
+            className="relative z-10 mx-4 w-full max-w-[560px]"
           >
-            <Command className="glass border border-[var(--color-border)] rounded-[12px] overflow-hidden shadow-2xl">
-              <div className="flex items-center gap-2 px-4 border-b border-[var(--color-border)]">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--color-text-dim)" strokeWidth="2" strokeLinecap="round">
-                  <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
-                </svg>
-                <Command.Input
-                  placeholder="Search pages, tasks, or type a command..."
-                  className="flex-1 bg-transparent py-3.5 text-[14px] text-[var(--color-text)] placeholder:text-[var(--color-text-dim)] outline-none"
-                />
-                <kbd className="data text-[10px] text-[var(--color-text-dim)] bg-[var(--color-surface2)] px-1.5 py-0.5 rounded">ESC</kbd>
+            <Command className={paletteShell}>
+              <div className="border-b border-[rgba(255,255,255,0.08)] px-4 pb-3 pt-4">
+                <label className="sr-only" htmlFor="command-palette-input">
+                  Search
+                </label>
+                <div className="flex items-center gap-3 rounded-[12px] border border-[rgba(255,255,255,0.08)] bg-[#2C2C2E] px-4">
+                  <svg
+                    width="18"
+                    height="18"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="rgba(255,255,255,0.45)"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    aria-hidden
+                  >
+                    <circle cx="11" cy="11" r="8" />
+                    <line x1="21" y1="21" x2="16.65" y2="16.65" />
+                  </svg>
+                  <Command.Input
+                    key={inputBoot.key}
+                    id="command-palette-input"
+                    defaultValue={inputBoot.q}
+                    placeholder="Search pages, tasks, or type a command…"
+                    className="min-h-[48px] flex-1 bg-transparent py-[14px] text-[17px] text-[#F5F5F7] placeholder:text-[rgba(255,255,255,0.3)] outline-none focus:ring-0"
+                  />
+                  <kbd className="data shrink-0 rounded-md bg-[rgba(255,255,255,0.08)] px-2 py-1 text-[11px] text-[rgba(255,255,255,0.45)]">
+                    ESC
+                  </kbd>
+                </div>
               </div>
-              <Command.List className="max-h-[320px] overflow-y-auto p-2">
-                <Command.Empty className="py-6 text-center text-[13px] text-[var(--color-text-dim)]">No results found.</Command.Empty>
+              <Command.List className="max-h-[min(420px,50vh)] overflow-y-auto p-2">
+                <Command.Empty className="py-8 text-center text-[17px] text-[rgba(255,255,255,0.45)]">
+                  No results found.
+                </Command.Empty>
 
-                <Command.Group heading={<span className="label text-[10px] px-2">PAGES</span>}>
+                <Command.Group heading={<span className="label block px-2 pb-1 pt-2">Pages</span>}>
                   {PAGES.map((p) => (
-                    <Command.Item
-                      key={p.href}
-                      value={p.name}
-                      onSelect={() => go(p.href)}
-                      className="flex items-center gap-3 px-3 py-2 rounded-lg text-[13px] text-[var(--color-text-mid)] cursor-pointer transition-colors data-[selected]:bg-[var(--color-surface2)] data-[selected]:text-[var(--color-text)]"
-                    >
-                      <span className="w-5 text-center opacity-60">{p.icon}</span>
+                    <Command.Item key={p.href} value={p.name} onSelect={() => go(p.href)} className={itemCls}>
+                      <span className="w-5 text-center text-[15px] opacity-70">{p.icon}</span>
                       {p.name}
                     </Command.Item>
                   ))}
                 </Command.Group>
 
-                <Command.Group heading={<span className="label text-[10px] px-2">BUSINESSES</span>}>
+                <Command.Group heading={<span className="label block px-2 pb-1 pt-3">Businesses</span>}>
                   {businesses.map((b) => (
                     <Command.Item
                       key={b.id}
                       value={`${b.name} ${b.id}`}
                       onSelect={() => go(`/business/${b.id}`)}
-                      className="flex items-center gap-3 px-3 py-2 rounded-lg text-[13px] text-[var(--color-text-mid)] cursor-pointer transition-colors data-[selected]:bg-[var(--color-surface2)] data-[selected]:text-[var(--color-text)]"
+                      className={itemCls}
                     >
-                      <span className="w-2 h-2 rounded-full" style={{ backgroundColor: b.color }} />
+                      <span className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: b.color }} />
                       {b.name}
                     </Command.Item>
                   ))}
                 </Command.Group>
 
                 {recentTasks.length > 0 && (
-                  <Command.Group heading={<span className="label text-[10px] px-2">RECENT TASKS</span>}>
+                  <Command.Group heading={<span className="label block px-2 pb-1 pt-3">Recent tasks</span>}>
                     {recentTasks.map((t) => (
                       <Command.Item
                         key={t.id}
                         value={t.text}
-                        onSelect={() => { go('/tasks') }}
-                        className="flex items-center gap-3 px-3 py-2 rounded-lg text-[13px] text-[var(--color-text-mid)] cursor-pointer transition-colors data-[selected]:bg-[var(--color-surface2)] data-[selected]:text-[var(--color-text)]"
+                        onSelect={() => {
+                          go('/tasks')
+                        }}
+                        className={itemCls}
                       >
-                        <span className="w-4 text-center opacity-40">☐</span>
+                        <span className="w-4 text-center text-[15px] opacity-40">☐</span>
                         <span className="truncate">{t.text}</span>
                       </Command.Item>
                     ))}
                   </Command.Group>
                 )}
 
-                <Command.Group heading={<span className="label text-[10px] px-2">ACTIONS</span>}>
-                  <Command.Item value="add task new" onSelect={() => go('/tasks')} className="flex items-center gap-3 px-3 py-2 rounded-lg text-[13px] text-[var(--color-text-mid)] cursor-pointer transition-colors data-[selected]:bg-[var(--color-surface2)] data-[selected]:text-[var(--color-text)]">
-                    <span className="w-5 text-center text-[var(--color-accent)]">+</span>
-                    Add Task
+                <Command.Group heading={<span className="label block px-2 pb-1 pt-3">Actions</span>}>
+                  <Command.Item value="add task new" onSelect={() => go('/tasks')} className={itemCls}>
+                    <span className="w-5 text-center text-[17px] font-semibold text-[var(--accent)]">+</span>
+                    Add task
                   </Command.Item>
-                  <Command.Item value="ask ai strategist" onSelect={() => go('/ai')} className="flex items-center gap-3 px-3 py-2 rounded-lg text-[13px] text-[var(--color-text-mid)] cursor-pointer transition-colors data-[selected]:bg-[var(--color-surface2)] data-[selected]:text-[var(--color-text)]">
-                    <span className="w-5 text-center">🧠</span>
+                  <Command.Item value="ask ai strategist" onSelect={() => go('/ai')} className={itemCls}>
+                    <span className="w-5 text-center text-[15px]">🧠</span>
                     Ask AI Strategist
                   </Command.Item>
-                  <Command.Item value="log idea" onSelect={() => go('/idea-bank')} className="flex items-center gap-3 px-3 py-2 rounded-lg text-[13px] text-[var(--color-text-mid)] cursor-pointer transition-colors data-[selected]:bg-[var(--color-surface2)] data-[selected]:text-[var(--color-text)]">
-                    <span className="w-5 text-center">💡</span>
-                    Log an Idea
+                  <Command.Item value="log idea" onSelect={() => go('/idea-bank')} className={itemCls}>
+                    <span className="w-5 text-center text-[15px]">💡</span>
+                    Log an idea
                   </Command.Item>
                 </Command.Group>
               </Command.List>

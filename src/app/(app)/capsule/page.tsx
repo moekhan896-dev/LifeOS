@@ -49,67 +49,64 @@ export default function CapsulePage() {
       <div className="space-y-6">
         {/* Header */}
         <div>
-          <h1 style={{ fontSize: 28, fontWeight: 600 }} className="text-white">Time Capsule</h1>
-          <p className="text-[13px] text-[var(--text-mid)] mt-1">Write to your future self.</p>
+          <h1 className="title">Time Capsule</h1>
+          <p className="subheadline mt-1">Write to your future self.</p>
         </div>
 
         {/* Write Form */}
         <motion.div
-          initial={{ opacity: 0, y: 10 }}
+          initial={{ opacity: 0, y: 8 }}
           animate={{ opacity: 1, y: 0 }}
-          className="rounded-[16px] p-5"
-          style={{ background: '#0e1018' }}
+          transition={{ duration: 0.25, ease: [0.25, 0.1, 0.25, 1] as const }}
+          className="card rounded-2xl p-5"
         >
-          <h2 className="text-[14px] font-semibold text-white mb-3">Write a Capsule</h2>
+          <h2 className="headline mb-3">Write a capsule</h2>
           <textarea
-            className="w-full bg-[#1a1d2e] border border-[var(--border)] rounded-lg px-3 py-3 text-[13px] text-white placeholder:text-[var(--text-dim)] focus:outline-none focus:border-emerald-500/50 resize-none min-h-[120px]"
+            className="w-full bg-[var(--bg-secondary)] border border-[var(--border)] rounded-xl px-4 py-3 text-[17px] text-[var(--text-primary)] placeholder:text-[var(--text-tertiary)] focus:outline-none focus:border-[var(--accent)] resize-none min-h-[120px] transition-[border-color] duration-200"
             placeholder="Dear Future Art..."
             value={letter}
             onChange={(e) => setLetter(e.target.value)}
           />
-          <div className="flex items-center gap-3 mt-3">
-            <span className="text-[12px] text-[var(--text-dim)]">Open in:</span>
+          <div className="flex flex-wrap items-center gap-3 mt-3">
+            <span className="footnote text-[var(--text-secondary)]">Open in:</span>
             {DELIVER_OPTIONS.map((opt) => (
               <button
+                type="button"
                 key={opt.days}
                 onClick={() => setDeliverDays(opt.days)}
-                className={`text-[11px] px-2.5 py-1 rounded-md border transition-colors ${
+                className={`text-[13px] px-3 py-2 min-h-[44px] rounded-lg border transition-colors ${
                   deliverDays === opt.days
-                    ? 'border-emerald-500 text-emerald-400 bg-emerald-500/10'
-                    : 'border-[var(--border)] text-[var(--text-dim)] hover:text-white'
+                    ? 'border-[var(--accent)] text-[var(--accent)] bg-[var(--accent-bg)]'
+                    : 'border-[var(--border)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-secondary)]'
                 }`}
               >
                 {opt.label}
               </button>
             ))}
           </div>
-          <button
-            onClick={handleSeal}
-            className="mt-4 text-[13px] font-medium px-5 py-2 rounded-lg text-white transition-all"
-            style={{ background: 'linear-gradient(135deg, #10b981, #059669)' }}
-          >
-            Seal capsule &rarr;
+          <button type="button" onClick={handleSeal} className="btn-primary mt-4">
+            Seal capsule →
           </button>
         </motion.div>
 
         {/* Ready to Open */}
         {ready.length > 0 && (
           <div className="space-y-3">
-            <h2 className="text-[14px] font-semibold text-emerald-400">Ready to Open</h2>
+            <h2 className="headline text-[var(--accent)]">Ready to open</h2>
             {ready.map((c, i) => (
               <motion.div
                 key={c.id}
-                initial={{ opacity: 0, y: 10 }}
+                initial={{ opacity: 0, y: 8 }}
                 animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: i * 0.05 }}
-                className="rounded-[16px] p-5"
-                style={{ background: '#0e1018', borderLeft: '3px solid #10b981' }}
+                transition={{ delay: i * 0.03, ease: [0.25, 0.1, 0.25, 1] as const }}
+                className="card rounded-2xl p-5 border-l-[3px] border-l-[var(--accent)]"
               >
-                <div className="text-[10px] font-mono text-[var(--text-dim)]">Sealed {fmtDate(c.createdAt)}</div>
-                <div className="text-[13px] text-[var(--text-mid)] mt-1">Delivery date has passed!</div>
+                <div className="caption data-number text-[var(--text-tertiary)]">Sealed {fmtDate(c.createdAt)}</div>
+                <div className="body text-[var(--text-secondary)] mt-1">Delivery date has passed!</div>
                 <button
+                  type="button"
                   onClick={() => handleOpen(c.id)}
-                  className="mt-3 text-[12px] text-emerald-400 hover:text-emerald-300 font-medium"
+                  className="btn-text mt-3 font-semibold"
                 >
                   Open capsule
                 </button>
@@ -121,25 +118,24 @@ export default function CapsulePage() {
         {/* Sealed Capsules */}
         {sealed.length > 0 && (
           <div className="space-y-3">
-            <h2 className="text-[14px] font-semibold text-amber-400">Sealed Capsules</h2>
+            <h2 className="headline text-[var(--warning)]">Sealed capsules</h2>
             {sealed.map((c, i) => {
               const days = daysUntil(c.deliverDate)
               return (
                 <motion.div
                   key={c.id}
-                  initial={{ opacity: 0, y: 10 }}
+                  initial={{ opacity: 0, y: 8 }}
                   animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: i * 0.05 }}
-                  className="rounded-[16px] p-5"
-                  style={{ background: '#0e1018', borderLeft: '3px solid #eab30833' }}
+                  transition={{ delay: i * 0.03, ease: [0.25, 0.1, 0.25, 1] as const }}
+                  className="card rounded-2xl p-5 border-l-[3px] border-l-[color-mix(in_srgb,var(--spiritual)_40%,transparent)]"
                 >
                   <div className="flex items-center gap-2">
                     <span className="text-[16px]">&#x1F512;</span>
                     <div>
-                      <div className="text-[10px] font-mono text-[var(--text-dim)]">
+                      <div className="caption data-number text-[var(--text-tertiary)]">
                         Sealed {fmtDate(c.createdAt)} &middot; Opens {fmtDate(c.deliverDate)}
                       </div>
-                      <div className="text-[13px] text-[var(--text-mid)] mt-0.5">{days} days until delivery</div>
+                      <div className="footnote text-[var(--text-secondary)] mt-0.5">{days} days until delivery</div>
                     </div>
                   </div>
                 </motion.div>
@@ -151,20 +147,19 @@ export default function CapsulePage() {
         {/* Opened Capsules */}
         {opened.length > 0 && (
           <div className="space-y-3">
-            <h2 className="text-[14px] font-semibold text-emerald-400">Opened Capsules</h2>
+            <h2 className="headline text-[var(--positive)]">Opened capsules</h2>
             {opened.map((c, i) => (
               <motion.div
                 key={c.id}
                 initial={revealedId === c.id ? { opacity: 0, scaleY: 0.3, originY: 0 } : { opacity: 1 }}
                 animate={{ opacity: 1, scaleY: 1 }}
                 transition={{ duration: 0.5, ease: 'easeOut' }}
-                className="rounded-[16px] p-5"
-                style={{ background: '#0e1018', borderLeft: '3px solid #10b981' }}
+                className="card rounded-2xl p-5 border-l-[3px] border-l-[var(--positive)]"
               >
-                <div className="text-[10px] font-mono text-[var(--text-dim)] mb-2">
+                <div className="caption data-number text-[var(--text-tertiary)] mb-2">
                   Written {fmtDate(c.createdAt)} &middot; Opened {fmtDate(c.deliverDate)}
                 </div>
-                <div className="text-[13px] text-white leading-relaxed whitespace-pre-wrap">{c.letter}</div>
+                <div className="body leading-relaxed whitespace-pre-wrap">{c.letter}</div>
               </motion.div>
             ))}
           </div>

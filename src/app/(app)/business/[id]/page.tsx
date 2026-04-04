@@ -12,16 +12,17 @@ import {
   TAGS, XP_VALUES, PRIORITY_COLORS, DRIVER_STATUSES, DRIVER_STATUS_COLORS,
   BUSINESS_STATUSES, COLOR_SWATCHES, MEETING_FREQUENCIES,
 } from '@/lib/constants'
+import { applyTaskDollarEstimateAfterCreate } from '@/lib/task-dollar-client'
 
 /* ── Constants ── */
 
 const STATUS_BADGE_COLORS: Record<string, string> = {
-  active_healthy: 'bg-emerald/15 text-emerald',
-  active_slow: 'bg-amber/15 text-amber',
-  active_prerevenue: 'bg-purple/15 text-purple',
-  dormant: 'bg-text-dim/15 text-text-dim',
-  backburner: 'bg-text-dim/15 text-text-dim',
-  idea: 'bg-blue/15 text-blue',
+  active_healthy: 'bg-[rgba(48,209,88,0.15)] text-[var(--positive)]',
+  active_slow: 'bg-[rgba(255,159,10,0.15)] text-[var(--warning)]',
+  active_prerevenue: 'bg-[rgba(191,90,242,0.15)] text-[var(--ai)]',
+  dormant: 'bg-[rgba(255,255,255,0.06)] text-[var(--text-tertiary)]',
+  backburner: 'bg-[rgba(255,255,255,0.06)] text-[var(--text-tertiary)]',
+  idea: 'bg-[var(--accent-bg)] text-[var(--accent)]',
 }
 
 const PRIORITY_BORDER: Record<string, string> = {
@@ -29,7 +30,9 @@ const PRIORITY_BORDER: Record<string, string> = {
 }
 
 const GMB_TOP_BORDER: Record<string, string> = {
-  strong: '#10b981', medium: '#f59e0b', new: '#3b82f6',
+  strong: 'var(--positive)',
+  medium: 'var(--warning)',
+  new: 'var(--accent)',
 }
 
 const stagger = { hidden: {}, show: { transition: { staggerChildren: 0.04 } } }
@@ -214,7 +217,8 @@ export default function BusinessPage() {
     const tagMatch = text.match(/#(\w+)\s*/)
     if (tagMatch) { tag = tagMatch[1].toUpperCase(); text = text.replace(tagMatch[0], '') }
 
-    addTask({ businessId: id, text, tag, priority, done: false, xpValue: XP_VALUES[priority] })
+    const tid = addTask({ businessId: id, text, tag, priority, done: false, xpValue: XP_VALUES[priority] })
+    void applyTaskDollarEstimateAfterCreate(tid, text)
     setNewTaskText('')
     toast.success('Task added')
   }

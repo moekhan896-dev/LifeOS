@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect } from 'react'
 import { motion, AnimatePresence, useMotionValue, useTransform } from 'framer-motion'
 import { useStore, type Task } from '@/stores/store'
+import TaskDollarHint from '@/components/TaskDollarHint'
 import { PRIORITY_COLORS } from '@/lib/constants'
 import { toast } from 'sonner'
 
@@ -18,7 +19,7 @@ interface TaskItemProps {
 }
 
 export default function TaskItem({ task }: TaskItemProps) {
-  const { toggleTask, deleteTask, updateTask, businesses } = useStore()
+  const { toggleTask, deleteTask, updateTask, businesses, anthropicKey } = useStore()
   const [showXp, setShowXp] = useState(false)
   const [editing, setEditing] = useState(false)
   const [editText, setEditText] = useState(task.text)
@@ -171,6 +172,8 @@ export default function TaskItem({ task }: TaskItemProps) {
             )}
           </div>
         </div>
+
+        <TaskDollarHint task={task} hasAiKey={!!anthropicKey?.trim()} />
 
         {/* Delete button */}
         <motion.button

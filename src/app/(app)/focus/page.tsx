@@ -134,7 +134,7 @@ export default function FocusPage() {
         {/* Rating Modal */}
         <AnimatePresence>
           {showRating && (
-            <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }} className="rounded-[16px] border border-[#1e2338] bg-[#0e1018] p-6 space-y-4">
+            <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }} className="rounded-[16px] border border-[var(--border)] bg-[var(--bg-elevated)] p-6 space-y-4">
               <h3 className="text-[16px] font-semibold text-[var(--text)] text-center">Rate this session</h3>
               <div className="flex justify-center gap-3">
                 {[1, 2, 3, 4, 5].map(q => (
@@ -151,7 +151,7 @@ export default function FocusPage() {
 
         {/* Active Session */}
         {isActive && !showRating && (
-          <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} className="rounded-[16px] border border-[#1e2338] bg-[#0e1018] p-8 text-center space-y-6">
+          <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} className="rounded-[16px] border border-[var(--border)] bg-[var(--bg-elevated)] p-8 text-center space-y-6">
             {/* Timer */}
             <div>
               <p className="text-[48px] font-mono font-bold text-[var(--accent)] tracking-wider">
@@ -193,7 +193,7 @@ export default function FocusPage() {
 
         {/* Idle State */}
         {!isActive && !showRating && (
-          <motion.div {...cardAnim(0.05)} className="rounded-[16px] border border-[#1e2338] bg-[#0e1018] p-6 space-y-5">
+          <motion.div {...cardAnim(0.05)} className="rounded-[16px] border border-[var(--border)] bg-[var(--bg-elevated)] p-6 space-y-5">
             <h3 className="text-[16px] font-semibold text-[var(--text)] text-center">Start Focus Session</h3>
 
             {/* Task selector */}
@@ -243,7 +243,7 @@ export default function FocusPage() {
 
         {/* Session History */}
         {todaySessions.length > 0 && !isActive && !showRating && (
-          <motion.div {...cardAnim(0.15)} className="rounded-[16px] border border-[#1e2338] bg-[#0e1018] p-5 space-y-3">
+          <motion.div {...cardAnim(0.15)} className="rounded-[16px] border border-[var(--border)] bg-[var(--bg-elevated)] p-5 space-y-3">
             <h3 className="text-[14px] font-semibold text-[var(--text)]">Today&apos;s Sessions</h3>
             <div className="space-y-2">
               {todaySessions.map((s, i) => {
