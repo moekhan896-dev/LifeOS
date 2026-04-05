@@ -256,6 +256,13 @@ export function OnboardingWizard({ mode = 'default' as 'default' | 'profileUpdat
 
   const interstitialName = businessInterstitial !== null ? draft.businesses[businessInterstitial]?.name?.trim() || 'This business' : ''
 
+  /** After business interstitial: recurring-clients step (3) unless no business has recurring clients. */
+  const advanceAfterBusinessInterstitial = (businessesForCheck: typeof draft.businesses) => {
+    const anyRecurring = businessesForCheck.some((b) => b.recurringClients === true)
+    if (anyRecurring) nextStep()
+    else setStep(4)
+  }
+
   if (mode === 'profileUpdate' && !profileGate) {
     return (
       <div className="flex min-h-[40vh] items-center justify-center text-[17px] text-[var(--color-text-dim,#888)]">
@@ -423,7 +430,8 @@ export function OnboardingWizard({ mode = 'default' as 'default' | 'profileUpdat
                             }))
                             setBusinessInterstitial(null)
                             setBusinessEditIndex(0)
-                            setStep(4)
+                            const trimmed = draft.businesses.slice(0, idx + 1)
+                            advanceAfterBusinessInterstitial(trimmed)
                           }}
                         >
                           Actually, I&apos;m done adding businesses
@@ -436,7 +444,7 @@ export function OnboardingWizard({ mode = 'default' as 'default' | 'profileUpdat
                           className={btnPrimary}
                           onClick={() => {
                             setBusinessInterstitial(null)
-                            setStep(4)
+                            advanceAfterBusinessInterstitial(draft.businesses)
                           }}
                         >
                           Continue to finances →
