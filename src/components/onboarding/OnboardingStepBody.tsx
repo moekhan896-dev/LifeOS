@@ -833,7 +833,7 @@ export function OnboardingStepBody({
         <AiBubble>Let&apos;s get real about money in and money out. This powers every financial impact view.</AiBubble>
         <div className={glassPanel + ' space-y-4'}>
           <div>
-            <label className={labelCls}>Connect bank (optional)</label>
+            <label className={labelCls}>Connect bank</label>
             <div className="flex flex-wrap gap-2">
               <Chip selected={f.plaidIntent === 'connect'} onClick={() => patchDraft((d) => ({ ...d, finance: { ...d.finance, plaidIntent: 'connect' } }))}>
                 Yes — connect via Plaid (soon)
@@ -856,12 +856,16 @@ export function OnboardingStepBody({
             {!f.housingFree && (
               <input
                 type="number"
-                className={inputCls + ' mt-2'}
+                min={1}
+                className={inputCls + ' mt-2' + fieldErrClass(fe('finance.housing'))}
                 value={f.housing || ''}
                 onChange={(e) =>
                   patchDraft((d) => ({ ...d, finance: { ...d.finance, housing: Number(e.target.value) || 0 } }))
                 }
               />
+            )}
+            {fe('finance.housing') && (
+              <p className="mt-1 text-[13px] text-[var(--negative)]">Choose rent-free or enter your monthly housing cost</p>
             )}
           </div>
           <div>
@@ -1060,7 +1064,9 @@ export function OnboardingStepBody({
           </div>
           <div>
             <label className={labelCls}>Liquid savings (range)</label>
-            <div className="flex flex-wrap gap-2">
+            <div
+              className={`flex flex-wrap gap-2 rounded-[14px] p-2 ${fe('finance.savingsRange') ? 'border border-[var(--negative)]' : ''}`}
+            >
               {SAVINGS_RANGE_OPTIONS.map((s) => (
                 <Chip
                   key={s}
@@ -1071,6 +1077,9 @@ export function OnboardingStepBody({
                 </Chip>
               ))}
             </div>
+            {fe('finance.savingsRange') && (
+              <p className="mt-1 text-[13px] text-[var(--negative)]">This field is required</p>
+            )}
           </div>
           <div>
             <label className={labelCls}>Assets to track</label>
@@ -1153,8 +1162,11 @@ export function OnboardingStepBody({
               onChange={(e) =>
                 patchDraft((d) => ({ ...d, goals: { ...d.goals, incomeTarget: Number(e.target.value) } }))
               }
-              className="w-full accent-[var(--accent)]"
+              className={'w-full accent-[var(--accent)]' + (fe('goals.incomeTarget') ? ' opacity-90 ring-2 ring-[var(--negative)] rounded-full' : '')}
             />
+            {fe('goals.incomeTarget') && (
+              <p className="mt-1 text-[13px] text-[var(--negative)]">This field is required (minimum $5,000/mo)</p>
+            )}
             <div className="flex justify-between text-[10px] text-white/25">
               <span>$5K</span>
               <span>$500K</span>
@@ -1164,12 +1176,15 @@ export function OnboardingStepBody({
             <label className={labelCls}>Target month</label>
             <input
               type="month"
-              className={inputCls}
+              className={inputCls + fieldErrClass(fe('goals.targetYearMonth'))}
               value={g.targetYearMonth}
               onChange={(e) =>
                 patchDraft((d) => ({ ...d, goals: { ...d.goals, targetYearMonth: e.target.value } }))
               }
             />
+            {fe('goals.targetYearMonth') && (
+              <p className="mt-1 text-[13px] text-[var(--negative)]">This field is required</p>
+            )}
           </div>
           <div>
             <label className={labelCls}>Why this number — what changes when you hit it?</label>
@@ -1198,7 +1213,7 @@ export function OnboardingStepBody({
             </div>
             {g.northStarMetric === 'Something else' && (
               <input
-                className={inputCls + ' mt-2'}
+                className={inputCls + ' mt-2' + fieldErrClass(fe('goals.northStarCustom'))}
                 placeholder="Describe your metric"
                 value={g.northStarCustom}
                 onChange={(e) =>
@@ -1206,10 +1221,15 @@ export function OnboardingStepBody({
                 }
               />
             )}
+            {fe('goals.northStarCustom') && (
+              <p className="mt-1 text-[13px] text-[var(--negative)]">This field is required</p>
+            )}
           </div>
           <div>
             <label className={labelCls}>Exit plans</label>
-            <div className="flex flex-wrap gap-2">
+            <div
+              className={`flex flex-wrap gap-2 rounded-[14px] p-2 ${fe('goals.exitIntent') ? 'border border-[var(--negative)]' : ''}`}
+            >
               {(['yes', 'maybe', 'no'] as const).map((ex) => (
                 <Chip
                   key={ex}
@@ -1220,6 +1240,9 @@ export function OnboardingStepBody({
                 </Chip>
               ))}
             </div>
+            {fe('goals.exitIntent') && (
+              <p className="mt-1 text-[13px] text-[var(--negative)]">This field is required</p>
+            )}
             {g.exitIntent !== 'no' && (
               <div className="mt-3 space-y-2">
                 <select
@@ -1684,7 +1707,9 @@ export function OnboardingStepBody({
       <motion.div key="s7" variants={variants} initial="enter" animate="center" exit="exit" transition={transition} className="space-y-4">
         <AiBubble>Do you have a spiritual or religious practice that matters to you?</AiBubble>
         <div className={glassPanel + ' space-y-3'}>
-          <div className="flex flex-wrap gap-2">
+          <div
+            className={`flex flex-wrap gap-2 rounded-[14px] p-2 ${fe('faith.level') ? 'border border-[var(--negative)]' : ''}`}
+          >
             {[
               ['central', 'Yes — central'],
               ['sometimes', 'Yes — sometimes'],
@@ -1695,12 +1720,20 @@ export function OnboardingStepBody({
               <Chip
                 key={k}
                 selected={fa.level === k}
-                onClick={() => patchDraft((d) => ({ ...d, faith: { ...d.faith, level: k as typeof fa.level } }))}
+                onClick={() =>
+                  patchDraft((d) => ({
+                    ...d,
+                    faith: { ...d.faith, level: k as import('./onboarding-types').FaithLevel },
+                  }))
+                }
               >
                 {lab}
               </Chip>
             ))}
           </div>
+          {fe('faith.level') && (
+            <p className="text-[13px] text-[var(--negative)]">This field is required</p>
+          )}
           {(fa.level === 'central' || fa.level === 'sometimes' || fa.level === 'spiritual') && (
             <>
               <div>
@@ -1926,7 +1959,9 @@ export function OnboardingStepBody({
         <div className={glassPanel + ' space-y-4'}>
           <div>
             <label className={labelCls}>When you avoid something important…</label>
-            <div className="space-y-2">
+            <div
+              className={`space-y-2 rounded-[14px] p-2 ${fe('ai.communicationStyle') ? 'border border-[var(--negative)]' : ''}`}
+            >
               {[
                 ['mix', 'Mix — balanced (default)'],
                 ['data', 'Show me the data and ask what it would take'],

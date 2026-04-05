@@ -161,25 +161,30 @@ export function OnboardingWizard({ mode = 'default' as 'default' | 'profileUpdat
     arr[i] = v
     setPinWorking(arr)
     setPinErr('')
+    clearValidationErrors()
     const refs = phase === 'set' ? pinRefs : confirmRefs
     if (v && i < 3) refs[i + 1].current?.focus()
 
     if (i === 3 && v) {
       const code = arr.join('')
       if (phase === 'set') {
-        patchDraft((d) => ({ ...d, pin: code }))
+        patchDraft((d) => ({ ...d, pin: code, pinConfirm: '' }))
+        clearValidationErrors()
         setPinWorking(['', '', '', ''])
         setPinPhase('confirm')
         setTimeout(() => confirmRefs[0].current?.focus(), 80)
       } else {
         const expected = useOnboardingStore.getState().draft.pin
         if (code === expected) {
+          patchDraft((d) => ({ ...d, pinConfirm: code }))
+          clearValidationErrors()
           nextStep()
         } else {
           setPinErr("Codes didn't match. Try again.")
+          setValidationErrors(['pinConfirm'])
           setPinWorking(['', '', '', ''])
           setPinPhase('set')
-          patchDraft((d) => ({ ...d, pin: '' }))
+          patchDraft((d) => ({ ...d, pin: '', pinConfirm: '' }))
           setTimeout(() => pinRefs[0].current?.focus(), 100)
         }
       }
@@ -320,7 +325,9 @@ export function OnboardingWizard({ mode = 'default' as 'default' | 'profileUpdat
                             r[i - 1].current?.focus()
                           }
                         }}
-                        className="data h-20 w-14 rounded-[12px] border border-[var(--border)] bg-[var(--bg-secondary)] text-center text-2xl text-[var(--text-primary)] focus:border-[var(--accent)] focus:outline-none focus:ring-0"
+                        className={`data h-20 w-14 rounded-[12px] border bg-[var(--bg-secondary)] text-center text-2xl text-[var(--text-primary)] focus:outline-none focus:ring-0 ${
+                          pinErr ? 'border-[var(--negative)] focus:border-[var(--negative)]' : 'border-[var(--border)] focus:border-[var(--accent)]'
+                        }`}
                       />
                     ))}
                   </div>
@@ -416,7 +423,7 @@ export function OnboardingWizard({ mode = 'default' as 'default' | 'profileUpdat
                             }))
                             setBusinessInterstitial(null)
                             setBusinessEditIndex(0)
-                            nextStep()
+                            setStep(4)
                           }}
                         >
                           Actually, I&apos;m done adding businesses
@@ -429,7 +436,7 @@ export function OnboardingWizard({ mode = 'default' as 'default' | 'profileUpdat
                           className={btnPrimary}
                           onClick={() => {
                             setBusinessInterstitial(null)
-                            nextStep()
+                            setStep(4)
                           }}
                         >
                           Continue to finances →

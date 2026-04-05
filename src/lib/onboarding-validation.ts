@@ -54,7 +54,7 @@ export function validateStep(
     case 4: {
       const f = draft.finance
       add('finance.plaidIntent', f.plaidIntent === 'connect' || f.plaidIntent === 'manual' || f.plaidIntent === 'later')
-      add('finance.housing', f.housingFree || (typeof f.housing === 'number' && f.housing >= 0))
+      add('finance.housing', f.housingFree === true || (typeof f.housing === 'number' && f.housing > 0))
       add('finance.savingsRange', !!f.savingsRange.trim())
       break
     }
@@ -79,7 +79,10 @@ export function validateStep(
       break
     }
     case 7:
-      add('faith.level', !!draft.faith.level)
+      add(
+        'faith.level',
+        ['central', 'sometimes', 'spiritual', 'no', 'prefer_not'].includes(String(draft.faith.level))
+      )
       break
     case 8:
       break

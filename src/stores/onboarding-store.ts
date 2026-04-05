@@ -104,6 +104,10 @@ export const useOnboardingStore = create<OnboardingWizardState>()(
         if (typeof base.businessEditIndex !== 'number') base.businessEditIndex = 0
         if (typeof base.healthScheduleSubStep !== 'number') base.healthScheduleSubStep = 0
         if (!Array.isArray(base.validationErrors)) base.validationErrors = []
+        const fd = base.draft as { faith?: { level?: string } }
+        if (fd.faith && (fd.faith.level === undefined || fd.faith.level === null)) {
+          fd.faith.level = ''
+        }
         return base
       },
       onRehydrateStorage: () => (state) => {

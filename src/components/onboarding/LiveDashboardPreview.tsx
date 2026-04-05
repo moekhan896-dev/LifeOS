@@ -55,13 +55,37 @@ export function LiveDashboardPreview({
   const showBusinesses = stepIndex >= 2
   const showFinance = stepIndex >= 4
   const showGoal = stepIndex >= 5
-  const showHabits = stepIndex >= 6
+  /** Habits sub-step (health step sub 2) or any step after health/schedule is done */
+  const showHabits = stepIndex > 6 || (stepIndex === 6 && healthScheduleSubStep >= 2)
+  /** Work-hours sub-step or later */
+  const showSchedule = stepIndex > 6 || (stepIndex === 6 && healthScheduleSubStep >= 1)
   const showFaith = stepIndex >= 7
-  const showSchedule = stepIndex >= 6 && (healthScheduleSubStep >= 1 || stepIndex >= 7)
   const showFull = stepIndex >= 12
 
   const exp = estMonthlyPersonalExp(draft.finance)
   const net = totalRev - exp
+
+  const goalPct =
+    incomeTarget > 0 ? Math.min(100, Math.round((incomeTarget / 500000) * 100)) : 0
+
+  const schedulePct = (() => {
+    const ws = draft.schedule.workStart
+    const we = draft.schedule.workEnd
+    if (!ws || !we) return 0
+    const toMin = (t: string) => {
+      const [h, m] = t.split(':').map((x) => parseInt(x, 10))
+      if (Number.isNaN(h)) return 0
+      return h * 60 + (Number.isNaN(m) ? 0 : m)
+    }
+    const a = toMin(ws)
+    const b = toMin(we)
+    if (b <= a) return 72
+    return Math.min(100, Math.round(((b - a) / (24 * 60)) * 100))
+  })()
+
+  const prayerOn =
+    draft.faith.tradition === 'Islam' &&
+    (draft.faith.islamPrayerTracking === 'build' || draft.faith.islamPrayerTracking === 'consistent')
 
   return (
     <div className="relative hidden h-full min-h-[420px] flex-col md:flex">
@@ -117,7 +141,9 @@ export function LiveDashboardPreview({
                 {showFinance ? `$${totalRev.toLocaleString()}` : '—'}
               </p>
               <p className="footnote mt-1 text-[var(--text-secondary)]">
-                {showFinance ? `Exp ~$${Math.round(exp).toLocaleString()} · Net ~$${Math.round(net).toLocaleString()}` : '—'}
+                {showFinance
+                  ? `Exp ~$${Math.round(exp).toLocaleString()} · Net ~$${Math.round(net).toLocaleString()}`
+                  : '—'}
               </p>
             </motion.button>
           )}
@@ -135,7 +161,17 @@ export function LiveDashboardPreview({
               <p className="data mt-2 text-[28px] font-bold tabular-nums text-[var(--positive)]">
                 {showGoal && incomeTarget > 0 ? `$${incomeTarget.toLocaleString()}` : '—'}
               </p>
-              <p className="footnote mt-1">{showGoal ? `by ${monthLabel}` : 'Goal step unlocks this meter'}</p>
+              <div className="mt-3 h-2 w-full overflow-hidden rounded-full bg-[var(--surface2)]">
+                {showGoal && incomeTarget > 0 ? (
+                  <motion.div
+                    className="h-2 rounded-full bg-[var(--accent)]"
+                    initial={{ width: 0 }}
+                    animate={{ width: `${goalPct}%` }}
+                    transition={{ duration: 0.35, ease }}
+                  />
+                ) : null}
+              </div>
+              <p className="footnote mt-1">{showGoal && monthLabel !== '—' ? `by ${monthLabel}` : '—'}</p>
             </motion.button>
           )}
 
@@ -159,8 +195,12 @@ export function LiveDashboardPreview({
                     className={`inline-flex items-center gap-1.5 rounded-full border border-[var(--border)] px-2.5 py-1 text-[15px] font-medium text-[var(--text-primary)] ${pulseBusinessIndex === i ? 'animate-pulse ring-2 ring-[var(--accent)]' : ''}`}
                     style={{ borderColor: `${b.color}44` }}
                   >
-                    <span className="h-2 w-2 rounded-full" style={{ background: b.color }} />
-                    {b.name}
+                    <span className="h-2 w-2 shrink-0 rounded-full" style={{ background: b.color }} />
+                    <span className="tabular-nums">
+                      {b.name}
+                      <span className="text-[var(--text-tertiary)]"> · </span>
+                      ${(b.monthlyRevenue || 0).toLocaleString()}/mo
+                    </span>
                   </span>
                 ))}
               </div>
@@ -180,10 +220,12 @@ export function LiveDashboardPreview({
               transition={{ duration: 0.25, ease, delay: 0.18 }}
             >
               <p className="label">Habits</p>
-              <p className="body mt-2">
-                {draft.health.habitsToBuild.length ? `${draft.health.habitsToBuild.length} selected` : '—'}
+              <p className="body mt-2 text-[var(--text-primary)]">
+                {draft.health.habitsToBuild.length
+                  ? draft.health.habitsToBuild.slice(0, 3).join(' · ')
+                  : '—'}
               </p>
-              <p className="footnote mt-1 text-[var(--text-tertiary)]">Habits you pick show up here</p>
+              <p className="footnote mt-1 text-[var(--text-tertiary)]">Tiles fill as you choose habits to build</p>
             </motion.button>
           )}
 
@@ -197,14 +239,20 @@ export function LiveDashboardPreview({
               transition={{ duration: 0.25, ease, delay: 0.22 }}
             >
               <p className="label" style={{ color: 'var(--spiritual)' }}>
-                Spirit
+                {showFaith && prayerOn ? 'Prayer' : 'Faith'}
               </p>
               <p className="body mt-2">
-                {draft.faith.level === 'prefer_not' || draft.faith.level === 'no'
+                {!showFaith
                   ? '—'
-                  : draft.faith.tradition || 'Configured'}
+                  : prayerOn
+                    ? 'Tracking on'
+                    : draft.faith.level === 'prefer_not' || draft.faith.level === 'no' || draft.faith.level === ''
+                      ? '—'
+                      : draft.faith.tradition || '—'}
               </p>
-              <p className="footnote mt-1 text-[var(--text-tertiary)]">Prayer tracking appears when enabled</p>
+              <p className="footnote mt-1 text-[var(--text-tertiary)]">
+                {showFaith ? (prayerOn ? 'Prayer window when enabled' : 'From your faith answers') : '—'}
+              </p>
             </motion.button>
           )}
 
@@ -219,17 +267,19 @@ export function LiveDashboardPreview({
             >
               <p className="label">Schedule</p>
               <div className="mt-2 h-3 w-full rounded-full bg-[var(--surface2)]">
-                {draft.schedule.workStart && draft.schedule.workEnd ? (
-                  <div
-                    className="h-3 rounded-full bg-[var(--accent)]/50"
-                    style={{ width: '72%' }}
+                {showSchedule && draft.schedule.workStart && draft.schedule.workEnd ? (
+                  <motion.div
+                    className="h-3 rounded-full bg-[var(--accent)]/55"
+                    initial={{ width: 0 }}
+                    animate={{ width: `${schedulePct || 72}%` }}
+                    transition={{ duration: 0.35, ease }}
                   />
                 ) : null}
               </div>
               <p className="footnote mt-2 text-[var(--text-secondary)]">
-                {draft.schedule.workStart && draft.schedule.workEnd
+                {showSchedule && draft.schedule.workStart && draft.schedule.workEnd
                   ? `${draft.schedule.workStart} – ${draft.schedule.workEnd}`
-                  : '— · Set work hours to fill this bar'}
+                  : '—'}
               </p>
             </motion.button>
           )}

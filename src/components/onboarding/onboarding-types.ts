@@ -140,7 +140,8 @@ export type FaithLevel =
   | 'prefer_not'
 
 export interface OnboardingFaithDraft {
-  level: FaithLevel
+  /** Empty until user selects a role (required before continuing). */
+  level: FaithLevel | ''
   tradition: string
   islamPrayerTracking: 'build' | 'consistent' | 'not_now' | ''
   prayerConsistency: string
@@ -293,7 +294,7 @@ export function createInitialDraft(): OnboardingDraft {
       quitPrivate: true,
     },
     faith: {
-      level: 'prefer_not',
+      level: '',
       tradition: '',
       islamPrayerTracking: '',
       prayerConsistency: '',

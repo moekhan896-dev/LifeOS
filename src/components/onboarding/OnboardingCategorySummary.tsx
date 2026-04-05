@@ -54,7 +54,6 @@ export function OnboardingCategorySummary({
   const totalRev = draft.businesses.reduce((s, b) => s + (b.monthlyRevenue || 0), 0)
   const expenseGuess =
     draft.finance.housingFree ? 0 : draft.finance.housing + draft.finance.carInsurance + draft.finance.phone
-  const netGuess = totalRev - expenseGuess
 
   const connections: string[] = []
   if (draft.connections.anthropicKey.trim()) connections.push('Anthropic key')
@@ -77,7 +76,7 @@ export function OnboardingCategorySummary({
           <Row label="About you" value={draft.identity.selfDescription.trim() || '—'} />
         </Section>
 
-        <Section title="Your businesses" editStep={2}>
+        <Section title="Businesses" editStep={2}>
           <Row label="Count" value={String(draft.businessCount)} />
           {draft.businesses.map((b, i) => (
             <Row
@@ -135,7 +134,7 @@ export function OnboardingCategorySummary({
           />
         </Section>
 
-        <Section title="AI preferences" editStep={9}>
+        <Section title="AI Preferences" editStep={9}>
           <Row label="Communication" value={draft.ai.communicationStyle || '—'} />
           <Row label="Frequency" value={draft.ai.frequency || '—'} />
           <Row label="Reasoning" value={draft.ai.reasoningDisplay || '—'} />
@@ -155,11 +154,6 @@ export function OnboardingCategorySummary({
           <Row label="PIN" value={draft.pin.length === 4 ? '✓ Set' : '—'} />
         </div>
 
-        <div className={glassPanel + ' p-4'}>
-          <p className="label text-[var(--text-tertiary)]">Snapshot</p>
-          <Row label="Combined revenue (entered)" value={`$${totalRev.toLocaleString()}`} />
-          <Row label="Rough net (rev − key personal costs)" value={`$${Math.round(netGuess).toLocaleString()}`} />
-        </div>
       </div>
 
       <div className="flex flex-col gap-3 pt-2">

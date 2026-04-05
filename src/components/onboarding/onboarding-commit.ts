@@ -142,7 +142,8 @@ export async function commitOnboardingDraft(store: StoreApi, draft: OnboardingDr
     phoneScreenTime: draft.health.screenTimeHours,
     energyLevel: draft.health.energy,
     stressLevel: draft.health.stress,
-    hasFaith: draft.faith.level !== 'no' && draft.faith.level !== 'prefer_not',
+    hasFaith:
+      !!draft.faith.level && draft.faith.level !== 'no' && draft.faith.level !== 'prefer_not',
     faithTradition: draft.faith.tradition,
     trackPrayers: draft.faith.islamPrayerTracking === 'build' || draft.faith.islamPrayerTracking === 'consistent',
     faithConsistency: draft.faith.prayerConsistency,
@@ -324,7 +325,8 @@ export async function commitProfileUpdateFromDraft(store: StoreApi, draft: Onboa
     phoneScreenTime: draft.health.screenTimeHours,
     energyLevel: draft.health.energy,
     stressLevel: draft.health.stress,
-    hasFaith: draft.faith.level !== 'no' && draft.faith.level !== 'prefer_not',
+    hasFaith:
+      !!draft.faith.level && draft.faith.level !== 'no' && draft.faith.level !== 'prefer_not',
     faithTradition: draft.faith.tradition,
     trackPrayers: draft.faith.islamPrayerTracking === 'build' || draft.faith.islamPrayerTracking === 'consistent',
     faithConsistency: draft.faith.prayerConsistency,
