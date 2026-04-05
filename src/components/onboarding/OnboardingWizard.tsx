@@ -8,78 +8,48 @@ import { useOnboardingStore } from '@/stores/onboarding-store'
 import { OnboardingStepBody } from './OnboardingStepBody'
 import { LiveDashboardPreview } from './LiveDashboardPreview'
 import { OnboardingVoiceFab } from './OnboardingVoiceFab'
-import { commitOnboardingDraft } from './onboarding-commit'
+import { OnboardingCategorySummary } from './OnboardingCategorySummary'
+import { commitOnboardingDraft, commitProfileUpdateFromDraft } from './onboarding-commit'
+import { hydrateOnboardingDraftFromMainStore } from '@/lib/hydrate-onboarding-from-store'
+import { toast } from 'sonner'
 import { capitalizeDisplayName } from '@/lib/display-name'
-import { CATEGORY_TITLES, btnPrimary, btnSecondary, glassPanel } from './onboarding-constants'
+import { CATEGORY_TITLES, btnPrimary, btnSecondary, glassPanel, aiBubbleCls } from './onboarding-constants'
+import { validateStep, canProceedStep } from '@/lib/onboarding-validation'
+import { emptyBusinessDraft } from './onboarding-types'
+import { newId } from '@/lib/id'
 
-function canProceed(
-  step: number,
-  draft: ReturnType<typeof useOnboardingStore.getState>['draft'],
-  identitySubStep: number
-): boolean {
-  switch (step) {
-    case 0:
-      return true
-    case 1:
-      switch (identitySubStep) {
-        case 0:
-          return !!draft.identity.name.trim()
-        case 1:
-          return !!draft.identity.location.trim()
-        case 2:
-          return draft.identity.age !== ''
-        case 3:
-          return true
-        default:
-          return false
-      }
-    case 2:
-      return draft.businesses.every((b) => b.name.trim() && b.type && b.status && b.role)
-    case 3:
-      return true
-    case 4:
-      return true
-    case 5:
-      return !!(
-        draft.goals.incomeTarget >= 5000 &&
-        draft.goals.targetYearMonth &&
-        draft.goals.exitIntent &&
-        (draft.goals.northStarMetric !== 'Something else' || !!draft.goals.northStarCustom?.trim())
-      )
-    case 6:
-      return !!(
-        draft.health.targetWake &&
-        draft.health.actualWake &&
-        draft.schedule?.workStart &&
-        draft.schedule?.workEnd
-      )
-    case 7:
-      return true
-    case 8:
-      return true
-    case 9:
-      return !!(draft.ai.communicationStyle && draft.ai.frequency && draft.ai.reasoningDisplay)
-    case 10:
-      return true
-    case 11:
-      return draft.pin.length === 4
-    case 12:
-      return true
-    default:
-      return false
-  }
-}
+const PALETTE = ['#0A84FF', '#60A5FA', '#A78BFA', '#FB7185', '#FBBF24', '#06B6D4', '#D4A853', '#F472B6']
 
-export function OnboardingWizard() {
+export function OnboardingWizard({ mode = 'default' as 'default' | 'profileUpdate' }) {
   const router = useRouter()
   const main = useStore()
-  const { step, draft, identitySubStep, setIdentitySubStep, nextStep, prevStep, patchDraft, resetWizard } =
-    useOnboardingStore()
+  const {
+    step,
+    draft,
+    identitySubStep,
+    setIdentitySubStep,
+    nextStep,
+    prevStep,
+    patchDraft,
+    resetWizard,
+    replaceDraft,
+    businessEditIndex,
+    setBusinessEditIndex,
+    healthScheduleSubStep,
+    setHealthScheduleSubStep,
+    setValidationErrors,
+    clearValidationErrors,
+    setStep,
+  } = useOnboardingStore()
   const [pinPhase, setPinPhase] = useState<'set' | 'confirm'>('set')
   const [pinWorking, setPinWorking] = useState(['', '', '', ''])
   const [pinErr, setPinErr] = useState('')
   const [launching, setLaunching] = useState(false)
   const launchOnceRef = useRef(false)
+  const [businessInterstitial, setBusinessInterstitial] = useState<number | null>(null)
+  const [resumeWelcome, setResumeWelcome] = useState(false)
+  const profileHydratedRef = useRef(false)
+  const [profileGate, setProfileGate] = useState(mode !== 'profileUpdate')
   const pinRefs = [useRef<HTMLInputElement>(null), useRef<HTMLInputElement>(null), useRef<HTMLInputElement>(null), useRef<HTMLInputElement>(null)]
   const confirmRefs = [useRef<HTMLInputElement>(null), useRef<HTMLInputElement>(null), useRef<HTMLInputElement>(null), useRef<HTMLInputElement>(null)]
 
@@ -91,26 +61,66 @@ export function OnboardingWizard() {
     }
   }, [step])
 
+  useEffect(() => {
+    clearValidationErrors()
+  }, [step, identitySubStep, healthScheduleSubStep, clearValidationErrors])
+
+  useEffect(() => {
+    if (mode === 'profileUpdate') return
+    if (typeof window === 'undefined') return
+    if (sessionStorage.getItem('onb-resume-shown')) return
+    const { step: st, draft: d } = useOnboardingStore.getState()
+    if (st > 0 && (d.identity.name.trim() || st > 1)) {
+      sessionStorage.setItem('onb-resume-shown', '1')
+      setResumeWelcome(true)
+    }
+  }, [mode])
+
+  useEffect(() => {
+    if (mode !== 'profileUpdate' || profileHydratedRef.current) return
+    profileHydratedRef.current = true
+    const d = hydrateOnboardingDraftFromMainStore(useStore.getState())
+    replaceDraft(d)
+    setIdentitySubStep(0)
+    setBusinessEditIndex(0)
+    setHealthScheduleSubStep(0)
+    setBusinessInterstitial(null)
+    setStep(12)
+    setProfileGate(true)
+  }, [mode, replaceDraft, setStep, setIdentitySubStep, setBusinessEditIndex, setHealthScheduleSubStep])
+
+  useEffect(() => {
+    if (step !== 2) setBusinessInterstitial(null)
+  }, [step])
+
   const launch = useCallback(async () => {
     if (launchOnceRef.current) return
     launchOnceRef.current = true
     setLaunching(true)
     try {
+      if (mode === 'profileUpdate') {
+        await commitProfileUpdateFromDraft(main, draft)
+        toast.success('Your profile was updated.')
+        router.push('/settings')
+        return
+      }
       await commitOnboardingDraft(main, draft)
       main.completeOnboarding()
       main.setAuthenticated(true)
       main.touchLastOpened()
       resetWizard()
+      sessionStorage.removeItem('onb-resume-shown')
       router.push('/dashboard')
     } finally {
       launchOnceRef.current = false
       setLaunching(false)
     }
-  }, [draft, main, resetWizard, router])
+  }, [draft, main, mode, resetWizard, router])
 
   const handleVoice = useCallback(
     (text: string) => {
       const sub = useOnboardingStore.getState().identitySubStep
+      const bi = useOnboardingStore.getState().businessEditIndex
       patchDraft((d) => {
         const sp = (a: string) => (a ? `${a} ` : '') + text
         if (step === 1) {
@@ -122,9 +132,9 @@ export function OnboardingWizard() {
           }
           return { ...d, identity: { ...d.identity, selfDescription: sp(d.identity.selfDescription) } }
         }
-        if (step === 2 && d.businesses[0]) {
+        if (step === 2 && d.businesses[bi]) {
           const bb = [...d.businesses]
-          bb[0] = { ...bb[0], bottleneck: sp(bb[0].bottleneck) }
+          bb[bi] = { ...bb[bi], bottleneck: sp(bb[bi].bottleneck) }
           return { ...d, businesses: bb }
         }
         if (step === 5) {
@@ -176,7 +186,6 @@ export function OnboardingWizard() {
     }
   }
 
-  /* 13 categories (steps 0–12); identity uses 4 substeps */
   const progressPct =
     step === 0
       ? 0
@@ -184,14 +193,70 @@ export function OnboardingWizard() {
 
   const catLabel = CATEGORY_TITLES[step] ?? ''
 
+  const runValidationAndAdvance = () => {
+    const v = validateStep(step, draft, identitySubStep, healthScheduleSubStep, businessEditIndex)
+    if (!v.ok) {
+      setValidationErrors(v.errors)
+      return false
+    }
+    clearValidationErrors()
+    return true
+  }
+
+  const footerContinueDisabled =
+    step === 0 || (step === 2 && businessInterstitial !== null) || step >= 11 || step === 12
+
+  const canProceed = canProceedStep(step, draft, identitySubStep, healthScheduleSubStep, businessEditIndex)
+  const continueBlockedByValidation =
+    step > 0 && step < 11 && !(step === 2 && businessInterstitial !== null) && !canProceed
+
   const handleMainContinue = () => {
+    if (!runValidationAndAdvance()) return
+
     if (step === 1) {
-      if (!canProceed(step, draft, identitySubStep)) return
       if (identitySubStep < 3) setIdentitySubStep(identitySubStep + 1)
       else nextStep()
       return
     }
+
+    if (step === 2) {
+      setBusinessInterstitial(businessEditIndex)
+      return
+    }
+
+    if (step === 6) {
+      if (healthScheduleSubStep < 2) {
+        setHealthScheduleSubStep(healthScheduleSubStep + 1)
+        return
+      }
+      setHealthScheduleSubStep(0)
+      nextStep()
+      return
+    }
+
     if (step < 11) nextStep()
+  }
+
+  const handleBack = () => {
+    if (step === 6 && healthScheduleSubStep > 0) {
+      setHealthScheduleSubStep(healthScheduleSubStep - 1)
+      return
+    }
+    if (step === 1 && identitySubStep > 0) {
+      setIdentitySubStep(identitySubStep - 1)
+      return
+    }
+    if (step > 0) prevStep()
+  }
+
+  const interstitialName = businessInterstitial !== null ? draft.businesses[businessInterstitial]?.name?.trim() || 'This business' : ''
+
+  if (mode === 'profileUpdate' && !profileGate) {
+    return (
+      <div className="flex min-h-[40vh] items-center justify-center text-[17px] text-[var(--color-text-dim,#888)]">
+        Loading your profile…
+      </div>
+    )
   }
 
   return (
@@ -217,6 +282,12 @@ export function OnboardingWizard() {
             <p className="label mb-4 text-[rgba(255,255,255,0.45)]">
               {step < 12 ? `Step ${step + 1} of 13 · ${catLabel}` : catLabel}
             </p>
+          )}
+
+          {resumeWelcome && mode !== 'profileUpdate' && step > 0 && step < 12 && (
+            <div className={aiBubbleCls + ' mb-4'}>
+              Welcome back. Let&apos;s pick up where you left off.
+            </div>
           )}
 
           <AnimatePresence mode="wait">
@@ -255,64 +326,173 @@ export function OnboardingWizard() {
                   </div>
                   {pinErr && <p className="mt-3 text-sm text-rose-300">{pinErr}</p>}
                   <p className="mt-4 text-[11px] text-white/30">Stored on this device. Change anytime in Settings.</p>
+                  {mode === 'profileUpdate' && (
+                    <button
+                      type="button"
+                      onClick={() => nextStep()}
+                      className="mt-5 text-[15px] font-medium text-[var(--accent)]"
+                    >
+                      Keep current PIN
+                    </button>
+                  )}
                 </div>
               </motion.div>
+            ) : step === 12 ? (
+              <motion.div key="s12" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="w-full">
+                <OnboardingCategorySummary
+                  draft={draft}
+                  onLaunch={() => void launch()}
+                  launching={launching}
+                  primaryCtaLabel={mode === 'profileUpdate' ? 'Save changes' : undefined}
+                  hideSettingsLink={mode === 'profileUpdate'}
+                />
+              </motion.div>
+            ) : step === 2 && businessInterstitial !== null ? (
+              <motion.div key="biz-int" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="space-y-6">
+                <div className={aiBubbleCls}>
+                  Got it. <span className="font-semibold">{interstitialName}</span> is mapped.
+                </div>
+                <p className="text-[14px] text-[var(--text-secondary)]">
+                  Check the preview — your business card pulses. {draft.businesses.length > 1 ? 'You can add more detail or move on.' : ''}
+                </p>
+              </motion.div>
             ) : (
-              <OnboardingStepBody step={step} draft={draft} patchDraft={patchDraft} identitySubStep={identitySubStep} />
+              <OnboardingStepBody
+                step={step}
+                draft={draft}
+                patchDraft={patchDraft}
+                identitySubStep={identitySubStep}
+                healthScheduleSubStep={healthScheduleSubStep}
+              />
             )}
           </AnimatePresence>
 
           <div className="mt-8 flex flex-wrap items-center justify-between gap-3">
             <button
               type="button"
-              onClick={() => (step > 0 ? prevStep() : undefined)}
-              disabled={step === 0}
+              onClick={handleBack}
+              disabled={step === 0 || (step === 2 && businessInterstitial !== null)}
               className={btnSecondary + ' disabled:opacity-20'}
             >
               ← Back
             </button>
             {step === 0 && (
-              <button type="button" onClick={() => nextStep()} className={btnPrimary}>
+              <button
+                type="button"
+                onClick={() => {
+                  setResumeWelcome(false)
+                  nextStep()
+                }}
+                className={btnPrimary}
+              >
                 Let&apos;s go →
               </button>
             )}
             {step > 0 && step < 11 && (
               <div className="flex flex-col items-end gap-2">
-                <button
-                  type="button"
-                  onClick={handleMainContinue}
-                  disabled={!canProceed(step, draft, identitySubStep)}
-                  className={btnPrimary}
-                >
-                  Continue →
-                </button>
-                {step === 8 && (
-                  <button type="button" onClick={() => nextStep()} className="text-[15px] font-medium text-[var(--accent)]">
-                    Skip this section →
-                  </button>
+                {step === 2 && businessInterstitial !== null ? (
+                  <>
+                    {businessInterstitial < draft.businesses.length - 1 ? (
+                      <>
+                        <button
+                          type="button"
+                          className={btnPrimary}
+                          onClick={() => {
+                            setBusinessInterstitial(null)
+                            setBusinessEditIndex(businessInterstitial + 1)
+                          }}
+                        >
+                          Next business →
+                        </button>
+                        <button
+                          type="button"
+                          className="text-[15px] font-medium text-[var(--accent)]"
+                          onClick={() => {
+                            const idx = businessInterstitial
+                            patchDraft((d) => ({
+                              ...d,
+                              businessCount: idx + 1,
+                              businesses: d.businesses.slice(0, idx + 1),
+                            }))
+                            setBusinessInterstitial(null)
+                            setBusinessEditIndex(0)
+                            nextStep()
+                          }}
+                        >
+                          Actually, I&apos;m done adding businesses
+                        </button>
+                      </>
+                    ) : (
+                      <>
+                        <button
+                          type="button"
+                          className={btnPrimary}
+                          onClick={() => {
+                            setBusinessInterstitial(null)
+                            nextStep()
+                          }}
+                        >
+                          Continue to finances →
+                        </button>
+                        <button
+                          type="button"
+                          className="text-[15px] text-[var(--accent)]"
+                          onClick={() => {
+                            patchDraft((d) => {
+                              const b = emptyBusinessDraft(PALETTE[d.businesses.length % PALETTE.length])
+                              const nb = { ...b, id: newId() }
+                              return {
+                                ...d,
+                                businessCount: d.businessCount + 1,
+                                businesses: [...d.businesses, nb],
+                              }
+                            })
+                            const nextIdx = draft.businesses.length
+                            setBusinessEditIndex(nextIdx)
+                            setBusinessInterstitial(null)
+                          }}
+                        >
+                          + Add another business
+                        </button>
+                      </>
+                    )}
+                  </>
+                ) : (
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setResumeWelcome(false)
+                        handleMainContinue()
+                      }}
+                      disabled={footerContinueDisabled || continueBlockedByValidation}
+                      className={btnPrimary}
+                    >
+                      Continue →
+                    </button>
+                    {step === 8 && (
+                      <button type="button" onClick={() => nextStep()} className="text-[15px] font-medium text-[var(--accent)]">
+                        Skip this section →
+                      </button>
+                    )}
+                  </>
                 )}
               </div>
-            )}
-            {step === 12 && (
-              <button
-                type="button"
-                onClick={() => void launch()}
-                disabled={launching}
-                className={btnPrimary + ' w-full sm:w-auto'}
-              >
-                {launching ? 'Starting…' : 'Enter ART OS →'}
-              </button>
             )}
           </div>
 
         </div>
 
         <div className="mt-10 hidden min-h-[480px] flex-1 md:mt-0 md:block md:max-w-[45%]">
-          <LiveDashboardPreview draft={draft} stepIndex={step} />
+          <LiveDashboardPreview
+            draft={draft}
+            stepIndex={step}
+            healthScheduleSubStep={healthScheduleSubStep}
+            pulseBusinessIndex={businessInterstitial}
+          />
         </div>
       </div>
 
-      {/* Mobile: compact preview strip */}
       <div className="border-t border-[var(--separator)] bg-[rgba(0,0,0,0.15)] px-4 py-3 md:hidden">
         <p className="label text-center">Preview updates as you go</p>
         <p className="body mt-1 text-center text-[17px] text-[var(--accent)]">

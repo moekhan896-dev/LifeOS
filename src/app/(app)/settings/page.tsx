@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { motion } from 'framer-motion'
 import { toast } from 'sonner'
 import { useStore } from '@/stores/store'
+import { useOnboardingStore } from '@/stores/onboarding-store'
 import PageTransition from '@/components/PageTransition'
 import { useRouter } from 'next/navigation'
 import { hashPin, verifyPin } from '@/lib/pin-hash'
@@ -236,7 +237,19 @@ export default function SettingsPage() {
   }, [resetCountdown, resetAll])
 
   const rerunOnboarding = () => {
-    useStore.setState({ onboardingComplete: false })
+    if (
+      typeof window !== 'undefined' &&
+      !window.confirm('This will clear all data and start fresh. Your PIN, businesses, tasks, and local history will be erased. Continue?')
+    ) {
+      return
+    }
+    useOnboardingStore.getState().resetWizard()
+    try {
+      sessionStorage.removeItem('onb-resume-shown')
+    } catch {
+      /* ignore */
+    }
+    resetAll()
     router.push('/')
   }
 
@@ -755,6 +768,12 @@ export default function SettingsPage() {
             <motion.button type="button" whileTap={{ scale: 0.95 }} onClick={exportData} className={`${btnClass} bg-[var(--color-surface2)] border border-[var(--color-border)] text-[var(--color-text)]`}>
               Export all data
             </motion.button>
+            <Link
+              href="/onboarding/update"
+              className={`${btnClass} bg-[var(--color-surface2)] border border-[var(--color-border)] text-[var(--color-text)]`}
+            >
+              Update my info
+            </Link>
             <motion.button
               type="button"
               whileTap={{ scale: 0.95 }}

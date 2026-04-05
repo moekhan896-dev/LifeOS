@@ -1,7 +1,7 @@
 'use client'
 
 import { AnimatePresence, motion } from 'framer-motion'
-import { useState } from 'react'
+import { useOnboardingStore } from '@/stores/onboarding-store'
 import { newId } from '@/lib/id'
 import type { OnboardingDraft } from './onboarding-types'
 import { emptyBusinessDraft, emptyClientDraft } from './onboarding-types'
@@ -67,18 +67,27 @@ function AiBubble({ children }: { children: React.ReactNode }) {
   return <div className={aiBubbleCls}>{children}</div>
 }
 
+function fieldErrClass(show: boolean) {
+  return show ? ' border-[var(--negative)]' : ''
+}
+
 export function OnboardingStepBody({
   step,
   draft,
   patchDraft,
   identitySubStep = 0,
+  healthScheduleSubStep = 0,
 }: {
   step: number
   draft: OnboardingDraft
   patchDraft: (fn: (d: OnboardingDraft) => OnboardingDraft) => void
   identitySubStep?: number
+  healthScheduleSubStep?: number
 }) {
-  const [bizEdit, setBizEdit] = useState(0)
+  const validationErrors = useOnboardingStore((s) => s.validationErrors)
+  const bizEdit = useOnboardingStore((s) => s.businessEditIndex)
+  const setBizEdit = useOnboardingStore((s) => s.setBusinessEditIndex)
+  const fe = (key: string) => validationErrors.includes(key)
 
   const businesses = draft.businesses
   const b = businesses[bizEdit] ?? businesses[0]
@@ -133,45 +142,60 @@ export function OnboardingStepBody({
             <AiBubble>{identityBubbles[identitySubStep]}</AiBubble>
             {identitySubStep === 0 && <h2 className="title-small">What&apos;s your first name?</h2>}
             {identitySubStep === 0 && (
-              <input
-                className={inputCls}
-                value={draft.identity.name}
-                onChange={(e) => patchDraft((d) => ({ ...d, identity: { ...d.identity, name: e.target.value } }))}
-                placeholder="First name"
-                autoFocus
-                aria-label="First name"
-              />
+              <div>
+                <input
+                  className={inputCls + fieldErrClass(fe('identity.name'))}
+                  value={draft.identity.name}
+                  onChange={(e) => patchDraft((d) => ({ ...d, identity: { ...d.identity, name: e.target.value } }))}
+                  placeholder="First name"
+                  autoFocus
+                  aria-label="First name"
+                />
+                {fe('identity.name') && (
+                  <p className="mt-1 text-[13px] text-[var(--negative)]">This field is required</p>
+                )}
+              </div>
             )}
             {identitySubStep === 1 && (
               <>
-                <input
-                  className={inputCls}
-                  value={draft.identity.location}
-                  onChange={(e) => patchDraft((d) => ({ ...d, identity: { ...d.identity, location: e.target.value } }))}
-                  placeholder="City, state or region"
-                  autoFocus
-                  aria-label="Location"
-                />
+                <div>
+                  <input
+                    className={inputCls + fieldErrClass(fe('identity.location'))}
+                    value={draft.identity.location}
+                    onChange={(e) => patchDraft((d) => ({ ...d, identity: { ...d.identity, location: e.target.value } }))}
+                    placeholder="City, state or region"
+                    autoFocus
+                    aria-label="Location"
+                  />
+                  {fe('identity.location') && (
+                    <p className="mt-1 text-[13px] text-[var(--negative)]">This field is required</p>
+                  )}
+                </div>
                 <p className="subheadline">Used for time zone and local context.</p>
               </>
             )}
             {identitySubStep === 2 && (
-              <input
-                type="number"
-                min={18}
-                max={99}
-                className={inputCls}
-                value={draft.identity.age === '' ? '' : draft.identity.age}
-                onChange={(e) =>
-                  patchDraft((d) => ({
-                    ...d,
-                    identity: { ...d.identity, age: e.target.value ? Number(e.target.value) : '' },
-                  }))
-                }
-                placeholder="Age"
-                autoFocus
-                aria-label="Age"
-              />
+              <div>
+                <input
+                  type="number"
+                  min={18}
+                  max={99}
+                  className={inputCls + fieldErrClass(fe('identity.age'))}
+                  value={draft.identity.age === '' ? '' : draft.identity.age}
+                  onChange={(e) =>
+                    patchDraft((d) => ({
+                      ...d,
+                      identity: { ...d.identity, age: e.target.value ? Number(e.target.value) : '' },
+                    }))
+                  }
+                  placeholder="Age"
+                  autoFocus
+                  aria-label="Age"
+                />
+                {fe('identity.age') && (
+                  <p className="mt-1 text-[13px] text-[var(--negative)]">This field is required</p>
+                )}
+              </div>
             )}
             {identitySubStep === 3 && (
               <textarea
@@ -257,7 +281,7 @@ export function OnboardingStepBody({
           <div>
             <label className={labelCls}>Business name</label>
             <input
-              className={inputCls}
+              className={inputCls + fieldErrClass(fe(`business.${bizEdit}.name`))}
               value={b?.name ?? ''}
               onChange={(e) =>
                 patchDraft((d) => {
@@ -268,11 +292,14 @@ export function OnboardingStepBody({
               }
               placeholder="Name"
             />
+            {fe(`business.${bizEdit}.name`) && (
+              <p className="mt-1 text-[13px] text-[var(--negative)]">This field is required</p>
+            )}
           </div>
           <div>
             <label className={labelCls}>Type</label>
             <select
-              className={inputCls}
+              className={inputCls + fieldErrClass(fe(`business.${bizEdit}.type`))}
               value={b?.type ?? ''}
               onChange={(e) =>
                 patchDraft((d) => {
@@ -289,6 +316,9 @@ export function OnboardingStepBody({
                 </option>
               ))}
             </select>
+            {fe(`business.${bizEdit}.type`) && (
+              <p className="mt-1 text-[13px] text-[var(--negative)]">This field is required</p>
+            )}
           </div>
           <div>
             <label className={labelCls}>Status</label>
@@ -309,13 +339,16 @@ export function OnboardingStepBody({
                 </Chip>
               ))}
             </div>
+            {fe(`business.${bizEdit}.status`) && (
+              <p className="mt-1 text-[13px] text-[var(--negative)]">This field is required</p>
+            )}
           </div>
           <div>
             <label className={labelCls}>Monthly revenue ($)</label>
             <input
               type="number"
               min={0}
-              className={inputCls}
+              className={inputCls + fieldErrClass(fe(`business.${bizEdit}.revenue`))}
               value={b?.monthlyRevenue || ''}
               onChange={(e) =>
                 patchDraft((d) => {
@@ -326,6 +359,9 @@ export function OnboardingStepBody({
               }
               placeholder="0 if pre-revenue"
             />
+            {fe(`business.${bizEdit}.revenue`) && (
+              <p className="mt-1 text-[13px] text-[var(--negative)]">This field is required</p>
+            )}
           </div>
           <div>
             <label className={labelCls}>What do you do day-to-day?</label>
@@ -361,6 +397,9 @@ export function OnboardingStepBody({
                 </Chip>
               ))}
             </div>
+            {fe(`business.${bizEdit}.role`) && (
+              <p className="mt-1 text-[13px] text-[var(--negative)]">This field is required</p>
+            )}
           </div>
           <div>
             <label className={labelCls}>Team?</label>
@@ -605,6 +644,9 @@ export function OnboardingStepBody({
                 />
               ))}
             </div>
+            {fe(`business.${bizEdit}.color`) && (
+              <p className="mt-1 text-[13px] text-[var(--negative)]">This field is required</p>
+            )}
           </div>
         </div>
 
@@ -613,7 +655,7 @@ export function OnboardingStepBody({
             type="button"
             className="rounded-[12px] border border-white/10 px-4 py-2 text-sm text-white/60"
             disabled={bizEdit === 0}
-            onClick={() => setBizEdit((i) => Math.max(0, i - 1))}
+            onClick={() => setBizEdit(Math.max(0, bizEdit - 1))}
           >
             ← Previous business
           </button>
@@ -621,7 +663,7 @@ export function OnboardingStepBody({
             type="button"
             className="rounded-[12px] border border-white/10 px-4 py-2 text-sm text-white/60"
             disabled={bizEdit >= businesses.length - 1}
-            onClick={() => setBizEdit((i) => Math.min(businesses.length - 1, i + 1))}
+            onClick={() => setBizEdit(Math.min(businesses.length - 1, bizEdit + 1))}
           >
             Next business →
           </button>
@@ -1237,34 +1279,219 @@ export function OnboardingStepBody({
       focusDuration: '',
       commitments: [] as import('./onboarding-types').OnboardingScheduleCommitmentDraft[],
     }
+    const hs = healthScheduleSubStep
     return (
       <motion.div key="s6" variants={variants} initial="enter" animate="center" exit="exit" transition={transition} className="space-y-4">
-        <AiBubble>Your body and mind run the business. Let&apos;s baseline what we&apos;ll track.</AiBubble>
-        <div className={glassPanel + ' space-y-3'}>
-          <div className="grid grid-cols-2 gap-2">
-            <div>
-              <label className={labelCls}>Target wake</label>
-              <input
-                type="time"
-                className={inputCls}
-                value={h.targetWake}
-                onChange={(e) =>
-                  patchDraft((d) => ({ ...d, health: { ...d.health, targetWake: e.target.value } }))
-                }
-              />
+        {hs === 0 && (
+          <>
+            <AiBubble>Your body and mind run the business. First, when do you actually wake?</AiBubble>
+            <div className={glassPanel + ' space-y-3'}>
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className={labelCls}>Target wake</label>
+                  <input
+                    type="time"
+                    className={inputCls + fieldErrClass(fe('health.targetWake'))}
+                    value={h.targetWake}
+                    onChange={(e) =>
+                      patchDraft((d) => ({ ...d, health: { ...d.health, targetWake: e.target.value } }))
+                    }
+                  />
+                  {fe('health.targetWake') && (
+                    <p className="mt-1 text-[13px] text-[var(--negative)]">This field is required</p>
+                  )}
+                </div>
+                <div>
+                  <label className={labelCls}>Actual wake (honest)</label>
+                  <input
+                    type="time"
+                    className={inputCls + fieldErrClass(fe('health.actualWake'))}
+                    value={h.actualWake}
+                    onChange={(e) =>
+                      patchDraft((d) => ({ ...d, health: { ...d.health, actualWake: e.target.value } }))
+                    }
+                  />
+                  {fe('health.actualWake') && (
+                    <p className="mt-1 text-[13px] text-[var(--negative)]">This field is required</p>
+                  )}
+                </div>
+              </div>
             </div>
-            <div>
-              <label className={labelCls}>Actual wake (honest)</label>
-              <input
-                type="time"
-                className={inputCls}
-                value={h.actualWake}
-                onChange={(e) =>
-                  patchDraft((d) => ({ ...d, health: { ...d.health, actualWake: e.target.value } }))
-                }
-              />
+          </>
+        )}
+
+        {hs === 1 && (
+          <>
+            <AiBubble>When are you generally available for deep work?</AiBubble>
+            <div className={glassPanel + ' space-y-3'}>
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className={labelCls}>Work day starts</label>
+                  <input
+                    type="time"
+                    className={inputCls + fieldErrClass(fe('schedule.workStart'))}
+                    value={sch.workStart}
+                    onChange={(e) =>
+                      patchDraft((d) => ({ ...d, schedule: { ...d.schedule, workStart: e.target.value } }))
+                    }
+                  />
+                  {fe('schedule.workStart') && (
+                    <p className="mt-1 text-[13px] text-[var(--negative)]">This field is required</p>
+                  )}
+                </div>
+                <div>
+                  <label className={labelCls}>Work day ends</label>
+                  <input
+                    type="time"
+                    className={inputCls + fieldErrClass(fe('schedule.workEnd'))}
+                    value={sch.workEnd}
+                    onChange={(e) =>
+                      patchDraft((d) => ({ ...d, schedule: { ...d.schedule, workEnd: e.target.value } }))
+                    }
+                  />
+                  {fe('schedule.workEnd') && (
+                    <p className="mt-1 text-[13px] text-[var(--negative)]">This field is required</p>
+                  )}
+                </div>
+              </div>
+              {(() => {
+                const dayOpts = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
+                return (
+                  <>
+                    <div>
+                      <label className={labelCls}>Fixed commitments (optional)</label>
+                      {(sch.commitments ?? []).map((row, idx) => (
+                        <div key={row.id || idx} className="mb-2 grid gap-2 rounded-xl border border-[var(--border)] p-3">
+                          <input
+                            className={inputCls}
+                            placeholder="Title"
+                            value={row.title}
+                            onChange={(e) =>
+                              patchDraft((d) => {
+                                const c = [...d.schedule.commitments]
+                                c[idx] = { ...c[idx], title: e.target.value }
+                                return { ...d, schedule: { ...d.schedule, commitments: c } }
+                              })
+                            }
+                          />
+                          <div className="grid grid-cols-2 gap-2">
+                            <input
+                              type="time"
+                              className={inputCls}
+                              value={row.time}
+                              onChange={(e) =>
+                                patchDraft((d) => {
+                                  const c = [...d.schedule.commitments]
+                                  c[idx] = { ...c[idx], time: e.target.value }
+                                  return { ...d, schedule: { ...d.schedule, commitments: c } }
+                                })
+                              }
+                            />
+                            <input
+                              type="number"
+                              className={inputCls}
+                              placeholder="Minutes"
+                              min={15}
+                              value={row.durationMin || ''}
+                              onChange={(e) =>
+                                patchDraft((d) => {
+                                  const c = [...d.schedule.commitments]
+                                  c[idx] = { ...c[idx], durationMin: Number(e.target.value) || 0 }
+                                  return { ...d, schedule: { ...d.schedule, commitments: c } }
+                                })
+                              }
+                            />
+                          </div>
+                          <div className="flex flex-wrap gap-1.5">
+                            {dayOpts.map((day) => (
+                              <Chip
+                                key={day}
+                                selected={row.days?.includes(day)}
+                                onClick={() =>
+                                  patchDraft((d) => {
+                                    const c = [...d.schedule.commitments]
+                                    const days = new Set(c[idx].days ?? [])
+                                    if (days.has(day)) days.delete(day)
+                                    else days.add(day)
+                                    c[idx] = { ...c[idx], days: [...days] }
+                                    return { ...d, schedule: { ...d.schedule, commitments: c } }
+                                  })
+                                }
+                              >
+                                {day}
+                              </Chip>
+                            ))}
+                          </div>
+                        </div>
+                      ))}
+                      <button
+                        type="button"
+                        className="text-[15px] font-medium text-[var(--accent)]"
+                        onClick={() =>
+                          patchDraft((d) => ({
+                            ...d,
+                            schedule: {
+                              ...d.schedule,
+                              commitments: [
+                                ...d.schedule.commitments,
+                                {
+                                  id: newId(),
+                                  title: '',
+                                  time: '12:00',
+                                  durationMin: 60,
+                                  days: [],
+                                },
+                              ],
+                            },
+                          }))
+                        }
+                      >
+                        + Add commitment
+                      </button>
+                    </div>
+                    <div>
+                      <label className={labelCls}>Deep focus preference</label>
+                      <div className="flex flex-wrap gap-2">
+                        {['Morning', 'Afternoon', 'Evening', 'Late night', 'No preference'].map((x) => (
+                          <Chip
+                            key={x}
+                            selected={sch.deepFocus === x}
+                            onClick={() =>
+                              patchDraft((d) => ({ ...d, schedule: { ...d.schedule, deepFocus: x } }))
+                            }
+                          >
+                            {x}
+                          </Chip>
+                        ))}
+                      </div>
+                    </div>
+                    <div>
+                      <label className={labelCls}>Preferred focus block length</label>
+                      <div className="flex flex-wrap gap-2">
+                        {['15', '30', '45', '60', '90+'].map((x) => (
+                          <Chip
+                            key={x}
+                            selected={sch.focusDuration === x}
+                            onClick={() =>
+                              patchDraft((d) => ({ ...d, schedule: { ...d.schedule, focusDuration: x } }))
+                            }
+                          >
+                            {x} min
+                          </Chip>
+                        ))}
+                      </div>
+                    </div>
+                  </>
+                )
+              })()}
             </div>
-          </div>
+          </>
+        )}
+
+        {hs === 2 && (
+          <>
+            <AiBubble>Let&apos;s baseline health habits we&apos;ll track.</AiBubble>
+            <div className={glassPanel + ' space-y-3'}>
           <div>
             <label className={labelCls}>Exercise</label>
             <div className="flex flex-wrap gap-2">
@@ -1445,164 +1672,8 @@ export function OnboardingStepBody({
             </label>
           </div>
         </div>
-
-        <AiBubble>Let&apos;s map your ideal workday — when you&apos;re available and how you focus best.</AiBubble>
-        <div className={glassPanel + ' space-y-3'}>
-          {(() => {
-            const dayOpts = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
-            return (
-              <>
-                <div className="grid grid-cols-2 gap-2">
-                  <div>
-                    <label className={labelCls}>Work day starts</label>
-                    <input
-                      type="time"
-                      className={inputCls}
-                      value={sch.workStart}
-                      onChange={(e) =>
-                        patchDraft((d) => ({ ...d, schedule: { ...d.schedule, workStart: e.target.value } }))
-                      }
-                    />
-                  </div>
-                  <div>
-                    <label className={labelCls}>Work day ends</label>
-                    <input
-                      type="time"
-                      className={inputCls}
-                      value={sch.workEnd}
-                      onChange={(e) =>
-                        patchDraft((d) => ({ ...d, schedule: { ...d.schedule, workEnd: e.target.value } }))
-                      }
-                    />
-                  </div>
-                </div>
-                <div>
-                  <label className={labelCls}>Fixed commitments (optional)</label>
-                  {(sch.commitments ?? []).map((row, idx) => (
-                    <div key={row.id || idx} className="mb-2 grid gap-2 rounded-xl border border-[var(--border)] p-3">
-                      <input
-                        className={inputCls}
-                        placeholder="Title"
-                        value={row.title}
-                        onChange={(e) =>
-                          patchDraft((d) => {
-                            const c = [...d.schedule.commitments]
-                            c[idx] = { ...c[idx], title: e.target.value }
-                            return { ...d, schedule: { ...d.schedule, commitments: c } }
-                          })
-                        }
-                      />
-                      <div className="grid grid-cols-2 gap-2">
-                        <input
-                          type="time"
-                          className={inputCls}
-                          value={row.time}
-                          onChange={(e) =>
-                            patchDraft((d) => {
-                              const c = [...d.schedule.commitments]
-                              c[idx] = { ...c[idx], time: e.target.value }
-                              return { ...d, schedule: { ...d.schedule, commitments: c } }
-                            })
-                          }
-                        />
-                        <input
-                          type="number"
-                          className={inputCls}
-                          placeholder="Minutes"
-                          min={15}
-                          value={row.durationMin || ''}
-                          onChange={(e) =>
-                            patchDraft((d) => {
-                              const c = [...d.schedule.commitments]
-                              c[idx] = { ...c[idx], durationMin: Number(e.target.value) || 0 }
-                              return { ...d, schedule: { ...d.schedule, commitments: c } }
-                            })
-                          }
-                        />
-                      </div>
-                      <div className="flex flex-wrap gap-1.5">
-                        {dayOpts.map((day) => (
-                          <Chip
-                            key={day}
-                            selected={row.days?.includes(day)}
-                            onClick={() =>
-                              patchDraft((d) => {
-                                const c = [...d.schedule.commitments]
-                                const days = new Set(c[idx].days ?? [])
-                                if (days.has(day)) days.delete(day)
-                                else days.add(day)
-                                c[idx] = { ...c[idx], days: [...days] }
-                                return { ...d, schedule: { ...d.schedule, commitments: c } }
-                              })
-                            }
-                          >
-                            {day}
-                          </Chip>
-                        ))}
-                      </div>
-                    </div>
-                  ))}
-                  <button
-                    type="button"
-                    className="text-[15px] font-medium text-[var(--accent)]"
-                    onClick={() =>
-                      patchDraft((d) => ({
-                        ...d,
-                        schedule: {
-                          ...d.schedule,
-                          commitments: [
-                            ...d.schedule.commitments,
-                            {
-                              id: newId(),
-                              title: '',
-                              time: '12:00',
-                              durationMin: 60,
-                              days: [],
-                            },
-                          ],
-                        },
-                      }))
-                    }
-                  >
-                    + Add commitment
-                  </button>
-                </div>
-                <div>
-                  <label className={labelCls}>Deep focus preference</label>
-                  <div className="flex flex-wrap gap-2">
-                    {['Morning', 'Afternoon', 'Evening', 'Late night', 'No preference'].map((x) => (
-                      <Chip
-                        key={x}
-                        selected={sch.deepFocus === x}
-                        onClick={() =>
-                          patchDraft((d) => ({ ...d, schedule: { ...d.schedule, deepFocus: x } }))
-                        }
-                      >
-                        {x}
-                      </Chip>
-                    ))}
-                  </div>
-                </div>
-                <div>
-                  <label className={labelCls}>Preferred focus block length</label>
-                  <div className="flex flex-wrap gap-2">
-                    {['15', '30', '45', '60', '90+'].map((x) => (
-                      <Chip
-                        key={x}
-                        selected={sch.focusDuration === x}
-                        onClick={() =>
-                          patchDraft((d) => ({ ...d, schedule: { ...d.schedule, focusDuration: x } }))
-                        }
-                      >
-                        {x} min
-                      </Chip>
-                    ))}
-                  </div>
-                </div>
-              </>
-            )
-          })()}
-        </div>
+          </>
+        )}
       </motion.div>
     )
   }
@@ -1857,6 +1928,7 @@ export function OnboardingStepBody({
             <label className={labelCls}>When you avoid something important…</label>
             <div className="space-y-2">
               {[
+                ['mix', 'Mix — balanced (default)'],
                 ['data', 'Show me the data and ask what it would take'],
                 ['direct', 'Be direct — call me out'],
                 ['gentle', 'Start gentle, get tougher over time'],
@@ -1878,6 +1950,9 @@ export function OnboardingStepBody({
                 </button>
               ))}
             </div>
+            {fe('ai.communicationStyle') && (
+              <p className="mt-1 text-[13px] text-[var(--negative)]">This field is required</p>
+            )}
           </div>
           <div>
             <label className={labelCls}>What motivates you?</label>

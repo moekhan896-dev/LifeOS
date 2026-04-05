@@ -275,8 +275,8 @@ export function createInitialDraft(): OnboardingDraft {
       commitments: [],
     },
     health: {
-      targetWake: '06:00',
-      actualWake: '07:00',
+      targetWake: '',
+      actualWake: '',
       exercise: '',
       exerciseDetail: '',
       gymEquipment: '',
@@ -311,7 +311,7 @@ export function createInitialDraft(): OnboardingDraft {
       whatNeedsToBeTrue: '',
     },
     ai: {
-      communicationStyle: '',
+      communicationStyle: 'mix',
       motivators: [],
       frequency: '',
       reasoningDisplay: '',

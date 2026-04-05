@@ -11,14 +11,34 @@ const ease = [0.25, 0.1, 0.25, 1] as const
 const previewTile =
   'rounded-[16px] border border-[var(--border)] bg-[var(--bg-elevated)] p-4 transition-[background,border-color] duration-200 hover:bg-[var(--bg-secondary)] hover:border-[var(--border-hover)] cursor-pointer active:scale-[0.98] active:duration-100'
 
-type TileId = 'greeting' | 'income' | 'goal' | 'businesses' | 'habits' | 'faith'
+type TileId = 'greeting' | 'income' | 'goal' | 'businesses' | 'habits' | 'faith' | 'schedule'
+
+function estMonthlyPersonalExp(f: OnboardingDraft['finance']) {
+  const cars = (f.cars ?? []).reduce((s, c) => s + (c.payment || 0), 0)
+  const other = (f.otherExpenses ?? []).reduce((s, o) => s + (o.amount || 0), 0)
+  const debts = (f.debts ?? []).reduce((s, d) => s + (d.monthlyPayment || 0), 0)
+  return (
+    (f.housingFree ? 0 : f.housing) +
+    cars +
+    f.carInsurance +
+    f.phone +
+    f.subscriptions +
+    f.food +
+    other +
+    debts
+  )
+}
 
 export function LiveDashboardPreview({
   draft,
   stepIndex,
+  healthScheduleSubStep = 0,
+  pulseBusinessIndex = null,
 }: {
   draft: OnboardingDraft
   stepIndex: number
+  healthScheduleSubStep?: number
+  pulseBusinessIndex?: number | null
 }) {
   const [open, setOpen] = useState<TileId | null>(null)
 
@@ -30,6 +50,18 @@ export function LiveDashboardPreview({
 
   const incomeTarget = draft.goals.incomeTarget
   const monthLabel = draft.goals.targetYearMonth || '—'
+
+  const showGreeting = stepIndex >= 1
+  const showBusinesses = stepIndex >= 2
+  const showFinance = stepIndex >= 4
+  const showGoal = stepIndex >= 5
+  const showHabits = stepIndex >= 6
+  const showFaith = stepIndex >= 7
+  const showSchedule = stepIndex >= 6 && (healthScheduleSubStep >= 1 || stepIndex >= 7)
+  const showFull = stepIndex >= 12
+
+  const exp = estMonthlyPersonalExp(draft.finance)
+  const net = totalRev - exp
 
   return (
     <div className="relative hidden h-full min-h-[420px] flex-col md:flex">
@@ -43,113 +75,164 @@ export function LiveDashboardPreview({
         <p className="label text-center">Live preview</p>
 
         <div className="grid auto-rows-min grid-cols-4 gap-3">
-          <motion.button
-            type="button"
-            layout
-            onClick={() => setOpen('greeting')}
-            className={`${previewTile} col-span-4 p-5 text-left`}
-            initial={{ opacity: 0, y: 8 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.25, ease, delay: 0.02 }}
-          >
-            <p className="label text-[var(--accent)]">Dashboard</p>
-            <p className="title-small mt-1">
-              {stepIndex >= 1 ? (
-                <>
-                  Good morning, <span className="text-[var(--positive)]">{name}</span>
-                </>
+          {(showGreeting || showFull) && (
+            <motion.button
+              type="button"
+              layout
+              onClick={() => setOpen('greeting')}
+              className={`${previewTile} col-span-4 p-5 text-left`}
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.25, ease, delay: 0.02 }}
+            >
+              <p className="label text-[var(--accent)]">Dashboard</p>
+              <p className="title-small mt-1">
+                {nameRaw ? (
+                  <>
+                    Good morning, <span className="text-[var(--positive)]">{name}</span>
+                  </>
+                ) : (
+                  <span className="text-[var(--text-tertiary)]">—</span>
+                )}
+              </p>
+              {showGreeting && nameRaw ? (
+                <p className="subheadline mt-1">{loc}</p>
               ) : (
-                <span className="text-[var(--text-tertiary)]">Waiting for your name…</span>
+                <p className="footnote mt-1 text-[var(--text-tertiary)]">Name and location fill this tile</p>
               )}
-            </p>
-            {stepIndex >= 1 && <p className="subheadline mt-1">{loc}</p>}
-          </motion.button>
+            </motion.button>
+          )}
 
-          <motion.button
-            type="button"
-            onClick={() => setOpen('income')}
-            className={`${previewTile} col-span-2 min-h-[120px] p-4 text-left`}
-            initial={{ opacity: 0, y: 8 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.25, ease, delay: 0.06 }}
-          >
-            <p className="label">Income (est.)</p>
-            <p className="data mt-2 text-[28px] font-bold tabular-nums text-[var(--positive)]">
-              {totalRev > 0 ? `$${totalRev.toLocaleString()}` : '—'}
-            </p>
-            <p className="footnote mt-1">/ mo combined</p>
-          </motion.button>
+          {(showFinance || showFull) && (
+            <motion.button
+              type="button"
+              onClick={() => setOpen('income')}
+              className={`${previewTile} col-span-2 min-h-[120px] p-4 text-left`}
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.25, ease, delay: 0.06 }}
+            >
+              <p className="label">Money in / out (est.)</p>
+              <p className="data mt-2 text-[22px] font-bold tabular-nums leading-tight text-[var(--positive)]">
+                {showFinance ? `$${totalRev.toLocaleString()}` : '—'}
+              </p>
+              <p className="footnote mt-1 text-[var(--text-secondary)]">
+                {showFinance ? `Exp ~$${Math.round(exp).toLocaleString()} · Net ~$${Math.round(net).toLocaleString()}` : '—'}
+              </p>
+            </motion.button>
+          )}
 
-          <motion.button
-            type="button"
-            onClick={() => setOpen('goal')}
-            className={`${previewTile} col-span-2 min-h-[120px] p-4 text-left`}
-            initial={{ opacity: 0, y: 8 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.25, ease, delay: 0.1 }}
-          >
-            <p className="label">Target</p>
-            <p className="data mt-2 text-[28px] font-bold tabular-nums text-[var(--positive)]">
-              {incomeTarget > 0 ? `$${incomeTarget.toLocaleString()}` : '—'}
-            </p>
-            <p className="footnote mt-1">by {monthLabel}</p>
-          </motion.button>
+          {(showGoal || showFull) && (
+            <motion.button
+              type="button"
+              onClick={() => setOpen('goal')}
+              className={`${previewTile} col-span-2 min-h-[120px] p-4 text-left`}
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.25, ease, delay: 0.1 }}
+            >
+              <p className="label">Target</p>
+              <p className="data mt-2 text-[28px] font-bold tabular-nums text-[var(--positive)]">
+                {showGoal && incomeTarget > 0 ? `$${incomeTarget.toLocaleString()}` : '—'}
+              </p>
+              <p className="footnote mt-1">{showGoal ? `by ${monthLabel}` : 'Goal step unlocks this meter'}</p>
+            </motion.button>
+          )}
 
-          <motion.button
-            type="button"
-            onClick={() => setOpen('businesses')}
-            className={`${previewTile} col-span-4 w-full p-5 text-left`}
-            initial={{ opacity: 0, y: 8 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.25, ease, delay: 0.14 }}
-          >
-            <p className="label">Businesses</p>
-            <div className="mt-3 flex flex-wrap gap-2">
-              {bizShown.length === 0 && <span className="body text-[var(--text-secondary)]">Add your first business during setup</span>}
-              {bizShown.map((b, i) => (
-                <span
-                  key={b.id || i}
-                  className="inline-flex items-center gap-1.5 rounded-full border border-[var(--border)] px-2.5 py-1 text-[15px] font-medium text-[var(--text-primary)]"
-                  style={{ borderColor: `${b.color}44` }}
-                >
-                  <span className="h-2 w-2 rounded-full" style={{ background: b.color }} />
-                  {b.name}
-                </span>
-              ))}
-            </div>
-          </motion.button>
+          {(showBusinesses || showFull) && (
+            <motion.button
+              type="button"
+              onClick={() => setOpen('businesses')}
+              className={`${previewTile} col-span-4 w-full p-5 text-left`}
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.25, ease, delay: 0.14 }}
+            >
+              <p className="label">Businesses</p>
+              <div className="mt-3 flex flex-wrap gap-2">
+                {bizShown.length === 0 && (
+                  <span className="body text-[var(--text-secondary)]">—</span>
+                )}
+                {bizShown.map((b, i) => (
+                  <span
+                    key={b.id || i}
+                    className={`inline-flex items-center gap-1.5 rounded-full border border-[var(--border)] px-2.5 py-1 text-[15px] font-medium text-[var(--text-primary)] ${pulseBusinessIndex === i ? 'animate-pulse ring-2 ring-[var(--accent)]' : ''}`}
+                    style={{ borderColor: `${b.color}44` }}
+                  >
+                    <span className="h-2 w-2 rounded-full" style={{ background: b.color }} />
+                    {b.name}
+                  </span>
+                ))}
+              </div>
+              {bizShown.length === 0 && (
+                <p className="footnote mt-2 text-[var(--text-tertiary)]">Business names appear as you add them</p>
+              )}
+            </motion.button>
+          )}
 
-          <motion.button
-            type="button"
-            onClick={() => setOpen('habits')}
-            className={`${previewTile} col-span-2 min-h-[100px] p-4 text-left`}
-            initial={{ opacity: 0, y: 8 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.25, ease, delay: 0.18 }}
-          >
-            <p className="label">Habits</p>
-            <p className="body mt-2">
-              {draft.health.habitsToBuild.length ? `${draft.health.habitsToBuild.length} selected` : '—'}
-            </p>
-          </motion.button>
+          {(showHabits || showFull) && (
+            <motion.button
+              type="button"
+              onClick={() => setOpen('habits')}
+              className={`${previewTile} col-span-2 min-h-[100px] p-4 text-left`}
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.25, ease, delay: 0.18 }}
+            >
+              <p className="label">Habits</p>
+              <p className="body mt-2">
+                {draft.health.habitsToBuild.length ? `${draft.health.habitsToBuild.length} selected` : '—'}
+              </p>
+              <p className="footnote mt-1 text-[var(--text-tertiary)]">Habits you pick show up here</p>
+            </motion.button>
+          )}
 
-          <motion.button
-            type="button"
-            onClick={() => setOpen('faith')}
-            className={`${previewTile} col-span-2 min-h-[100px] p-4 text-left`}
-            initial={{ opacity: 0, y: 8 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.25, ease, delay: 0.22 }}
-          >
-            <p className="label" style={{ color: 'var(--spiritual)' }}>
-              Spirit
-            </p>
-            <p className="body mt-2">
-              {draft.faith.level === 'prefer_not' || draft.faith.level === 'no'
-                ? '—'
-                : draft.faith.tradition || 'Configured'}
-            </p>
-          </motion.button>
+          {(showFaith || showFull) && (
+            <motion.button
+              type="button"
+              onClick={() => setOpen('faith')}
+              className={`${previewTile} col-span-2 min-h-[100px] p-4 text-left`}
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.25, ease, delay: 0.22 }}
+            >
+              <p className="label" style={{ color: 'var(--spiritual)' }}>
+                Spirit
+              </p>
+              <p className="body mt-2">
+                {draft.faith.level === 'prefer_not' || draft.faith.level === 'no'
+                  ? '—'
+                  : draft.faith.tradition || 'Configured'}
+              </p>
+              <p className="footnote mt-1 text-[var(--text-tertiary)]">Prayer tracking appears when enabled</p>
+            </motion.button>
+          )}
+
+          {(showSchedule || showFull) && (
+            <motion.button
+              type="button"
+              onClick={() => setOpen('schedule')}
+              className={`${previewTile} col-span-4 p-4 text-left`}
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.25, ease, delay: 0.26 }}
+            >
+              <p className="label">Schedule</p>
+              <div className="mt-2 h-3 w-full rounded-full bg-[var(--surface2)]">
+                {draft.schedule.workStart && draft.schedule.workEnd ? (
+                  <div
+                    className="h-3 rounded-full bg-[var(--accent)]/50"
+                    style={{ width: '72%' }}
+                  />
+                ) : null}
+              </div>
+              <p className="footnote mt-2 text-[var(--text-secondary)]">
+                {draft.schedule.workStart && draft.schedule.workEnd
+                  ? `${draft.schedule.workStart} – ${draft.schedule.workEnd}`
+                  : '— · Set work hours to fill this bar'}
+              </p>
+            </motion.button>
+          )}
         </div>
       </div>
 
@@ -165,6 +248,7 @@ export function LiveDashboardPreview({
               {open === 'businesses' && 'Business cards'}
               {open === 'habits' && 'Habit stack'}
               {open === 'faith' && 'Spiritual practice'}
+              {open === 'schedule' && 'Schedule'}
             </Drawer.Title>
             <p className="body mt-2 text-[var(--text-secondary)]">
               This is a live mirror of what you&apos;re entering. After onboarding, every tile opens real data —
@@ -174,7 +258,7 @@ export function LiveDashboardPreview({
               {open === 'income' && (
                 <>
                   <li>Combined business revenue you enter rolls into financial projections.</li>
-                  <li>Client MRR is added when you list recurring customers.</li>
+                  <li>Personal expenses from the finance step refine net estimates.</li>
                 </>
               )}
               {open === 'goal' && (
@@ -195,6 +279,11 @@ export function LiveDashboardPreview({
               {open === 'faith' && (
                 <>
                   <li>Visibility matches what you selected — prominent, compact, or health-only.</li>
+                </>
+              )}
+              {open === 'schedule' && (
+                <>
+                  <li>Work blocks anchor your execution score and reminders.</li>
                 </>
               )}
               {open === 'greeting' && (

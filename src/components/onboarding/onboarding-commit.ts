@@ -296,3 +296,122 @@ export async function commitOnboardingDraft(store: StoreApi, draft: OnboardingDr
     coldEmail: draft.health.habitsToBuild.some((h) => h.toLowerCase().includes('outreach')),
   })
 }
+
+/** Settings “Update my info” — profile, schedule, tracking, optional new PIN only (no duplicate businesses/expenses). */
+export async function commitProfileUpdateFromDraft(store: StoreApi, draft: OnboardingDraft) {
+  const isoMonth = draft.goals.targetYearMonth ? `${draft.goals.targetYearMonth}-01` : ''
+
+  store.updateProfile({
+    userName: capitalizeDisplayName(draft.identity.name),
+    userLocation: draft.identity.location.trim(),
+    userAge: typeof draft.identity.age === 'number' ? draft.identity.age : 0,
+    userSituation: draft.identity.selfDescription,
+    incomeTarget: draft.goals.incomeTarget,
+    targetDate: isoMonth,
+    incomeWhy: draft.goals.whyThisMatters,
+    exitTarget: draft.goals.exitPrice,
+    exitBusinessId: draft.goals.exitBusinessId,
+    northStarMetric:
+      draft.goals.northStarMetric === 'Something else'
+        ? draft.goals.northStarCustom.trim()
+        : draft.goals.northStarMetric,
+    wakeUpTime: draft.health.targetWake,
+    actualWakeTime: draft.health.actualWake,
+    exercise: [draft.health.exercise, draft.health.exerciseDetail].filter(Boolean).join(' — '),
+    dietQuality: draft.health.dietQuality,
+    caffeineType: [draft.health.caffeine, draft.health.caffeineDetail].filter(Boolean).join(' '),
+    caffeineAmount: 0,
+    phoneScreenTime: draft.health.screenTimeHours,
+    energyLevel: draft.health.energy,
+    stressLevel: draft.health.stress,
+    hasFaith: draft.faith.level !== 'no' && draft.faith.level !== 'prefer_not',
+    faithTradition: draft.faith.tradition,
+    trackPrayers: draft.faith.islamPrayerTracking === 'build' || draft.faith.islamPrayerTracking === 'consistent',
+    faithConsistency: draft.faith.prayerConsistency,
+    faithRoleModel: draft.faith.roleModel,
+    procrastination: draft.struggles.procrastinationPattern,
+    patterns: draft.struggles.behaviorPatterns,
+    biggestDistraction: draft.struggles.biggestDistraction,
+    tryingToQuit: draft.struggles.tryingToQuitDetail,
+    lockedInMemory: draft.struggles.lastLockedIn,
+    aiAvoidanceStyle: draft.ai.communicationStyle,
+    aiPushStyle: '',
+    aiMotivators: draft.ai.motivators,
+    savingsRange: draft.finance.savingsRange,
+    anthropicKey: draft.connections.anthropicKey,
+    stripeKey: '',
+    idealDay: draft.goals.idealDay,
+    whatNeedsToBeTrue: draft.struggles.whatNeedsToBeTrue,
+    aiFrequency: draft.ai.frequency,
+    aiReasoningDisplay: draft.ai.reasoningDisplay,
+    factorHealthInBusiness: draft.ai.factorHealthInBusiness,
+    smokingStatus: draft.health.smoking,
+    habitsToBuild: draft.health.habitsToBuild,
+    faithDashboardVisibility: draft.faith.dashboardVisibility,
+    calendarConnected: draft.connections.calendarConnected,
+    plaidConnected: draft.finance.plaidIntent === 'connect' || draft.connections.plaidIntent === 'connect',
+    exitIntent: draft.goals.exitIntent,
+    workDayStart: draft.schedule.workStart,
+    workDayEnd: draft.schedule.workEnd,
+  })
+
+  const loc = draft.identity.location.trim()
+  if (loc) {
+    try {
+      const res = await fetch(`/api/geocode?q=${encodeURIComponent(loc)}`)
+      if (res.ok) {
+        const j = (await res.json()) as { lat?: number; lon?: number }
+        if (typeof j.lat === 'number' && typeof j.lon === 'number') {
+          store.updateProfile({ userLat: j.lat, userLng: j.lon })
+        }
+      }
+    } catch {
+      /* offline */
+    }
+  }
+
+  const toMin = (t: string) => {
+    const [h, m] = t.split(':').map((x) => parseInt(x, 10))
+    if (Number.isNaN(h)) return 0
+    return h * 60 + (Number.isNaN(m) ? 0 : m)
+  }
+  const sch = draft.schedule
+  const scheduleBlocks: ScheduleBlock[] = []
+  if (sch.workStart && sch.workEnd) {
+    const dur = Math.max(30, toMin(sch.workEnd) - toMin(sch.workStart))
+    scheduleBlocks.push({
+      time: sch.workStart,
+      title: 'Work',
+      type: 'work',
+      duration: dur,
+      completed: false,
+    })
+  }
+  for (const c of sch.commitments) {
+    if (!c.title?.trim()) continue
+    scheduleBlocks.push({
+      time: c.time || sch.workStart || '09:00',
+      title: c.title.trim(),
+      type: 'personal',
+      duration: c.durationMin > 0 ? c.durationMin : 60,
+      completed: false,
+    })
+  }
+  store.setSchedule(scheduleBlocks)
+
+  store.setTrackingPrefs({
+    prayers: draft.faith.islamPrayerTracking === 'build' || draft.faith.islamPrayerTracking === 'consistent',
+    gym: draft.health.habitsToBuild.some((h) => h.toLowerCase().includes('exercise')),
+    sleep: draft.health.habitsToBuild.some((h) => h.toLowerCase().includes('sleep')),
+    meals: true,
+    energyDrinks: false,
+    screenTime: draft.health.habitsToBuild.some((h) => h.toLowerCase().includes('screen')),
+    gambling: false,
+    coldEmail: draft.health.habitsToBuild.some((h) => h.toLowerCase().includes('outreach')),
+  })
+
+  if (draft.pin.length === 4) {
+    const pinHash = await hashPin(draft.pin)
+    store.setPinHash(pinHash)
+  }
+}
