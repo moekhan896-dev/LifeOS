@@ -7,10 +7,13 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { Drawer } from 'vaul'
 import { AreaChart, Area, LineChart, Line, ResponsiveContainer } from 'recharts'
 import { toast } from 'sonner'
-import type { HealthLog, Priority } from '@/stores/store'
+import type { HealthLog, Priority, Task } from '@/stores/store'
 import { XP_VALUES } from '@/lib/constants'
 import { applyTaskDollarEstimateAfterCreate } from '@/lib/task-dollar-client'
 import EveningVoiceReview from '@/components/EveningVoiceReview'
+import ScoreDetailDrawerContent from '@/components/dashboard/ScoreDetailDrawerContent'
+import PrayerDetailDrawerContent from '@/components/dashboard/PrayerDetailDrawerContent'
+import HabitsDetailDrawerContent from '@/components/dashboard/HabitsDetailDrawerContent'
 import type { LifeAdjustment } from '@/lib/life-expectancy'
 
 const cardAnim = (delay: number) => ({
@@ -92,7 +95,6 @@ export function renderDashboardTile(tileId: string, x: DashboardTileRenderCtx): 
   const latestEnergy = x.latestEnergy as { level: number; timeOfDay: string } | null
   const addEnergyLog = x.addEnergyLog as (l: { date: string; timeOfDay: string; level: number }) => void
   const energyLogs = x.energyLogs as { date: string; timeOfDay: string; level: number }[]
-  const prayerTimes12 = x.prayerTimes12 as Record<string, string> | null | undefined
   const togglePrayer = x.togglePrayer as (p: 'fajr' | 'dhuhr' | 'asr' | 'maghrib' | 'isha') => void
   const lifeY = x.lifeY as number
   const lifeD = x.lifeD as number
@@ -148,7 +150,20 @@ export function renderDashboardTile(tileId: string, x: DashboardTileRenderCtx): 
     text: string
     id?: string
   }) => { href?: string; label: string; action?: () => void } | null
-  const costOfInaction = x.costOfInaction as { total: number; items: { label: string; amount: number }[] }
+  const costOfInaction = x.costOfInaction as {
+    total: number
+    allClear?: boolean
+    items: { label: string; amount: number; taskId?: string }[]
+  }
+  const tasksFull = x.tasks as Task[]
+  const xp = x.xp as number
+  const level = x.level as number
+  const healthHistory = x.healthHistory as HealthLog[]
+  const trackPrayers = x.trackPrayers as boolean
+  const userLat = x.userLat as number | null
+  const userLng = x.userLng as number | null
+  const prayerCalcMethod = x.prayerCalcMethod as string
+  const prayerAsrHanafi = x.prayerAsrHanafi as boolean
   const daysRemaining = x.daysRemaining as number
   const incomeTarget = x.incomeTarget as number
   const targetDate = x.targetDate as string | undefined
@@ -569,48 +584,26 @@ export function renderDashboardTile(tileId: string, x: DashboardTileRenderCtx): 
     <Drawer.Overlay className="fixed inset-0 z-50 bg-black/60" />
     <Drawer.Content className="fixed bottom-0 left-0 right-0 z-50 rounded-t-[20px] border-t border-white/[0.06] bg-[var(--bg-elevated)] p-5 max-h-[85vh] overflow-y-auto">
       <div className="mx-auto mb-4 h-1 w-10 rounded-full bg-white/10" />
-      <Drawer.Title className="text-lg font-semibold text-white mb-4">Execution Score Breakdown</Drawer.Title>
-      <div className="flex justify-center mb-6 relative" style={{ width: 80, height: 80, margin: '0 auto 24px' }}>
+      <Drawer.Title className="text-lg font-semibold text-white mb-2">Daily score</Drawer.Title>
+      <div className="flex justify-center mb-4 relative" style={{ width: 80, height: 80, margin: '0 auto 16px' }}>
         <ProgressRing value={executionScore} max={100} size={80} color="var(--accent)" />
         <span className="absolute inset-0 flex items-center justify-center data text-[18px] font-bold text-white">{executionScore}</span>
       </div>
-      <div className="space-y-3">
-        {[
-          { label: 'Task Commitment', detail: `${tasksDoneToday}/${tasksCommitted} tasks done`, value: tasksCommitted > 0 ? Math.round((tasksDoneToday / tasksCommitted) * 35) : 0, max: 35, color: 'var(--accent)' },
-          { label: 'Prayer', detail: `${prayersDone}/5 prayers`, value: prayersDone * 4, max: 20, color: 'var(--gold)' },
-          { label: 'Gym', detail: todayHealth.gym ? 'Completed' : 'Not yet', value: todayHealth.gym ? 10 : 0, max: 10, color: 'var(--accent)' },
-          { label: 'Meal Quality', detail: todayHealth.mealQuality || 'Not logged', value: todayHealth.mealQuality === 'good' ? 5 : 0, max: 5, color: 'var(--blue)' },
-          { label: 'Energy Drinks', detail: `${todayHealth.energyDrinks} today`, value: todayHealth.energyDrinks < 2 ? 5 : 0, max: 5, color: todayHealth.energyDrinks < 2 ? 'var(--accent)' : 'var(--rose)' },
-          { label: 'Sleep Tracked', detail: todayHealth.sleepTime ? 'Yes' : 'No', value: (todayHealth.sleepTime && todayHealth.wakeTime) ? 5 : 0, max: 5, color: 'var(--accent)' },
-          { label: 'Focus Sessions', detail: `${todayFocusSessions} sessions`, value: Math.min(20, todayFocusSessions * 5), max: 20, color: 'var(--cyan)' },
-        ].map((item, i) => (
-          <div key={i} className="rounded-[10px] p-3" style={{ background: 'var(--surface2)' }}>
-            <div className="flex justify-between items-center mb-1.5">
-              <span className="text-[12px] text-[var(--text)]">{item.label}</span>
-              <span className="data text-[12px]" style={{ color: item.color }}>{item.value}/{item.max}</span>
-            </div>
-            <div className="h-1.5 rounded-full bg-white/[0.06] overflow-hidden">
-              <motion.div
-                className="h-full rounded-full"
-                style={{ background: item.color }}
-                initial={{ width: 0 }}
-                animate={{ width: `${(item.value / item.max) * 100}%` }}
-                transition={{ duration: 0.6, ease: [0.25, 0.46, 0.45, 0.94] as const }}
-              />
-            </div>
-            <p className="text-[10px] text-[var(--text-dim)] mt-1">{item.detail}</p>
-          </div>
-        ))}
-      </div>
-      <div className="mt-4 flex gap-2">
-        <motion.button onClick={() => { updateHealth({ gym: !todayHealth.gym }); toast.success(todayHealth.gym ? 'Gym unchecked' : 'Gym checked! +10') }} whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.97 }}
-          className="flex-1 py-2.5 rounded-[10px] text-[12px] font-semibold" style={{ background: todayHealth.gym ? 'var(--accent)' : 'var(--surface2)', color: todayHealth.gym ? 'white' : 'var(--text-mid)' }}>
-          {todayHealth.gym ? '✓ Gym Done' : 'Log Gym'}
-        </motion.button>
-        <Link href="/focus" className="flex-1 py-2.5 rounded-[10px] text-[12px] font-semibold text-center" style={{ background: 'var(--surface2)', color: 'var(--text-mid)' }}>
-          Start Focus Session
-        </Link>
-      </div>
+      <ScoreDetailDrawerContent
+        todayStr={todayStr}
+        executionScore={executionScore}
+        tasks={tasksFull}
+        todayHealth={todayHealth}
+        tasksDoneToday={tasksDoneToday}
+        tasksCommitted={tasksCommitted}
+        todayFocusSessions={todayFocusSessions}
+        trackPrayers={trackPrayers}
+        healthHistory={healthHistory}
+        xp={xp}
+        level={level}
+        togglePrayer={togglePrayer}
+        toggleTask={toggleTask}
+      />
     </Drawer.Content>
   </Drawer.Portal>
 </Drawer.Root>
@@ -722,50 +715,22 @@ export function renderDashboardTile(tileId: string, x: DashboardTileRenderCtx): 
     <Drawer.Overlay className="fixed inset-0 z-50 bg-black/60" />
     <Drawer.Content className="fixed bottom-0 left-0 right-0 z-50 rounded-t-[20px] border-t border-white/[0.06] bg-[var(--bg-elevated)] p-5 max-h-[85vh] overflow-y-auto">
       <div className="mx-auto mb-4 h-1 w-10 rounded-full bg-white/10" />
-      <Drawer.Title className="text-lg font-semibold text-white mb-4">Today&apos;s Prayers</Drawer.Title>
-      {!prayerTimes12 && (
-        <p className="mb-4 text-[13px] text-[var(--text-dim)]">
-          Set your location in Settings (or finish onboarding) to compute times with ISNA / adhan.js. Times shown
-          as — until coordinates are saved.
-        </p>
-      )}
-
-      <div className="flex items-center gap-2 mb-5">
+      <Drawer.Title className="text-lg font-semibold text-white mb-4">Prayers</Drawer.Title>
+      <div className="flex items-center gap-2 mb-4">
         <span className="data text-[24px] font-bold" style={{ color: 'var(--gold)' }}>{prayersDone}/5</span>
         <span className="text-[12px] text-[var(--text-dim)]">completed today</span>
       </div>
-
-      <div className="space-y-2.5">
-        {(['fajr', 'dhuhr', 'asr', 'maghrib', 'isha'] as const).map(prayer => (
-          <motion.button
-            key={prayer}
-            onClick={() => {
-              togglePrayer(prayer)
-              toast.success(todayHealth.prayers[prayer] ? `${prayer} unmarked` : `${prayer} prayed! +4 execution`)
-            }}
-            whileHover={{ scale: 1.01 }}
-            whileTap={{ scale: 0.97 }}
-            className="w-full flex items-center justify-between rounded-[12px] p-4 transition-colors"
-            style={{
-              background: todayHealth.prayers[prayer] ? 'rgba(255,215,0,0.08)' : 'var(--surface2)',
-              border: `1px solid ${todayHealth.prayers[prayer] ? 'rgba(255,215,0,0.25)' : 'var(--border)'}`,
-            }}
-          >
-            <div className="flex items-center gap-3">
-              <div className="w-5 h-5 rounded-full flex items-center justify-center" style={{
-                background: todayHealth.prayers[prayer] ? 'var(--gold)' : 'transparent',
-                border: `2px solid var(--gold)`,
-              }}>
-                {todayHealth.prayers[prayer] && <span className="text-[10px] text-black font-bold">✓</span>}
-              </div>
-              <span className="text-[14px] font-semibold text-white capitalize">{prayer}</span>
-            </div>
-            <span className="text-[12px] text-[var(--text-dim)] font-mono">
-              {prayerTimes12?.[prayer] ?? '—'}
-            </span>
-          </motion.button>
-        ))}
-      </div>
+      <PrayerDetailDrawerContent
+        todayStr={todayStr}
+        todayHealth={todayHealth}
+        healthHistory={healthHistory}
+        trackPrayers={trackPrayers}
+        togglePrayer={togglePrayer}
+        userLat={userLat}
+        userLng={userLng}
+        prayerCalcMethod={prayerCalcMethod}
+        prayerAsrHanafi={prayerAsrHanafi}
+      />
     </Drawer.Content>
   </Drawer.Portal>
 </Drawer.Root>
@@ -1120,10 +1085,19 @@ export function renderDashboardTile(tileId: string, x: DashboardTileRenderCtx): 
       whileHover={{ filter: 'brightness(1.05)' }}
     >
       <span className="text-[13px] font-semibold text-[var(--negative)]">Cost of inaction</span>
-      <div className="data mt-2" style={{ fontSize: 28, fontWeight: 700, color: 'var(--rose)' }}>
+      <div
+        className="data mt-2"
+        style={{
+          fontSize: 28,
+          fontWeight: 700,
+          color: costOfInaction.allClear ? 'var(--positive)' : 'var(--rose)',
+        }}
+      >
         ${costOfInaction.total.toLocaleString()}
       </div>
-      <p className="text-[10px] text-[var(--text-dim)] mb-2">lost today if you don&apos;t act</p>
+      <p className="text-[10px] text-[var(--text-dim)] mb-2">
+        {costOfInaction.allClear ? 'high-priority dollar tasks clear' : "lost today if you don't act"}
+      </p>
       <div className="space-y-1">
         {costOfInaction.items.map((item, i) => (
           <div key={i} className="flex items-center justify-between text-[11px]">
@@ -1132,7 +1106,9 @@ export function renderDashboardTile(tileId: string, x: DashboardTileRenderCtx): 
           </div>
         ))}
         {costOfInaction.items.length === 0 && (
-          <p className="text-[11px] text-[var(--text-dim)] italic">No critical tasks pending</p>
+          <p className="text-[11px] text-[var(--text-dim)] italic">
+            {costOfInaction.allClear ? 'All crit/high dollar tasks done or none pending.' : 'No qualifying tasks'}
+          </p>
         )}
       </div>
     </motion.div>
@@ -1143,8 +1119,17 @@ export function renderDashboardTile(tileId: string, x: DashboardTileRenderCtx): 
       <div className="mx-auto mb-4 h-1 w-10 rounded-full bg-white/10" />
       <Drawer.Title className="text-lg font-semibold text-white mb-4">Cost of Inaction</Drawer.Title>
 
-      <div className="data text-[32px] font-bold mb-1" style={{ color: 'var(--rose)' }}>${costOfInaction.total.toLocaleString()}</div>
-      <p className="text-[12px] text-[var(--text-dim)] mb-5">estimated opportunity cost today</p>
+      <div
+        className="data text-[32px] font-bold mb-1"
+        style={{ color: costOfInaction.allClear ? 'var(--positive)' : 'var(--rose)' }}
+      >
+        ${costOfInaction.total.toLocaleString()}
+      </div>
+      <p className="text-[12px] text-[var(--text-dim)] mb-2">
+        {costOfInaction.allClear
+          ? 'No incomplete crit/high tasks with dollar estimates — opportunity cost is $0.'
+          : 'Σ(dailyValue × hours since wake ÷ working hours); dailyValue = dollarValue ÷ 30.'}
+      </p>
 
       <div className="space-y-2.5">
         {costOfInaction.items.map((item, i) => (
@@ -1304,6 +1289,58 @@ export function renderDashboardTile(tileId: string, x: DashboardTileRenderCtx): 
   )}
 </motion.div>
       )
+    case 'habits': {
+      const habitDrawerOpen = x.habitDrawerOpen as boolean
+      const setHabitDrawerOpen = x.setHabitDrawerOpen as (v: boolean) => void
+      const habitDoneToday = x.habitDoneToday as number
+      const habitTotalToday = x.habitTotalToday as number
+      const mini = [
+        { k: 'gym', e: '💪', ok: todayHealth.gym },
+        { k: 'diet', e: '🍎', ok: todayHealth.mealQuality === 'good' },
+        { k: 'sleep', e: '😴', ok: !!(todayHealth.sleepTime && todayHealth.wakeTime) },
+        { k: 'screen', e: '📱', ok: todayHealth.screenTimeHours > 0 },
+        { k: 'water', e: '💧', ok: (todayHealth.waterGlasses ?? 0) >= 8 },
+      ]
+      return (
+        <Drawer.Root open={habitDrawerOpen} onOpenChange={setHabitDrawerOpen}>
+          <Drawer.Trigger asChild>
+            <motion.div
+              className="w-full cursor-pointer rounded-2xl border border-[var(--border)] bg-[var(--bg-elevated)] p-5 shadow-[0_2px_12px_rgba(0,0,0,0.35)]"
+              {...cardAnim(0.19)}
+              whileHover={{ filter: 'brightness(1.06)' }}
+            >
+              <span className="text-[13px] font-semibold text-[var(--text-secondary)]">Habits</span>
+              <div className="data mt-2" style={{ fontSize: 28, fontWeight: 700, color: 'var(--accent)' }}>
+                {habitDoneToday}
+                <span className="text-[14px] text-[var(--text-dim)]">/{habitTotalToday}</span>
+              </div>
+              <p className="text-[11px] text-[var(--text-mid)]">today</p>
+              <div className="mt-3 grid grid-cols-5 gap-2">
+                {mini.map((m) => (
+                  <div
+                    key={m.k}
+                    className="relative flex aspect-square flex-col items-center justify-center rounded-xl border border-[var(--border)] bg-[var(--surface2)] text-[20px]"
+                  >
+                    <span>{m.e}</span>
+                    {m.ok && (
+                      <span className="absolute right-1 top-1 text-[10px] text-[var(--positive)]">✓</span>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </motion.div>
+          </Drawer.Trigger>
+          <Drawer.Portal>
+            <Drawer.Overlay className="fixed inset-0 z-50 bg-black/60" />
+            <Drawer.Content className="fixed bottom-0 left-0 right-0 z-50 max-h-[85vh] overflow-y-auto rounded-t-[20px] border-t border-white/[0.06] bg-[var(--bg-elevated)] p-5">
+              <div className="mx-auto mb-4 h-1 w-10 rounded-full bg-white/10" />
+              <Drawer.Title className="text-lg font-semibold text-white mb-2">Habits</Drawer.Title>
+              <HabitsDetailDrawerContent todayStr={todayStr} />
+            </Drawer.Content>
+          </Drawer.Portal>
+        </Drawer.Root>
+      )
+    }
     case 'gmb':
       return (
 <motion.div className="card rounded-[16px] p-5 w-full cursor-pointer" {...cardAnim(0.48)} whileHover={{ filter: 'brightness(1.05)' }}>

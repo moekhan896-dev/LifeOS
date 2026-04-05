@@ -107,7 +107,35 @@ export interface WeeklyScorecardSlot {
 }
 
 export interface Insight { id: string; type: InsightType; priority: string; title: string; body: string; rating?: 'up' | 'down' | null; snoozedUntil?: string; createdAt: string }
-export interface HealthLog { date: string; prayers: { fajr: boolean; dhuhr: boolean; asr: boolean; maghrib: boolean; isha: boolean }; gym: boolean; sleepTime?: string; wakeTime?: string; mealQuality?: 'good' | 'okay' | 'bad'; energyDrinks: number; screenTimeHours: number; dailyScore: number }
+export interface HealthLog {
+  date: string
+  prayers: { fajr: boolean; dhuhr: boolean; asr: boolean; maghrib: boolean; isha: boolean }
+  gym: boolean
+  sleepTime?: string
+  wakeTime?: string
+  mealQuality?: 'good' | 'okay' | 'bad'
+  energyDrinks: number
+  screenTimeHours: number
+  dailyScore: number
+  waterGlasses?: number
+  screenCategory?: 'social' | 'youtube' | 'games' | 'productive'
+  gymType?: string
+  gymDurationMin?: number
+  gymNotes?: string
+  mealDescription?: string
+  /** Custom habit id → logged value today */
+  customHabitLog?: Record<string, string | number | boolean | null>
+}
+
+/** PRD §9.10 — user-defined habits in Habits drawer */
+export interface CustomHabitDef {
+  id: string
+  name: string
+  emoji: string
+  loggingType: 'boolean' | 'number' | 'text' | 'rating'
+  private: boolean
+  order: number
+}
 export interface Streak { habit: string; currentStreak: number; longestStreak: number; lastCompleted?: string }
 export interface Idea { id: string; text: string; category: string; promoted: boolean; archived: boolean; createdAt: string }
 export interface RevenueDriver { id: string; businessId: string; category: string; name: string; impact: number; status: DriverStatus; notes?: string }
@@ -427,6 +455,10 @@ interface AppState {
   updateHealth: (updates: Partial<HealthLog>) => void
   togglePrayer: (prayer: keyof HealthLog['prayers']) => void
   saveHealthDay: () => void
+  customHabits: CustomHabitDef[]
+  addCustomHabit: (h: Omit<CustomHabitDef, 'id' | 'order'>) => string
+  updateCustomHabit: (id: string, updates: Partial<CustomHabitDef>) => void
+  deleteCustomHabit: (id: string) => void
 
   // ── Streaks ──
   streaks: Streak[]
@@ -841,6 +873,7 @@ export const useStore = create<AppState>()(
           businesses: [],
           clients: [],
           tasks: [],
+          customHabits: [],
           insights: [],
           ideas: [],
           drivers: [],
@@ -1119,6 +1152,20 @@ export const useStore = create<AppState>()(
         }
       },
       saveHealthDay: () => set((s) => ({ healthHistory: [...s.healthHistory.filter((h) => h.date !== s.todayHealth.date), s.todayHealth] })),
+
+      customHabits: [],
+      addCustomHabit: (h) => {
+        const id = uid()
+        set((s) => ({
+          customHabits: [...s.customHabits, { ...h, id, order: s.customHabits.length }],
+        }))
+        return id
+      },
+      updateCustomHabit: (id, updates) =>
+        set((s) => ({
+          customHabits: s.customHabits.map((c) => (c.id === id ? { ...c, ...updates } : c)),
+        })),
+      deleteCustomHabit: (id) => set((s) => ({ customHabits: s.customHabits.filter((c) => c.id !== id) })),
 
       // ── Streaks ──
       streaks: [
@@ -1588,6 +1635,7 @@ export const useStore = create<AppState>()(
         const base = { ...current, ...p } as AppState
         base.dashboardLayout = normalizeDashboardLayout(p?.dashboardLayout ?? current.dashboardLayout)
         base.notificationPrefs = { ...INITIAL_NOTIFICATIONS, ...base.notificationPrefs }
+        if (!Array.isArray(base.customHabits)) base.customHabits = []
         return base
       },
     }

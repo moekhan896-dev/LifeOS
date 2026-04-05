@@ -25,6 +25,7 @@ export const DASHBOARD_TILE_CATALOG: { id: string; label: string; defaultSpan: D
   { id: 'execution', label: 'Execution score', defaultSpan: 3 },
   { id: 'energy', label: 'Energy', defaultSpan: 3 },
   { id: 'prayers', label: 'Prayers', defaultSpan: 3 },
+  { id: 'habits', label: 'Habits', defaultSpan: 6 },
   { id: 'life_horizon', label: 'Life horizon', defaultSpan: 12 },
   { id: 'schedule', label: "Today's schedule", defaultSpan: 12 },
   { id: 'active_projects', label: 'Active projects', defaultSpan: 6 },

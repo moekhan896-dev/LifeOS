@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useMemo, useEffect, useCallback } from 'react'
+import { computeCostOfInactionGap17 } from '@/lib/cost-of-inaction-gap17'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
@@ -18,11 +19,11 @@ import {
   computeMonthlyMoneySnapshot,
   type Priority,
 } from '@/stores/store'
+import { Drawer } from 'vaul'
 import PageTransition from '@/components/PageTransition'
 import CommandInput from '@/components/CommandInput'
 import { XP_VALUES } from '@/lib/constants'
 import { applyTaskDollarEstimateAfterCreate } from '@/lib/task-dollar-client'
-import { prayerRecordTo12 } from '@/lib/prayer-times'
 import { computeLifeExpectancy } from '@/lib/life-expectancy'
 import SortableDashboardTile from '@/components/dashboard/SortableDashboardTile'
 import TileLibrarySheet from '@/components/dashboard/TileLibrarySheet'
@@ -49,17 +50,23 @@ export default function DashboardPage() {
     userName, todaySchedule, energyLogs, commitments, wakeUpTime,
     focusSessions, goals, identityStatements, logEvent,
     addTask, addProject, togglePrayer, updateHealth, addEnergyLog, updateBusiness,
-    trackPrayers, healthHistory,
+    trackPrayers,
+    healthHistory,
     dailyNetSnapshots, proactiveMessages, markProactiveRead,
     userLat, userLng, prayerCalcMethod, prayerAsrHanafi,
     userAge, exercise, smokingStatus, dietQuality, stressLevel, phoneScreenTime,
     lastSessionDaysSinceOpen, previousLastOpenedAt,
+    workDayStart, workDayEnd,
+    xp, level,
+    streaks,
     dashboardLayout,
     reorderDashboardTiles,
     updateDashboardTileSpan,
     setDashboardTileVisible,
     setDashboardLayout,
     showDashboardTile,
+    customHabits,
+    addIdea,
   } = useStore()
 
   const unreadProactive = useMemo(
@@ -68,7 +75,33 @@ export default function DashboardPage() {
   )
 
   const todayStr = new Date().toISOString().split('T')[0]
-  const now = new Date()
+
+  const habitDoneToday = useMemo(() => {
+    let n = 0
+    if (todayHealth.gym) n++
+    if (todayHealth.mealQuality === 'good') n++
+    if (todayHealth.sleepTime && todayHealth.wakeTime) n++
+    if (todayHealth.screenTimeHours > 0) n++
+    if ((todayHealth.waterGlasses ?? 0) >= 8) n++
+    for (const c of customHabits.filter((x) => !x.private)) {
+      const v = todayHealth.customHabitLog?.[c.id]
+      if (c.loggingType === 'boolean') {
+        if (v === true) n++
+      } else if (v != null && v !== '') {
+        n++
+      }
+    }
+    return n
+  }, [todayHealth, customHabits])
+
+  const habitTotalToday = useMemo(() => 5 + customHabits.filter((c) => !c.private).length, [customHabits])
+
+  const [coiTick, setCoiTick] = useState(0)
+  useEffect(() => {
+    const id = window.setInterval(() => setCoiTick((n) => n + 1), 1000)
+    return () => window.clearInterval(id)
+  }, [])
+  const now = useMemo(() => new Date(), [coiTick])
   const hour = now.getHours()
   /** PRD §9.21 — morning briefing tile before noon. */
   const isMorningBriefWindow = hour < 12
@@ -79,6 +112,23 @@ export default function DashboardPage() {
   const [newTaskBiz, setNewTaskBiz] = useState(businesses[0]?.id || '')
   const [newTaskPriority, setNewTaskPriority] = useState<Priority>('med')
   const [expandedAlert, setExpandedAlert] = useState<number | null>(null)
+  const [habitDrawerOpen, setHabitDrawerOpen] = useState(false)
+  const [ideaFabOpen, setIdeaFabOpen] = useState(false)
+  const [ideaText, setIdeaText] = useState('')
+
+  useEffect(() => {
+    const openTask = () => setShowAddTask(true)
+    const openIdea = () => setIdeaFabOpen(true)
+    const openHabits = () => setHabitDrawerOpen(true)
+    window.addEventListener('artos-open-task-drawer', openTask)
+    window.addEventListener('artos-open-idea', openIdea)
+    window.addEventListener('artos-open-habit-log', openHabits)
+    return () => {
+      window.removeEventListener('artos-open-task-drawer', openTask)
+      window.removeEventListener('artos-open-idea', openIdea)
+      window.removeEventListener('artos-open-habit-log', openHabits)
+    }
+  }, [])
   const [quickTaskText, setQuickTaskText] = useState('')
   const [newProjectName, setNewProjectName] = useState('')
   const [newProjectDesc, setNewProjectDesc] = useState('')
@@ -107,11 +157,6 @@ export default function DashboardPage() {
   const scoreZone = getScoreZone(executionScore)
 
   const prayersDone = Object.values(todayHealth.prayers).filter(Boolean).length
-
-  const prayerTimes12 = useMemo(() => {
-    if (userLat == null || userLng == null) return null
-    return prayerRecordTo12(userLat, userLng, new Date(), prayerCalcMethod, prayerAsrHanafi)
-  }, [userLat, userLng, prayerCalcMethod, prayerAsrHanafi, todayHealth.date])
 
   const lifeModel = useMemo(
     () =>
@@ -210,19 +255,38 @@ export default function DashboardPage() {
     return list.slice(0, 8)
   }, [clients, businesses, tasks, revenueEntries, commitments, proactiveMessages])
 
-  // ── Cost of inaction ──
+  /** PRD GAP 17 — dollar tasks + live recompute every 1s */
+  const workingHoursPerDay = useMemo(() => {
+    const parse = (s: string | undefined) => {
+      if (!s?.includes(':')) return null
+      const [h, m] = s.split(':').map(Number)
+      return (h ?? 0) + (m ?? 0) / 60
+    }
+    const a = parse(workDayStart)
+    const b = parse(workDayEnd)
+    if (a != null && b != null && b > a) return Math.min(16, b - a)
+    return 10
+  }, [workDayStart, workDayEnd])
+
   const costOfInaction = useMemo(() => {
-    const wakeHour = wakeUpTime ? parseInt(wakeUpTime.split(':')[0]) : 8
-    const hoursSinceWake = Math.max(0, hour - wakeHour)
-    const critHighUndone = tasks.filter(t => !t.done && (t.priority === 'crit' || t.priority === 'high'))
-    const estimatedHourlyRate = netIncome > 0 ? netIncome / 160 : 25
-    const costPerTask = critHighUndone.map(t => {
-      const weight = t.priority === 'crit' ? 1.5 : 1
-      return { label: t.text.slice(0, 40), amount: Math.round(estimatedHourlyRate * weight * (hoursSinceWake / critHighUndone.length || 1)) }
-    }).slice(0, 4)
-    const total = costPerTask.reduce((s, c) => s + c.amount, 0)
-    return { items: costPerTask, total }
-  }, [tasks, netIncome, hour, wakeUpTime])
+    const gap = computeCostOfInactionGap17({
+      tasks,
+      wakeUpTime,
+      workingHoursPerDay,
+      now,
+    })
+    const allClear = gap.items.length === 0
+    return {
+      items: gap.items.map((it) => ({
+        label: it.label,
+        amount: Math.round(it.taskCostNow),
+        taskId: it.taskId,
+      })),
+      total: allClear ? 0 : Math.round(gap.totalCostNow),
+      totalDailyValue: gap.totalDailyValue,
+      allClear,
+    }
+  }, [tasks, wakeUpTime, workingHoursPerDay, now, coiTick])
 
   // ── Days remaining ──
   const daysRemaining = targetDate ? Math.max(0, Math.ceil((new Date(targetDate).getTime() - Date.now()) / 86400000)) : 0
@@ -482,7 +546,10 @@ export default function DashboardPage() {
       latestEnergy,
       addEnergyLog,
       energyLogs,
-      prayerTimes12,
+      habitDrawerOpen,
+      setHabitDrawerOpen,
+      habitDoneToday,
+      habitTotalToday,
       togglePrayer,
       lifeY,
       lifeD,
@@ -515,6 +582,10 @@ export default function DashboardPage() {
       quickTaskText,
       setQuickTaskText,
       sortedTasks,
+      tasks,
+      xp,
+      level,
+      streaks,
       clients,
       getClientNet,
       gmbProfiles,
@@ -523,6 +594,12 @@ export default function DashboardPage() {
       lastSessionDaysSinceOpen,
       idealSelfBenchmark,
       nextActionMotivation,
+      healthHistory,
+      trackPrayers,
+      userLat,
+      userLng,
+      prayerCalcMethod,
+      prayerAsrHanafi,
     }),
     [
       router,
@@ -559,7 +636,10 @@ export default function DashboardPage() {
       latestEnergy,
       addEnergyLog,
       energyLogs,
-      prayerTimes12,
+      habitDrawerOpen,
+      setHabitDrawerOpen,
+      habitDoneToday,
+      habitTotalToday,
       togglePrayer,
       lifeY,
       lifeD,
@@ -586,6 +666,10 @@ export default function DashboardPage() {
       targetDate,
       quickTaskText,
       sortedTasks,
+      tasks,
+      xp,
+      level,
+      streaks,
       clients,
       gmbProfiles,
       updateHealth,
@@ -593,6 +677,12 @@ export default function DashboardPage() {
       lastSessionDaysSinceOpen,
       idealSelfBenchmark,
       nextActionMotivation,
+      healthHistory,
+      trackPrayers,
+      userLat,
+      userLng,
+      prayerCalcMethod,
+      prayerAsrHanafi,
     ]
   )
 
@@ -677,6 +767,40 @@ export default function DashboardPage() {
             toast.success('Tile added to the bottom of your dashboard')
           }}
         />
+
+        <Drawer.Root open={ideaFabOpen} onOpenChange={setIdeaFabOpen}>
+          <Drawer.Portal>
+            <Drawer.Overlay className="fixed inset-0 z-[110] bg-black/60" />
+            <Drawer.Content className="fixed bottom-0 left-0 right-0 z-[120] max-h-[55vh] rounded-t-[20px] border border-[var(--border)] bg-[var(--bg-elevated)] p-5">
+              <div className="mx-auto mb-3 h-1 w-10 rounded-full bg-white/10" />
+              <p className="text-lg font-semibold text-[var(--text-primary)]">Capture idea</p>
+              <textarea
+                value={ideaText}
+                onChange={(e) => setIdeaText(e.target.value)}
+                placeholder="Quick idea…"
+                rows={4}
+                className="mt-3 w-full rounded-xl border border-[var(--border)] bg-[var(--bg-secondary)] px-4 py-3 text-[16px] text-[var(--text-primary)] outline-none focus:border-[var(--accent)]"
+              />
+              <button
+                type="button"
+                className="btn-primary mt-4 w-full py-3"
+                onClick={() => {
+                  const t = ideaText.trim()
+                  if (!t) {
+                    toast.error('Enter an idea')
+                    return
+                  }
+                  addIdea(t, 'quick-capture')
+                  setIdeaText('')
+                  setIdeaFabOpen(false)
+                  toast.success('Idea saved')
+                }}
+              >
+                Save idea
+              </button>
+            </Drawer.Content>
+          </Drawer.Portal>
+        </Drawer.Root>
 
         {/* ── ROW 7: QUICK CAPTURE (sticky bottom) ── */}
         <div className="fixed bottom-0 left-0 right-0 z-40 p-4" style={{ background: 'linear-gradient(to top, var(--bg) 80%, transparent)' }}>

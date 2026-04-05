@@ -8,6 +8,7 @@ import { runWeeklyReportIfDue } from '@/lib/weekly-report'
 import Sidebar from '@/components/Sidebar'
 import CommandPalette from '@/components/CommandPalette'
 import VoiceCommandFab from '@/components/VoiceCommandFab'
+import QuickAddFab from '@/components/QuickAddFab'
 import OfflineBanner from '@/components/OfflineBanner'
 import PwaInstallPrompt from '@/components/PwaInstallPrompt'
 import MobileTabBar from '@/components/MobileTabBar'
@@ -73,6 +74,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       <MobileTabBar />
       <PwaInstallPrompt />
       <CommandPalette />
+      <QuickAddFab />
       <VoiceCommandFab />
     </div>
   )

@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { motion, AnimatePresence } from 'framer-motion'
@@ -221,7 +221,7 @@ export default function VoiceCommandFab() {
     [runParsed]
   )
 
-  const toggle = () => {
+  const toggle = useCallback(() => {
     const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition
     if (!SpeechRecognition) return
     if (recording) {
@@ -255,7 +255,13 @@ export default function VoiceCommandFab() {
     rec.start()
     setRecording(true)
     setText('')
-  }
+  }, [process, recording])
+
+  useEffect(() => {
+    const onFab = () => toggle()
+    window.addEventListener('artos-trigger-voice', onFab)
+    return () => window.removeEventListener('artos-trigger-voice', onFab)
+  }, [toggle])
 
   if (typeof window === 'undefined') return null
   const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition

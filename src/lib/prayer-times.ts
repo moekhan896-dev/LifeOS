@@ -126,3 +126,25 @@ export function prayerRecordTo24(
     isha: formatPrayerTime24(r.isha),
   }
 }
+
+/** Visual window for each salāh: this adhān → next boundary (PRD §9.9). Isha ends at next day Fajr. */
+export function getPrayerWindows12(
+  lat: number,
+  lng: number,
+  date: Date,
+  methodKey: string,
+  hanafiAsr: boolean
+): Record<PrayerNameKey, { start: string; end: string }> {
+  const t = computePrayerTimesRecord(lat, lng, date, methodKey, hanafiAsr)
+  const next = new Date(date)
+  next.setDate(next.getDate() + 1)
+  const tNext = computePrayerTimesRecord(lat, lng, next, methodKey, hanafiAsr)
+  const fmt = formatPrayerTime12
+  return {
+    fajr: { start: fmt(t.fajr), end: fmt(t.dhuhr) },
+    dhuhr: { start: fmt(t.dhuhr), end: fmt(t.asr) },
+    asr: { start: fmt(t.asr), end: fmt(t.maghrib) },
+    maghrib: { start: fmt(t.maghrib), end: fmt(t.isha) },
+    isha: { start: fmt(t.isha), end: fmt(tNext.fajr) },
+  }
+}
