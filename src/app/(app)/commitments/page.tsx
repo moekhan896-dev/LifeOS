@@ -1,155 +1,205 @@
 'use client'
 
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { motion } from 'framer-motion'
 import { toast } from 'sonner'
-import { useStore } from '@/stores/store'
+import { useStore, type Commitment } from '@/stores/store'
 import PageTransition from '@/components/PageTransition'
 import { StaggerContainer, StaggerItem } from '@/components/Stagger'
 
-export default function CommitmentsPage() {
-  const { commitments, addCommitment, fulfillCommitment } = useStore()
-  const [text, setText] = useState('')
-  const [source, setSource] = useState('')
-  const [dueDate, setDueDate] = useState('')
+type Tab = 'active' | 'fulfilled' | 'all'
 
-  const handleAdd = () => {
-    if (!text.trim()) return
-    addCommitment(text.trim(), source.trim() || 'Self', dueDate || undefined)
-    setText('')
-    setSource('')
-    setDueDate('')
-    toast.success('Commitment added')
-  }
+function formatSourceLine(c: Commitment): string {
+  const created = new Date(c.createdAt)
+  const dateStr = created.toLocaleDateString(undefined, { month: 'long', day: 'numeric' })
+  if (c.source === 'manual') return `Manual · ${dateStr}`
+  if (c.source === 'ai_chat') return `From AI chat · ${dateStr}`
+  if (c.source === 'decision_lab' || c.source === 'decision_lab_option') return `From Decision Lab · ${dateStr}`
+  return `${c.source} · ${dateStr}`
+}
+
+function dueTone(c: Commitment): { className: string; label: string } {
+  if (!c.dueDate || c.fulfilled) return { className: 'text-[var(--text-dim)]', label: c.dueDate ? c.dueDate : 'No due date' }
+  const due = new Date(c.dueDate + 'T12:00:00')
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+  const d = new Date(due)
+  d.setHours(0, 0, 0, 0)
+  const diff = (d.getTime() - today.getTime()) / 86400000
+  if (diff < 0) return { className: 'text-[var(--negative)] font-medium', label: `Due ${c.dueDate} (overdue)` }
+  if (diff === 0) return { className: 'text-[var(--warning)] font-medium', label: `Due today` }
+  return { className: 'text-[var(--positive)]', label: `Due ${c.dueDate}` }
+}
+
+export default function CommitmentsPage() {
+  const { commitments, addCommitment, fulfillCommitment, removeCommitment } = useStore()
+  const [tab, setTab] = useState<Tab>('active')
+  const [showAdd, setShowAdd] = useState(false)
+  const [text, setText] = useState('')
+  const [dueDate, setDueDate] = useState('')
 
   const total = commitments.length
   const fulfilled = commitments.filter((c) => c.fulfilled).length
-  const rate = total > 0 ? Math.round((fulfilled / total) * 100) : 0
+  const pct = total > 0 ? Math.round((fulfilled / total) * 100) : 0
 
-  // 30-day rolling
-  const thirtyDaysAgo = new Date()
-  thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30)
-  const recent = commitments.filter((c) => new Date(c.createdAt) >= thirtyDaysAgo)
-  const recentFulfilled = recent.filter((c) => c.fulfilled).length
-  const recentRate = recent.length > 0 ? Math.round((recentFulfilled / recent.length) * 100) : 0
+  const filtered = useMemo(() => {
+    let list =
+      tab === 'active'
+        ? commitments.filter((c) => !c.fulfilled)
+        : tab === 'fulfilled'
+          ? commitments.filter((c) => c.fulfilled)
+          : [...commitments]
+    if (tab === 'active') {
+      list = [...list].sort((a, b) => {
+        if (!a.dueDate && !b.dueDate) return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
+        if (!a.dueDate) return 1
+        if (!b.dueDate) return -1
+        return new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime()
+      })
+    } else if (tab === 'fulfilled' || tab === 'all') {
+      list = [...list].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+    }
+    return list
+  }, [commitments, tab])
 
-  const sorted = [...commitments].sort((a, b) => {
-    if (a.fulfilled !== b.fulfilled) return a.fulfilled ? 1 : -1
-    return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-  })
+  const handleAdd = () => {
+    if (!text.trim()) return
+    addCommitment(text.trim(), 'manual', dueDate || undefined)
+    setText('')
+    setDueDate('')
+    setShowAdd(false)
+    toast.success('Commitment added')
+  }
 
   return (
     <PageTransition>
-      <StaggerContainer className="space-y-4 pb-20">
+      <StaggerContainer className="space-y-4 pb-24">
         <StaggerItem>
-          <h1 className="text-2xl font-bold text-[var(--text)]">
-            Commitment Tracker
-          </h1>
+          <h1 className="text-2xl font-bold text-[var(--text)]">Commitments</h1>
         </StaggerItem>
 
-        {/* Stats */}
         <StaggerItem>
-          <div className="grid grid-cols-2 gap-3">
-            <motion.div whileHover={{ scale: 1.02 }} className="card p-3">
-              <span className="label text-[10px] tracking-widest text-[var(--text-dim)]">ALL-TIME RATE</span>
-              <p className={`data text-2xl font-bold mt-1 ${rate >= 80 ? 'text-[var(--accent)]' : rate >= 50 ? 'text-[var(--amber)]' : 'text-[var(--rose)]'}`}>
-                {rate}%
-              </p>
-              <p className="text-xs text-[var(--text-dim)]">{fulfilled}/{total} kept</p>
-            </motion.div>
-            <motion.div whileHover={{ scale: 1.02 }} className="card p-3">
-              <span className="label text-[10px] tracking-widest text-[var(--text-dim)]">30-DAY RATE</span>
-              <p className={`data text-2xl font-bold mt-1 ${recentRate >= 80 ? 'text-[var(--accent)]' : recentRate >= 50 ? 'text-[var(--amber)]' : 'text-[var(--rose)]'}`}>
-                {recentRate}%
-              </p>
-              <p className="text-xs text-[var(--text-dim)]">{recentFulfilled}/{recent.length} kept</p>
-            </motion.div>
-          </div>
-        </StaggerItem>
-
-        {/* Add */}
-        <StaggerItem>
-          <div className="card p-3">
-            <span className="label text-[10px] tracking-widest text-[var(--accent)] mb-2 block">ADD COMMITMENT</span>
-            <div className="space-y-2">
-              <input
-                type="text"
-                placeholder="What did you commit to?"
-                value={text}
-                onChange={(e) => setText(e.target.value)}
-                onKeyDown={(e) => e.key === 'Enter' && handleAdd()}
-                className="w-full rounded-lg border border-[var(--border)] bg-[var(--bg)] px-3 py-2 text-sm text-[var(--text)] placeholder:text-[var(--text-dim)] outline-none focus:border-[var(--accent)]"
-              />
-              <div className="flex gap-2">
-                <input
-                  type="text"
-                  placeholder="Source (who/where)"
-                  value={source}
-                  onChange={(e) => setSource(e.target.value)}
-                  className="flex-1 rounded-lg border border-[var(--border)] bg-[var(--bg)] px-3 py-2 text-xs text-[var(--text)] placeholder:text-[var(--text-dim)] outline-none"
-                />
-                <input
-                  type="date"
-                  value={dueDate}
-                  onChange={(e) => setDueDate(e.target.value)}
-                  className="rounded-lg border border-[var(--border)] bg-[var(--bg)] px-3 py-2 text-xs text-[var(--text)] outline-none"
-                />
-                <motion.button
-                  whileHover={{ scale: 1.05 }}
-                  whileTap={{ scale: 0.95 }}
-                  onClick={handleAdd}
-                  className="rounded-lg bg-[var(--accent)] px-4 py-2 text-xs font-semibold text-[var(--bg)]"
-                >
-                  Add
-                </motion.button>
-              </div>
+          <div className="card p-4">
+            <p className="text-[15px] text-[var(--text)]">
+              <span className="font-semibold">{fulfilled}</span>/{total} commitments fulfilled ({pct}%)
+            </p>
+            <div className="mt-2 h-2 overflow-hidden rounded-full bg-[var(--surface2)]">
+              <div className="h-2 rounded-full bg-[var(--accent)] transition-all" style={{ width: `${pct}%` }} />
             </div>
           </div>
         </StaggerItem>
 
-        {/* List */}
-        <div className="space-y-2">
-          {sorted.map((c) => (
-            <StaggerItem key={c.id}>
-              <motion.div
-                whileHover={{ scale: 1.01 }}
-                transition={{ type: 'spring', stiffness: 400, damping: 25 }}
-                className={`card p-3 flex items-start gap-3 ${
-                  c.fulfilled ? 'border-[var(--accent)]/20' : 'border-[var(--border)]'
+        <StaggerItem>
+          <div className="flex rounded-[12px] border border-[var(--border)] p-1">
+            {(['active', 'fulfilled', 'all'] as const).map((t) => (
+              <button
+                key={t}
+                type="button"
+                onClick={() => setTab(t)}
+                className={`flex-1 rounded-[10px] py-2 text-[13px] font-medium capitalize ${
+                  tab === t ? 'bg-[var(--accent)] text-black' : 'text-[var(--text-secondary)]'
                 }`}
               >
-                <motion.button
-                  whileHover={{ scale: 1.2 }}
-                  whileTap={{ scale: 0.9 }}
-                  onClick={() => {
-                    if (!c.fulfilled) {
-                      fulfillCommitment(c.id)
-                      toast.success('Commitment fulfilled!')
-                    }
-                  }}
-                  className={`mt-0.5 w-5 h-5 rounded border flex items-center justify-center shrink-0 ${
-                    c.fulfilled ? 'bg-[var(--accent)] border-[var(--accent)]' : 'border-[var(--border)] hover:border-[var(--accent)]'
-                  }`}
-                >
-                  {c.fulfilled && <span className="text-[var(--bg)] text-xs">&#10003;</span>}
-                </motion.button>
-                <div className="flex-1 min-w-0">
-                  <p className={`text-sm ${c.fulfilled ? 'line-through text-[var(--text-dim)]' : 'text-[var(--text)]'}`}>
-                    {c.text}
-                  </p>
-                  <div className="mt-1 flex items-center gap-2 text-[10px] text-[var(--text-dim)]">
-                    <span>From: {c.source}</span>
-                    {c.dueDate && <span>Due: {c.dueDate}</span>}
-                    <span>{new Date(c.createdAt).toLocaleDateString()}</span>
-                  </div>
-                </div>
-              </motion.div>
-            </StaggerItem>
-          ))}
-          {commitments.length === 0 && (
-            <p className="text-center text-sm text-[var(--text-dim)] py-10">No commitments tracked yet.</p>
+                {t}
+              </button>
+            ))}
+          </div>
+        </StaggerItem>
+
+        <StaggerItem>
+          <button
+            type="button"
+            onClick={() => setShowAdd(!showAdd)}
+            className="w-full rounded-[12px] border border-[var(--border)] py-3 text-[14px] font-semibold text-[var(--accent)]"
+          >
+            + Add Commitment
+          </button>
+          {showAdd && (
+            <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} className="card mt-3 space-y-3 p-4">
+              <input
+                value={text}
+                onChange={(e) => setText(e.target.value)}
+                placeholder="What are you committing to?"
+                className="w-full rounded-[10px] border border-[var(--border)] bg-[var(--bg-elevated)] px-3 py-2 text-[14px] text-[var(--text)]"
+              />
+              <input
+                type="date"
+                value={dueDate}
+                onChange={(e) => setDueDate(e.target.value)}
+                className="w-full rounded-[10px] border border-[var(--border)] bg-[var(--bg-elevated)] px-3 py-2 text-[14px]"
+              />
+              <div className="flex gap-2">
+                <button type="button" onClick={handleAdd} className="flex-1 rounded-[10px] bg-[var(--accent)] py-2.5 text-[14px] font-semibold text-black">
+                  Save
+                </button>
+                <button type="button" onClick={() => setShowAdd(false)} className="rounded-[10px] border border-[var(--border)] px-4 py-2 text-[13px]">
+                  Cancel
+                </button>
+              </div>
+            </motion.div>
           )}
+        </StaggerItem>
+
+        <div className="space-y-2">
+          {filtered.map((c) => {
+            const overdue =
+              !c.fulfilled &&
+              !!c.dueDate &&
+              (() => {
+                const t0 = new Date()
+                t0.setHours(0, 0, 0, 0)
+                const d = new Date(c.dueDate + 'T12:00:00')
+                d.setHours(0, 0, 0, 0)
+                return d.getTime() < t0.getTime()
+              })()
+            const tone = dueTone(c)
+            return (
+              <StaggerItem key={c.id}>
+                <div
+                  className={`card p-4 ${overdue ? 'border-l-[3px] border-l-[var(--negative)]' : ''}`}
+                >
+                  <p className="body text-[15px] text-[var(--text)]">{c.text}</p>
+                  <p className="caption mt-1 text-[12px] text-[var(--text-dim)]">{formatSourceLine(c)}</p>
+                  <p className={`mt-2 text-[13px] ${tone.className}`}>{tone.label}</p>
+                  {!c.fulfilled && (
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          fulfillCommitment(c.id)
+                          toast.success('Marked fulfilled')
+                        }}
+                        className="rounded-[10px] bg-[var(--positive)]/15 px-3 py-1.5 text-[13px] font-medium text-[var(--positive)]"
+                      >
+                        Mark Fulfilled ✓
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (typeof window !== 'undefined' && !window.confirm('Remove this commitment?')) return
+                          removeCommitment(c.id)
+                          toast.success('Removed')
+                        }}
+                        className="text-[13px] text-[var(--text-dim)] underline"
+                      >
+                        Remove
+                      </button>
+                    </div>
+                  )}
+                </div>
+              </StaggerItem>
+            )
+          })}
         </div>
+
+        {commitments.length === 0 && (
+          <p className="px-2 text-center text-[15px] leading-relaxed text-[var(--text-secondary)]">
+            No commitments yet. When you tell the AI &quot;I&apos;ll do X,&quot; it gets logged here. You can also add commitments manually.{' '}
+            <button type="button" onClick={() => setShowAdd(true)} className="font-medium text-[var(--accent)]">
+              + Add Commitment
+            </button>
+          </p>
+        )}
       </StaggerContainer>
     </PageTransition>
   )

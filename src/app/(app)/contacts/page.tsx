@@ -17,16 +17,19 @@ const ROLE_COLORS: Record<string, string> = {
   other: 'bg-zinc-500/15 text-zinc-400 border-zinc-500/20',
 }
 
+/** Days since last contact — higher = staler */
 function daysSince(dateStr?: string): number {
-  if (!dateStr) return 999
+  if (!dateStr) return 9999
   const diff = Date.now() - new Date(dateStr).getTime()
   return Math.floor(diff / (1000 * 60 * 60 * 24))
 }
 
-function daysColor(days: number): string {
-  if (days < 3) return 'text-green-400'
-  if (days <= 7) return 'text-amber-400'
-  return 'text-rose-400'
+/** PRD: green &lt;14d, orange &gt;30d, red &gt;90d */
+function agingClass(days: number): string {
+  if (days < 14) return 'text-emerald-400'
+  if (days > 90) return 'text-red-400'
+  if (days > 30) return 'text-orange-400'
+  return 'text-[var(--text-mid)]'
 }
 
 export default function ContactsPage() {
@@ -37,8 +40,12 @@ export default function ContactsPage() {
   const [expandedId, setExpandedId] = useState<string | null>(null)
   const [hoveredId, setHoveredId] = useState<string | null>(null)
 
-  const sortedContacts = [...contacts].sort((a, b) => daysSince(b.lastContact) - daysSince(a.lastContact))
-  const goingCold = sortedContacts.filter(c => daysSince(c.lastContact) > 7)
+  /** Oldest last-contact first (need attention most) */
+  const sortedContacts = [...contacts].sort((a, b) => {
+    const ta = a.lastContact ? new Date(a.lastContact).getTime() : 0
+    const tb = b.lastContact ? new Date(b.lastContact).getTime() : 0
+    return ta - tb
+  })
 
   const handleAdd = () => {
     if (!name.trim()) return
@@ -50,93 +57,62 @@ export default function ContactsPage() {
 
   const markContacted = (id: string) => {
     updateContact(id, { lastContact: new Date().toISOString() })
-    toast.success('Marked as contacted today')
+    toast.success('Last contact updated')
   }
 
   return (
     <PageTransition>
-      <div className="max-w-3xl mx-auto px-4 py-8">
+      <div className="mx-auto max-w-3xl px-4 py-8">
         <div className="mb-8">
           <h1 className="text-2xl font-semibold text-text">Relationships</h1>
-          <p className="text-sm text-text-dim mt-1">Track who matters. Don&apos;t let connections go cold.</p>
+          <p className="mt-1 text-sm text-text-dim">Sorted by last contact — oldest first.</p>
         </div>
 
-        {/* Add Contact Form */}
-        <div className="bg-surface2 border border-border rounded-[16px] p-4 mb-8 space-y-3">
+        <div className="mb-8 space-y-3 rounded-[16px] border border-border bg-surface2 p-4">
           <div className="flex gap-3">
             <input
               value={name}
-              onChange={e => setName(e.target.value)}
+              onChange={(e) => setName(e.target.value)}
               placeholder="Name"
-              className="flex-1 bg-surface3 border border-border rounded-[10px] px-3 py-2 text-sm text-text placeholder-text-dim outline-none focus:border-accent/50"
+              className="flex-1 rounded-[10px] border border-border bg-surface3 px-3 py-2 text-sm text-text placeholder-text-dim outline-none focus:border-accent/50"
             />
             <select
               value={role}
-              onChange={e => setRole(e.target.value)}
-              className="bg-surface3 border border-border rounded-[10px] px-3 py-2 text-sm text-text outline-none focus:border-accent/50"
+              onChange={(e) => setRole(e.target.value)}
+              className="rounded-[10px] border border-border bg-surface3 px-3 py-2 text-sm text-text outline-none focus:border-accent/50"
             >
-              {ROLES.map(r => <option key={r} value={r}>{r}</option>)}
+              {ROLES.map((r) => (
+                <option key={r} value={r}>
+                  {r}
+                </option>
+              ))}
             </select>
           </div>
           <input
             value={notes}
-            onChange={e => setNotes(e.target.value)}
+            onChange={(e) => setNotes(e.target.value)}
             placeholder="Notes (optional)"
-            className="w-full bg-surface3 border border-border rounded-[10px] px-3 py-2 text-sm text-text placeholder-text-dim outline-none focus:border-accent/50"
+            className="w-full rounded-[10px] border border-border bg-surface3 px-3 py-2 text-sm text-text placeholder-text-dim outline-none focus:border-accent/50"
           />
           <motion.button
             whileHover={{ scale: 1.02 }}
             whileTap={{ scale: 0.98 }}
             onClick={handleAdd}
-            className="px-4 py-2 rounded-[10px] bg-accent text-bg text-sm font-medium hover:bg-accent/80 transition-colors"
+            className="rounded-[10px] bg-accent px-4 py-2 text-sm font-medium text-bg hover:bg-accent/80"
           >
             Add Contact
           </motion.button>
         </div>
 
-        {/* Going Cold Section */}
-        {goingCold.length > 0 && (
-          <div className="mb-8">
-            <h2 className="text-xs font-mono uppercase tracking-[2px] text-rose-400 mb-3">Going Cold</h2>
-            <div className="space-y-2">
-              {goingCold.map(c => {
-                const days = daysSince(c.lastContact)
-                return (
-                  <motion.div
-                    key={c.id}
-                    initial={{ opacity: 0, y: 6 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    className="bg-rose-500/5 border border-rose-500/20 rounded-[12px] px-4 py-3 flex items-center justify-between"
-                  >
-                    <div>
-                      <span className="text-[14px] font-semibold text-text">{c.name}</span>
-                      <span className={`ml-2 text-[11px] px-2 py-0.5 rounded-full border ${ROLE_COLORS[c.role] || ROLE_COLORS.other}`}>{c.role}</span>
-                      <p className="text-rose-400 text-xs mt-0.5">Last contacted: {days} days ago</p>
-                    </div>
-                    <motion.button
-                      whileHover={{ scale: 1.05 }}
-                      whileTap={{ scale: 0.95 }}
-                      onClick={() => markContacted(c.id)}
-                      className="text-xs px-3 py-1.5 rounded-[8px] bg-surface3 border border-border hover:border-accent/40 text-text-mid hover:text-text transition-colors"
-                    >
-                      Contacted Today
-                    </motion.button>
-                  </motion.div>
-                )
-              })}
-            </div>
-          </div>
-        )}
-
-        {/* All Contacts */}
         <div>
-          <h2 className="text-xs font-mono uppercase tracking-[2px] text-text-dim mb-3">All Contacts ({sortedContacts.length})</h2>
+          <h2 className="mb-3 text-xs font-mono uppercase tracking-[2px] text-text-dim">All Contacts ({sortedContacts.length})</h2>
           <div className="space-y-2">
             <AnimatePresence>
-              {sortedContacts.map(c => {
+              {sortedContacts.map((c) => {
                 const days = daysSince(c.lastContact)
                 const isExpanded = expandedId === c.id
                 const isHovered = hoveredId === c.id
+                const ageCls = agingClass(days)
                 return (
                   <motion.div
                     key={c.id}
@@ -146,29 +122,29 @@ export default function ContactsPage() {
                     exit={{ opacity: 0, y: -6 }}
                     onMouseEnter={() => setHoveredId(c.id)}
                     onMouseLeave={() => setHoveredId(null)}
-                    className="bg-surface2 border border-border rounded-[12px] px-4 py-3"
+                    className="rounded-[12px] border border-border bg-surface2 px-4 py-3"
                   >
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2 flex-1 min-w-0">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <div className="flex min-w-0 flex-1 items-center gap-2">
                         <span className="text-[14px] font-semibold text-text">{c.name}</span>
-                        <span className={`text-[11px] px-2 py-0.5 rounded-full border shrink-0 ${ROLE_COLORS[c.role] || ROLE_COLORS.other}`}>{c.role}</span>
+                        <span className={`shrink-0 rounded-full border px-2 py-0.5 text-[11px] ${ROLE_COLORS[c.role] || ROLE_COLORS.other}`}>{c.role}</span>
                       </div>
-                      <div className="flex items-center gap-3">
-                        <span className={`text-xs ${daysColor(days)}`}>
-                          {c.lastContact ? `Last contacted: ${days} days ago` : 'Never contacted'}
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className={`text-xs ${ageCls}`}>
+                          {c.lastContact ? `${days}d since contact` : 'Never contacted'}
                         </span>
                         <motion.button
                           whileHover={{ scale: 1.05 }}
                           whileTap={{ scale: 0.95 }}
                           onClick={() => markContacted(c.id)}
-                          className="text-[10px] px-2 py-1 rounded-[6px] bg-surface3 border border-border hover:border-accent/40 text-text-dim hover:text-text transition-colors"
+                          className="rounded-[8px] border border-border bg-surface3 px-3 py-1.5 text-[11px] text-text-mid hover:border-accent/40 hover:text-text"
                         >
-                          Today
+                          Update Last Contact
                         </motion.button>
                         {c.notes && (
                           <button
                             onClick={() => setExpandedId(isExpanded ? null : c.id)}
-                            className="text-text-dim hover:text-text text-xs transition-colors"
+                            className="text-xs text-text-dim transition-colors hover:text-text"
                           >
                             {isExpanded ? '−' : '+'}
                           </button>
@@ -177,8 +153,11 @@ export default function ContactsPage() {
                           <motion.button
                             initial={{ opacity: 0 }}
                             animate={{ opacity: 1 }}
-                            onClick={() => { deleteContact(c.id); toast('Contact deleted') }}
-                            className="text-rose-400 hover:text-rose-300 text-xs transition-colors"
+                            onClick={() => {
+                              deleteContact(c.id)
+                              toast('Contact deleted')
+                            }}
+                            className="text-xs text-rose-400 transition-colors hover:text-rose-300"
                           >
                             Delete
                           </motion.button>
@@ -193,7 +172,7 @@ export default function ContactsPage() {
                           exit={{ height: 0, opacity: 0 }}
                           className="overflow-hidden"
                         >
-                          <p className="text-xs text-text-dim mt-2 pt-2 border-t border-border">{c.notes}</p>
+                          <p className="mt-2 border-t border-border pt-2 text-xs text-text-dim">{c.notes}</p>
                         </motion.div>
                       )}
                     </AnimatePresence>
@@ -201,9 +180,7 @@ export default function ContactsPage() {
                 )
               })}
             </AnimatePresence>
-            {sortedContacts.length === 0 && (
-              <p className="text-center text-text-dim text-sm py-8">No contacts yet. Add someone above.</p>
-            )}
+            {sortedContacts.length === 0 && <p className="py-8 text-center text-sm text-text-dim">No contacts yet. Add someone above.</p>}
           </div>
         </div>
       </div>

@@ -1,18 +1,15 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
-import { motion, AnimatePresence } from 'framer-motion'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { AnimatePresence, motion } from 'framer-motion'
 import { toast } from 'sonner'
+import { Drawer } from 'vaul'
 import { useStore } from '@/stores/store'
 import PageTransition from '@/components/PageTransition'
+import type { FocusSession, Priority } from '@/stores/store'
 
-const cardAnim = (delay: number) => ({
-  initial: { opacity: 0, y: 12 } as const,
-  animate: { opacity: 1, y: 0 } as const,
-  transition: { delay, duration: 0.35 },
-})
-
-const DURATIONS = [25, 50, 90]
+const PRI_ORDER: Record<Priority, number> = { crit: 0, high: 1, med: 2, low: 3 }
+const DURATION_CHIPS = [25, 45, 60, 90] as const
 
 function formatTimer(seconds: number) {
   const m = Math.floor(seconds / 60)
@@ -20,252 +17,441 @@ function formatTimer(seconds: number) {
   return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`
 }
 
+function formatSessionWhen(iso: string) {
+  const d = new Date(iso)
+  return d.toLocaleString(undefined, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })
+}
+
+/** 120px outer ring — SVG viewBox 100 100, r=40 */
+function TimerRing({ progress }: { progress: number }) {
+  const r = 40
+  const c = 2 * Math.PI * r
+  const off = c * (1 - Math.min(1, Math.max(0, progress)))
+  return (
+    <svg width={120} height={120} viewBox="0 0 100 100" className="shrink-0">
+      <circle cx={50} cy={50} r={r} fill="none" stroke="var(--surface2)" strokeWidth={8} />
+      <circle
+        cx={50}
+        cy={50}
+        r={r}
+        fill="none"
+        stroke="var(--accent)"
+        strokeWidth={8}
+        strokeLinecap="round"
+        strokeDasharray={c}
+        strokeDashoffset={off}
+        transform="rotate(-90 50 50)"
+        className="transition-[stroke-dashoffset] duration-1000 ease-linear"
+      />
+    </svg>
+  )
+}
+
 export default function FocusPage() {
-  const { focusSessions, addFocusSession, updateFocusSession, tasks, projects, goals } = useStore()
+  const { focusSessions, addFocusSession, updateFocusSession, tasks, projects, addXp } = useStore()
+
+  const [configOpen, setConfigOpen] = useState(false)
+  const [completeOpen, setCompleteOpen] = useState(false)
+
+  const [selectedTaskId, setSelectedTaskId] = useState('')
+  const [selectedProjectId, setSelectedProjectId] = useState('')
+  const [durationMin, setDurationMin] = useState(25)
+  const [customMin, setCustomMin] = useState('')
 
   const [isActive, setIsActive] = useState(false)
   const [isPaused, setIsPaused] = useState(false)
-  const [duration, setDuration] = useState(50)
-  const [timeLeft, setTimeLeft] = useState(50 * 60)
-  const [selectedTaskId, setSelectedTaskId] = useState('')
+  const [timeLeft, setTimeLeft] = useState(25 * 60)
+  const [plannedSeconds, setPlannedSeconds] = useState(25 * 60)
   const [distractions, setDistractions] = useState(0)
   const [sessionId, setSessionId] = useState<string | null>(null)
-  const [showRating, setShowRating] = useState(false)
-  const [rating, setRating] = useState(3)
+
+  const [quality, setQuality] = useState(3)
   const [sessionNotes, setSessionNotes] = useState('')
-  const intervalRef = useRef<NodeJS.Timeout | null>(null)
 
-  const incompleteTasks = tasks.filter(t => !t.done)
-  const todayStr = new Date().toISOString().split('T')[0]
-  const todaySessions = focusSessions.filter(s => s.startedAt.startsWith(todayStr))
-  const totalFocusToday = todaySessions.reduce((sum, s) => sum + (s.duration || 0), 0)
-  const avgQuality = todaySessions.filter(s => s.quality).length > 0
-    ? Math.round(todaySessions.filter(s => s.quality).reduce((sum, s) => sum + (s.quality || 0), 0) / todaySessions.filter(s => s.quality).length)
-    : 0
+  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
-  // Timer effect
-  useEffect(() => {
-    if (isActive && !isPaused && timeLeft > 0) {
-      intervalRef.current = setInterval(() => {
-        setTimeLeft(prev => {
-          if (prev <= 1) {
-            clearInterval(intervalRef.current!)
-            handleSessionEnd()
-            return 0
-          }
-          return prev - 1
-        })
-      }, 1000)
-    }
-    return () => { if (intervalRef.current) clearInterval(intervalRef.current) }
-  }, [isActive, isPaused])
+  const sortedTasks = useMemo(() => {
+    return tasks
+      .filter((t) => !t.done)
+      .sort((a, b) => PRI_ORDER[a.priority] - PRI_ORDER[b.priority])
+  }, [tasks])
 
-  const startSession = () => {
-    const now = new Date().toISOString()
-    const task = tasks.find(t => t.id === selectedTaskId)
-    addFocusSession({
-      taskId: selectedTaskId || undefined,
-      projectId: task?.projectId || undefined,
-      startedAt: now,
-      duration: duration,
-      distractions: 0,
-    })
-    // Get the ID of the session we just added
-    const sessions = useStore.getState().focusSessions
-    const newSession = sessions[sessions.length - 1]
-    setSessionId(newSession?.id || null)
-    setTimeLeft(duration * 60)
-    setDistractions(0)
-    setIsActive(true)
-    setIsPaused(false)
-    toast.success(`Focus session started — ${duration} minutes`)
-  }
+  const filteredProjects = useMemo(() => {
+    if (!selectedTaskId) return projects
+    const t = tasks.find((x) => x.id === selectedTaskId)
+    if (t?.projectId) return projects.filter((p) => p.id === t.projectId)
+    return projects
+  }, [projects, tasks, selectedTaskId])
 
-  const handleSessionEnd = () => {
+  const selectedTask = tasks.find((t) => t.id === selectedTaskId)
+  const effectiveProjectId = selectedTask?.projectId || selectedProjectId || undefined
+
+  const endSession = useCallback(() => {
     setIsActive(false)
     setIsPaused(false)
     if (intervalRef.current) clearInterval(intervalRef.current)
-    setShowRating(true)
-    toast.success('Session complete!')
+    setCompleteOpen(true)
+  }, [])
+
+  useEffect(() => {
+    if (!isActive || isPaused || timeLeft <= 0) return
+    intervalRef.current = setInterval(() => {
+      setTimeLeft((prev) => {
+        if (prev <= 1) {
+          if (intervalRef.current) clearInterval(intervalRef.current)
+          endSession()
+          return 0
+        }
+        return prev - 1
+      })
+    }, 1000)
+    return () => {
+      if (intervalRef.current) clearInterval(intervalRef.current)
+    }
+  }, [isActive, isPaused, endSession])
+
+  const applyDurationChip = (m: number) => {
+    setDurationMin(m)
+    setCustomMin('')
+    setTimeLeft(m * 60)
+    setPlannedSeconds(m * 60)
   }
 
-  const endSessionEarly = () => {
-    const elapsed = duration * 60 - timeLeft
-    const elapsedMin = Math.round(elapsed / 60)
-    if (sessionId) {
-      updateFocusSession(sessionId, { endedAt: new Date().toISOString(), duration: elapsedMin, distractions })
-    }
-    handleSessionEnd()
+  const selectCustomChip = () => {
+    setCustomMin((c) => {
+      if (c.trim()) {
+        setTimeLeft(durationMin * 60)
+        setPlannedSeconds(durationMin * 60)
+        return ''
+      }
+      setTimeLeft(45 * 60)
+      setPlannedSeconds(45 * 60)
+      return '45'
+    })
   }
 
-  const submitRating = () => {
-    if (sessionId) {
-      updateFocusSession(sessionId, { quality: rating, notes: sessionNotes, endedAt: new Date().toISOString(), distractions })
+  const openConfigAndPrime = () => {
+    const m = customMin.trim() ? Math.min(240, Math.max(1, parseInt(customMin, 10) || durationMin)) : durationMin
+    setDurationMin(m)
+    setTimeLeft(m * 60)
+    setPlannedSeconds(m * 60)
+    setConfigOpen(true)
+  }
+
+  const startSession = () => {
+    const m = customMin.trim() ? Math.min(240, Math.max(1, parseInt(customMin, 10) || durationMin)) : durationMin
+    const secs = m * 60
+    const now = new Date().toISOString()
+    addFocusSession({
+      taskId: selectedTaskId || undefined,
+      projectId: effectiveProjectId,
+      startedAt: now,
+      duration: m,
+      distractions: 0,
+    })
+    const sessions = useStore.getState().focusSessions
+    const newSession = sessions[sessions.length - 1]
+    setSessionId(newSession?.id ?? null)
+    setTimeLeft(secs)
+    setPlannedSeconds(secs)
+    setDistractions(0)
+    setIsActive(true)
+    setIsPaused(false)
+    setConfigOpen(false)
+    toast.success(`Focus session — ${m} min`)
+  }
+
+  const saveCompletedSession = () => {
+    if (!sessionId) {
+      setCompleteOpen(false)
+      setSessionNotes('')
+      setQuality(3)
+      return
     }
-    setShowRating(false)
+    const elapsedMin = Math.max(1, Math.round((plannedSeconds - Math.min(plannedSeconds, timeLeft)) / 60))
+    updateFocusSession(sessionId, {
+      quality,
+      notes: sessionNotes.trim() || undefined,
+      endedAt: new Date().toISOString(),
+      distractions,
+      duration: elapsedMin,
+    })
+    const day = new Date().toISOString().split('T')[0]
+    const already = useStore.getState().focusSessions.filter(
+      (s) => s.startedAt.startsWith(day) && s.quality != null && s.id !== sessionId
+    ).length
+    if (already < 4) addXp(5)
+    setCompleteOpen(false)
     setSessionId(null)
     setSessionNotes('')
-    setRating(3)
-    toast.success('Session rated')
+    setQuality(3)
+    toast.success('Session saved')
   }
 
-  const completeTask = () => {
-    if (selectedTaskId) {
-      const { toggleTask } = useStore.getState()
-      toggleTask(selectedTaskId)
-      toast.success('Task completed!')
-    }
-    endSessionEarly()
-  }
+  const ringProgress = plannedSeconds > 0 ? timeLeft / plannedSeconds : 0
 
-  const selectedTask = tasks.find(t => t.id === selectedTaskId)
-  const linkedProject = selectedTask?.projectId ? projects.find(p => p.id === selectedTask.projectId) : null
-  const linkedGoal = linkedProject?.goalId ? goals.find(g => g.id === linkedProject.goalId) : null
+  const history = useMemo(() => {
+    return [...focusSessions].sort((a, b) => new Date(b.startedAt).getTime() - new Date(a.startedAt).getTime())
+  }, [focusSessions])
+
+  const empty = history.length === 0 && !isActive
 
   return (
     <PageTransition>
-      <div className="space-y-6 max-w-3xl mx-auto">
-        {/* Header */}
-        <motion.div {...cardAnim(0)}>
-          <h1 className="text-[22px] font-bold text-[var(--text)]">Focus Mode</h1>
-          <p className="text-[13px] text-[var(--text-dim)] mt-1">Deep work. One task. No distractions.</p>
-        </motion.div>
+      <div className="mx-auto max-w-lg space-y-6 pb-24">
+        <div>
+          <h1 className="text-[22px] font-bold text-[var(--text)]">Focus Sessions</h1>
+          <p className="mt-1 text-[13px] text-[var(--text-dim)]">Deep work, tracked.</p>
+        </div>
 
-        {/* Rating Modal */}
-        <AnimatePresence>
-          {showRating && (
-            <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }} className="rounded-[16px] border border-[var(--border)] bg-[var(--bg-elevated)] p-6 space-y-4">
-              <h3 className="text-[16px] font-semibold text-[var(--text)] text-center">Rate this session</h3>
-              <div className="flex justify-center gap-3">
-                {[1, 2, 3, 4, 5].map(q => (
-                  <button key={q} onClick={() => setRating(q)} className={`w-12 h-12 rounded-[10px] text-[16px] font-bold border transition-colors ${rating === q ? 'border-[var(--accent)] text-black bg-[var(--accent)]' : 'border-[var(--border)] text-[var(--text-dim)]'}`}>
-                    {q}
-                  </button>
-                ))}
+        {history.length > 0 && !isActive && (
+          <button
+            type="button"
+            onClick={openConfigAndPrime}
+            className="w-full rounded-[14px] bg-[var(--accent)] py-3.5 text-[15px] font-semibold text-black"
+          >
+            Start Focus Session
+          </button>
+        )}
+
+        <Drawer.Root open={configOpen} onOpenChange={setConfigOpen}>
+          <Drawer.Portal>
+            <Drawer.Overlay className="fixed inset-0 z-[80] bg-black/50" />
+            <Drawer.Content className="fixed bottom-0 left-0 right-0 z-[90] max-h-[88vh] rounded-t-[20px] border border-[var(--border)] bg-[var(--surface)] p-6">
+              <div className="mx-auto mb-3 h-1 w-10 rounded-full bg-[var(--border)]" />
+              <Drawer.Title className="text-lg font-semibold text-[var(--text)]">Configure session</Drawer.Title>
+              <div className="mt-4 space-y-4">
+                <div>
+                  <label className="mb-1.5 block text-[11px] text-[var(--text-dim)]">Task (priority order)</label>
+                  <select
+                    value={selectedTaskId}
+                    onChange={(e) => {
+                      setSelectedTaskId(e.target.value)
+                      setSelectedProjectId('')
+                    }}
+                    className="w-full rounded-[10px] border border-[var(--border)] bg-[var(--bg-elevated)] px-3 py-2.5 text-[13px] text-[var(--text)]"
+                  >
+                    <option value="">Optional — pick a task</option>
+                    {sortedTasks.map((t) => (
+                      <option key={t.id} value={t.id}>
+                        [{t.priority}] {t.text.slice(0, 80)}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="mb-1.5 block text-[11px] text-[var(--text-dim)]">Project (optional)</label>
+                  <select
+                    value={selectedProjectId}
+                    onChange={(e) => setSelectedProjectId(e.target.value)}
+                    disabled={!!selectedTask?.projectId}
+                    className="w-full rounded-[10px] border border-[var(--border)] bg-[var(--bg-elevated)] px-3 py-2.5 text-[13px] text-[var(--text)] disabled:opacity-50"
+                  >
+                    <option value="">None</option>
+                    {filteredProjects.map((p) => (
+                      <option key={p.id} value={p.id}>
+                        {p.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="mb-1.5 block text-[11px] text-[var(--text-dim)]">Duration</label>
+                  <div className="flex flex-wrap gap-2">
+                    {DURATION_CHIPS.map((d) => (
+                      <button
+                        key={d}
+                        type="button"
+                        onClick={() => applyDurationChip(d)}
+                        className={`rounded-[10px] px-3 py-2 text-[13px] font-semibold ${
+                          durationMin === d && !customMin.trim()
+                            ? 'bg-[var(--accent)] text-black'
+                            : 'border border-[var(--border)] text-[var(--text-secondary)]'
+                        }`}
+                      >
+                        {d} min
+                      </button>
+                    ))}
+                    <button
+                      type="button"
+                      onClick={selectCustomChip}
+                      className={`rounded-[10px] px-3 py-2 text-[13px] font-semibold ${
+                        customMin.trim() ? 'bg-[var(--accent)] text-black' : 'border border-[var(--border)] text-[var(--text-secondary)]'
+                      }`}
+                    >
+                      Custom
+                    </button>
+                  </div>
+                  {customMin.trim() !== '' && (
+                    <input
+                      type="number"
+                      min={1}
+                      max={240}
+                      value={customMin}
+                      onChange={(e) => {
+                        setCustomMin(e.target.value)
+                        const m = Math.min(240, Math.max(1, parseInt(e.target.value, 10) || 1))
+                        setTimeLeft(m * 60)
+                        setPlannedSeconds(m * 60)
+                      }}
+                      className="mt-2 w-full rounded-[10px] border border-[var(--border)] bg-[var(--bg-elevated)] px-3 py-2 text-[13px]"
+                      placeholder="Minutes"
+                    />
+                  )}
+                </div>
+                <button
+                  type="button"
+                  onClick={startSession}
+                  className="w-full rounded-[12px] bg-[var(--accent)] py-3 text-[15px] font-semibold text-black"
+                >
+                  Start
+                </button>
               </div>
-              <textarea placeholder="Session notes (optional)" value={sessionNotes} onChange={e => setSessionNotes(e.target.value)} rows={2} className="w-full px-3 py-2 rounded-[8px] bg-[var(--surface2)] border border-[var(--border)] text-[13px] text-[var(--text)] outline-none resize-none" />
-              <button onClick={submitRating} className="w-full px-4 py-2.5 rounded-[10px] text-[13px] font-semibold bg-[var(--accent)] text-black">Save & Close</button>
+            </Drawer.Content>
+          </Drawer.Portal>
+        </Drawer.Root>
+
+        <AnimatePresence>
+          {isActive && (
+            <motion.div
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0 }}
+              className="card space-y-6 px-5 py-8 text-center"
+            >
+              {selectedTask && <p className="headline text-[17px] font-semibold text-[var(--text)]">{selectedTask.text}</p>}
+              <div className="flex flex-col items-center justify-center gap-4">
+                <div className="relative flex h-[120px] w-[120px] items-center justify-center">
+                  <div className="absolute inset-0 flex items-center justify-center">
+                    <TimerRing progress={ringProgress} />
+                  </div>
+                  <p className="relative z-10 font-mono text-[40px] font-bold leading-none tabular-nums text-[var(--accent)]">
+                    {formatTimer(timeLeft)}
+                  </p>
+                </div>
+                <p className="text-[12px] uppercase tracking-wider text-[var(--text-dim)]">{isPaused ? 'Paused' : 'Focusing'}</p>
+              </div>
+              <div className="flex flex-wrap items-center justify-center gap-3">
+                <button
+                  type="button"
+                  onClick={() => setIsPaused((p) => !p)}
+                  className="rounded-[10px] border border-[var(--border)] px-5 py-2.5 text-[13px] font-semibold text-[var(--text)]"
+                >
+                  {isPaused ? 'Resume' : 'Pause'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    endSession()
+                  }}
+                  className="text-[15px] font-medium text-[var(--accent)] underline-offset-4 hover:underline"
+                >
+                  End Session
+                </button>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setDistractions((d) => {
+                    const n = d + 1
+                    if (sessionId) updateFocusSession(sessionId, { distractions: n })
+                    return n
+                  })
+                  toast.message('Distraction logged')
+                }}
+                className="w-full text-[15px] text-[var(--text-secondary)]"
+              >
+                Distractions: {distractions}
+              </button>
             </motion.div>
           )}
         </AnimatePresence>
 
-        {/* Active Session */}
-        {isActive && !showRating && (
-          <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} className="rounded-[16px] border border-[var(--border)] bg-[var(--bg-elevated)] p-8 text-center space-y-6">
-            {/* Timer */}
-            <div>
-              <p className="text-[48px] font-mono font-bold text-[var(--accent)] tracking-wider">
-                {formatTimer(timeLeft)}
-              </p>
-              <p className="text-[12px] text-[var(--text-dim)] mt-2">{isPaused ? 'PAUSED' : 'FOCUSING'}</p>
-            </div>
-
-            {/* Context chain */}
-            {selectedTask && (
-              <div className="space-y-1">
-                <p className="text-[14px] font-semibold text-[var(--text)]">{selectedTask.text}</p>
-                {linkedProject && <p className="text-[12px] text-[var(--text-dim)]">Project: {linkedProject.name}</p>}
-                {linkedGoal && <p className="text-[12px] text-[var(--text-dim)]">Goal: {linkedGoal.title}</p>}
-              </div>
-            )}
-
-            {/* Controls */}
-            <div className="flex justify-center gap-3">
-              <button onClick={() => setIsPaused(!isPaused)} className="px-5 py-2.5 rounded-[10px] text-[13px] font-semibold border border-[var(--border)] text-[var(--text)] hover:bg-[var(--surface2)] transition-colors">
-                {isPaused ? 'Resume' : 'Pause'}
+        <Drawer.Root open={completeOpen} onOpenChange={setCompleteOpen}>
+          <Drawer.Portal>
+            <Drawer.Overlay className="fixed inset-0 z-[80] bg-black/50" />
+            <Drawer.Content className="fixed bottom-0 left-0 right-0 z-[90] max-h-[88vh] rounded-t-[20px] border border-[var(--border)] bg-[var(--surface)] p-6">
+              <div className="mx-auto mb-3 h-1 w-10 rounded-full bg-[var(--border)]" />
+              <Drawer.Title className="text-lg font-semibold text-[var(--text)]">Session complete</Drawer.Title>
+              <p className="mt-1 text-[13px] text-[var(--text-secondary)]">Rate focus quality (1–5)</p>
+              <input
+                type="range"
+                min={1}
+                max={5}
+                step={1}
+                value={quality}
+                onChange={(e) => setQuality(Number(e.target.value))}
+                className="mt-4 w-full accent-[var(--accent)]"
+              />
+              <div className="mt-1 text-center font-mono text-[20px] text-[var(--text)]">{quality}</div>
+              <textarea
+                value={sessionNotes}
+                onChange={(e) => setSessionNotes(e.target.value)}
+                placeholder="Notes (optional)"
+                rows={3}
+                className="mt-4 w-full resize-none rounded-[12px] border border-[var(--border)] bg-[var(--bg-elevated)] px-3 py-2 text-[13px] text-[var(--text)]"
+              />
+              <button
+                type="button"
+                onClick={saveCompletedSession}
+                className="mt-4 w-full rounded-[12px] bg-[var(--accent)] py-3 text-[15px] font-semibold text-black"
+              >
+                Save Session
               </button>
-              <button onClick={completeTask} className="px-5 py-2.5 rounded-[10px] text-[13px] font-semibold bg-[var(--accent)] text-black hover:opacity-90 transition-opacity">
-                Complete Task
-              </button>
-              <button onClick={endSessionEarly} className="px-5 py-2.5 rounded-[10px] text-[13px] font-semibold border border-[var(--rose)] text-[var(--rose)] hover:bg-[var(--rose)]/10 transition-colors">
-                End Session
-              </button>
-            </div>
+            </Drawer.Content>
+          </Drawer.Portal>
+        </Drawer.Root>
 
-            {/* Distraction counter */}
-            <div className="pt-2">
-              <button onClick={() => { setDistractions(d => d + 1); toast('Distraction logged', { icon: '😤' }) }} className="px-4 py-2 rounded-[8px] text-[11px] font-semibold text-[var(--text-dim)] border border-[var(--border)] hover:border-[var(--rose)] transition-colors">
-                +1 Distraction {distractions > 0 && `(${distractions})`}
-              </button>
-            </div>
-          </motion.div>
-        )}
-
-        {/* Idle State */}
-        {!isActive && !showRating && (
-          <motion.div {...cardAnim(0.05)} className="rounded-[16px] border border-[var(--border)] bg-[var(--bg-elevated)] p-6 space-y-5">
-            <h3 className="text-[16px] font-semibold text-[var(--text)] text-center">Start Focus Session</h3>
-
-            {/* Task selector */}
-            <div>
-              <label className="text-[11px] text-[var(--text-dim)] mb-1.5 block">What are you working on?</label>
-              <select value={selectedTaskId} onChange={e => setSelectedTaskId(e.target.value)} className="w-full px-3 py-2.5 rounded-[8px] bg-[var(--surface2)] border border-[var(--border)] text-[13px] text-[var(--text)] outline-none">
-                <option value="">Select a task (optional)</option>
-                {incompleteTasks.map(t => (
-                  <option key={t.id} value={t.id}>{t.text}</option>
-                ))}
-              </select>
-            </div>
-
-            {/* Duration selector */}
-            <div>
-              <label className="text-[11px] text-[var(--text-dim)] mb-1.5 block">Duration</label>
-              <div className="flex gap-2">
-                {DURATIONS.map(d => (
-                  <button key={d} onClick={() => { setDuration(d); setTimeLeft(d * 60) }} className={`flex-1 py-2.5 rounded-[8px] text-[13px] font-semibold border transition-colors ${duration === d ? 'border-[var(--accent)] text-black bg-[var(--accent)]' : 'border-[var(--border)] text-[var(--text-dim)]'}`}>
-                    {d} min
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            <button onClick={startSession} className="w-full px-4 py-3 rounded-[10px] text-[14px] font-bold bg-[var(--accent)] text-black hover:opacity-90 transition-opacity">
-              Start Focus
-            </button>
-
-            {/* Stats */}
-            <div className="grid grid-cols-3 gap-3 pt-2">
-              <div className="text-center">
-                <p className="data text-[20px] font-bold text-[var(--accent)]">{todaySessions.length}/4</p>
-                <p className="text-[11px] text-[var(--text-dim)]">Sessions today</p>
-              </div>
-              <div className="text-center">
-                <p className="data text-[20px] font-bold text-[var(--text)]">{totalFocusToday}m</p>
-                <p className="text-[11px] text-[var(--text-dim)]">Focus time</p>
-              </div>
-              <div className="text-center">
-                <p className="data text-[20px] font-bold text-[var(--text)]">{avgQuality || '—'}/5</p>
-                <p className="text-[11px] text-[var(--text-dim)]">Avg quality</p>
-              </div>
-            </div>
-          </motion.div>
-        )}
-
-        {/* Session History */}
-        {todaySessions.length > 0 && !isActive && !showRating && (
-          <motion.div {...cardAnim(0.15)} className="rounded-[16px] border border-[var(--border)] bg-[var(--bg-elevated)] p-5 space-y-3">
-            <h3 className="text-[14px] font-semibold text-[var(--text)]">Today&apos;s Sessions</h3>
+        {history.length > 0 && (
+          <div className="space-y-3">
+            <h2 className="text-[13px] font-semibold uppercase tracking-wider text-[var(--text-dim)]">History</h2>
             <div className="space-y-2">
-              {todaySessions.map((s, i) => {
-                const task = s.taskId ? tasks.find(t => t.id === s.taskId) : null
-                return (
-                  <div key={s.id} className="flex items-center justify-between p-3 rounded-[10px] bg-[var(--surface2)] border border-[var(--border)]">
-                    <div className="flex-1">
-                      <p className="text-[13px] text-[var(--text)] font-medium">{task?.text || 'Untitled session'}</p>
-                      <p className="text-[11px] text-[var(--text-dim)]">{s.duration}min{s.distractions > 0 ? ` · ${s.distractions} distractions` : ''}</p>
-                    </div>
-                    {s.quality && (
-                      <span className="data text-[13px] font-bold" style={{ color: s.quality >= 4 ? 'var(--accent)' : s.quality >= 3 ? 'var(--amber)' : 'var(--rose)' }}>
-                        {s.quality}/5
-                      </span>
-                    )}
-                  </div>
-                )
+              {history.map((s) => {
+                const t = s.taskId ? tasks.find((x) => x.id === s.taskId) : null
+                return <HistoryRow key={s.id} s={s} taskLabel={t?.text ?? 'Session'} />
               })}
             </div>
-          </motion.div>
+          </div>
+        )}
+
+        {empty && (
+          <div className="card px-5 py-8 text-center text-[15px] leading-relaxed text-[var(--text-secondary)]">
+            Focus sessions help you track deep work. Each session earns 5 execution points (up to 20/day).
+            <button type="button" onClick={openConfigAndPrime} className="mt-4 block w-full text-[var(--accent)] font-medium">
+              Start your first session →
+            </button>
+          </div>
         )}
       </div>
     </PageTransition>
+  )
+}
+
+function HistoryRow({ s, taskLabel }: { s: FocusSession; taskLabel: string }) {
+  const [open, setOpen] = useState(false)
+  return (
+    <div className="rounded-[12px] border border-[var(--border)] bg-[var(--bg-elevated)]">
+      <button type="button" onClick={() => setOpen(!open)} className="flex w-full items-center justify-between px-4 py-3 text-left">
+        <div>
+          <p className="text-[14px] font-medium text-[var(--text)]">{taskLabel}</p>
+          <p className="text-[12px] text-[var(--text-dim)]">{formatSessionWhen(s.startedAt)}</p>
+        </div>
+        <div className="flex items-center gap-2 text-[12px] text-[var(--text-secondary)]">
+          <span>{s.duration ?? '—'} min</span>
+          <span className="flex gap-0.5">
+            {[1, 2, 3, 4, 5].map((i) => (
+              <span
+                key={i}
+                className={`h-1.5 w-1.5 rounded-full ${s.quality && i <= (s.quality || 0) ? 'bg-[var(--accent)]' : 'bg-[var(--border)]'}`}
+              />
+            ))}
+          </span>
+          <span className="text-[var(--text-dim)]">· {s.distractions} dist.</span>
+        </div>
+      </button>
+      {open && s.notes && (
+        <div className="border-t border-[var(--border)] px-4 py-2 text-[13px] text-[var(--text-secondary)]">{s.notes}</div>
+      )}
+    </div>
   )
 }

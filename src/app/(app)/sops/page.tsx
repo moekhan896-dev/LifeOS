@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { motion } from 'framer-motion'
 import { toast } from 'sonner'
 import { useStore, type SOP } from '@/stores/store'
@@ -16,12 +16,21 @@ const STATUS_STYLES: Record<string, { bg: string; label: string }> = {
 export default function SopsPage() {
   const { sops, businesses, addSop, updateSop } = useStore()
   const [newTitle, setNewTitle] = useState('')
-  const [newBiz, setNewBiz] = useState('agency')
+  const [newBiz, setNewBiz] = useState('')
   const [expandedId, setExpandedId] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (businesses.length && !newBiz) setNewBiz(businesses[0].id)
+  }, [businesses, newBiz])
 
   const handleAdd = () => {
     if (!newTitle.trim()) return
-    addSop({ businessId: newBiz, title: newTitle.trim(), status: 'not_started' })
+    const bid = newBiz || businesses[0]?.id
+    if (!bid) {
+      toast.error('Add a business first')
+      return
+    }
+    addSop({ businessId: bid, title: newTitle.trim(), status: 'not_started' })
     setNewTitle('')
     toast.success('SOP added')
   }

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { motion } from 'framer-motion'
 import { toast } from 'sonner'
 import { useStore } from '@/stores/store'
@@ -14,18 +14,27 @@ function fmt(n: number) {
 }
 
 export default function WinsPage() {
-  const { wins, businesses, addWin } = useStore()
+  const { wins, businesses, addWin, deleteWin } = useStore()
   const [title, setTitle] = useState('')
   const [dollarValue, setDollarValue] = useState('')
-  const [businessId, setBusinessId] = useState('agency')
+  const [businessId, setBusinessId] = useState('')
   const [category, setCategory] = useState<string>('New Client')
+
+  useEffect(() => {
+    if (businesses.length && !businessId) setBusinessId(businesses[0].id)
+  }, [businesses, businessId])
 
   const handleAdd = () => {
     if (!title.trim()) return
+    const bid = businessId || businesses[0]?.id
+    if (!bid) {
+      toast.error('Add a business first')
+      return
+    }
     addWin({
       title: title.trim(),
       dollarValue: dollarValue ? Number(dollarValue) : undefined,
-      businessId,
+      businessId: bid,
       category,
     })
     setTitle('')
@@ -134,10 +143,10 @@ export default function WinsPage() {
                 <motion.div
                   whileHover={{ scale: 1.01 }}
                   transition={{ type: 'spring', stiffness: 400, damping: 25 }}
-                  className="card border-[var(--amber)]/20 p-3"
+                  className="card border border-[var(--border)] border-l-[3px] border-l-[var(--positive)] p-3"
                 >
                   <div className="flex items-start gap-3">
-                    <div className="w-1 h-full min-h-[40px] rounded-full bg-[var(--amber)]" />
+                    <div className="h-full min-h-[40px] w-0 shrink-0" />
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-medium text-[var(--text)]">{win.title}</p>
                       <div className="mt-1 flex items-center gap-2 flex-wrap">
@@ -151,6 +160,16 @@ export default function WinsPage() {
                         <span className="text-[10px] text-[var(--text-dim)]">{new Date(win.createdAt).toLocaleDateString()}</span>
                       </div>
                     </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        deleteWin(win.id)
+                        toast.success('Removed')
+                      }}
+                      className="text-[11px] text-[var(--text-dim)] hover:text-[var(--negative)]"
+                    >
+                      Remove
+                    </button>
                   </div>
                 </motion.div>
               </StaggerItem>

@@ -6,7 +6,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { toast } from 'sonner'
 import { useStore } from '@/stores/store'
 import { buildFullSystemPrompt } from '@/lib/ai-context'
-import { extractCommitmentsFromUserMessage } from '@/lib/extract-commitment'
+import { extractCommitmentsFromUserMessage } from '@/lib/extract-commitments'
 
 const SUGGESTED_PROMPTS = [
   'What should I focus on this week?',

@@ -188,9 +188,16 @@ export interface FocusSession {
   duration: number; quality?: number; notes?: string; distractions: number
 }
 
+export type KnowledgeVaultStatus = 'captured' | 'processing' | 'applied' | 'archived'
+
 export interface KnowledgeEntry {
   id: string; title: string; source: string; type: 'book' | 'podcast' | 'article' | 'video' | 'idea' | 'framework' | 'swipe'
-  takeaways: string; actionItem?: string; status?: string; createdAt: string
+  takeaways: string
+  /** PRD — "What will I DO with this?" — may auto-create a linked task */
+  actionItem?: string
+  status?: KnowledgeVaultStatus
+  linkedTaskId?: string
+  createdAt: string
 }
 
 export interface AiReport {
@@ -486,10 +493,12 @@ interface AppState {
   commitments: Commitment[]
   addCommitment: (text: string, source: string, dueDate?: string) => string
   fulfillCommitment: (id: string) => void
+  removeCommitment: (id: string) => void
 
   // ── Wins ──
   wins: Win[]
   addWin: (w: Omit<Win, 'id' | 'createdAt'>) => void
+  deleteWin: (id: string) => void
 
   // ── Schedule ──
   todaySchedule: ScheduleBlock[]
@@ -512,7 +521,9 @@ interface AppState {
   // ── Sprints ──
   sprints: Sprint[]
   addSprint: (s: Omit<Sprint, 'id'>) => void
+  updateSprint: (id: string, updates: Partial<Sprint>) => void
   updateSprintDeliverable: (sprintId: string, index: number, done: boolean) => void
+  appendSprintDeliverable: (sprintId: string, text: string) => void
 
   // ── SOPs ──
   sops: SOP[]
@@ -582,7 +593,7 @@ interface AppState {
 
   // ── Knowledge Vault ──
   knowledgeEntries: KnowledgeEntry[]
-  addKnowledge: (k: Omit<KnowledgeEntry, 'id' | 'createdAt'>) => void
+  addKnowledge: (k: Omit<KnowledgeEntry, 'id' | 'createdAt'>) => string
   updateKnowledge: (id: string, updates: Partial<KnowledgeEntry>) => void
   deleteKnowledge: (id: string) => void
 
@@ -608,6 +619,8 @@ interface AppState {
   setContract: (c: AccountabilityContract) => void
   weeklyReflections: WeeklyReflection[]
   addReflection: (r: Omit<WeeklyReflection, 'id' | 'createdAt'>) => void
+  updateReflection: (id: string, updates: Partial<WeeklyReflection>) => void
+  deleteReflection: (id: string) => void
   contacts: ContactEntry[]
   addContact: (c: Omit<ContactEntry, 'id'>) => void
   updateContact: (id: string, updates: Partial<ContactEntry>) => void
@@ -1249,10 +1262,12 @@ export const useStore = create<AppState>()(
           get().logEvent('commitment_fulfilled', { commitmentId: id, daysToFulfill })
         }
       },
+      removeCommitment: (id) => set((s) => ({ commitments: s.commitments.filter((c) => c.id !== id) })),
 
       // ── Wins ──
       wins: [],
       addWin: (w) => set((s) => ({ wins: [...s.wins, { ...w, id: uid(), createdAt: new Date().toISOString() }] })),
+      deleteWin: (id) => set((s) => ({ wins: s.wins.filter((w) => w.id !== id) })),
 
       // ── Schedule ──
       todaySchedule: [],
@@ -1283,10 +1298,27 @@ export const useStore = create<AppState>()(
 
       // ── Sprints ──
       sprints: [],
-      addSprint: (s_) => set((s) => ({ sprints: [...s.sprints, { ...s_, id: uid() }] })),
+      addSprint: (s_) =>
+        set((s) => ({
+          sprints: [
+            ...s.sprints.map((sp) => (sp.status === 'active' ? { ...sp, status: 'completed' as const } : sp)),
+            { ...s_, id: uid() },
+          ],
+        })),
+      updateSprint: (id, updates) =>
+        set((s) => ({ sprints: s.sprints.map((sp) => (sp.id === id ? { ...sp, ...updates } : sp)) })),
       updateSprintDeliverable: (sprintId, index, done) => set((s) => ({
         sprints: s.sprints.map((sp) => sp.id === sprintId ? { ...sp, deliverables: sp.deliverables.map((d, i) => i === index ? { ...d, done } : d) } : sp),
       })),
+      appendSprintDeliverable: (sprintId, text) => {
+        const t = text.trim()
+        if (!t) return
+        set((s) => ({
+          sprints: s.sprints.map((sp) =>
+            sp.id === sprintId ? { ...sp, deliverables: [...sp.deliverables, { text: t, done: false }] } : sp
+          ),
+        }))
+      },
 
       // ── SOPs ──
       sops: [],
@@ -1398,7 +1430,13 @@ export const useStore = create<AppState>()(
 
       // ── Knowledge Vault ──
       knowledgeEntries: [],
-      addKnowledge: (k) => set((s) => ({ knowledgeEntries: [...s.knowledgeEntries, { ...k, id: uid(), createdAt: new Date().toISOString() }] })),
+      addKnowledge: (k) => {
+        const kid = uid()
+        set((s) => ({
+          knowledgeEntries: [...s.knowledgeEntries, { ...k, id: kid, createdAt: new Date().toISOString() }],
+        }))
+        return kid
+      },
       updateKnowledge: (id, updates) => set((s) => ({ knowledgeEntries: s.knowledgeEntries.map((k) => k.id === id ? { ...k, ...updates } : k) })),
       deleteKnowledge: (id) => set((s) => ({ knowledgeEntries: s.knowledgeEntries.filter((k) => k.id !== id) })),
 
@@ -1466,6 +1504,12 @@ export const useStore = create<AppState>()(
       setContract: (c) => set({ accountabilityContract: c }),
       weeklyReflections: [],
       addReflection: (r) => set((s) => ({ weeklyReflections: [...s.weeklyReflections, { ...r, id: uid(), createdAt: new Date().toISOString() }] })),
+      updateReflection: (id, updates) =>
+        set((s) => ({
+          weeklyReflections: s.weeklyReflections.map((x) => (x.id === id ? { ...x, ...updates } : x)),
+        })),
+      deleteReflection: (id) =>
+        set((s) => ({ weeklyReflections: s.weeklyReflections.filter((x) => x.id !== id) })),
       contacts: [],
       addContact: (c) => set((s) => ({ contacts: [...s.contacts, { ...c, id: uid() }] })),
       updateContact: (id, updates) => set((s) => ({ contacts: s.contacts.map(c => c.id === id ? { ...c, ...updates } : c) })),
