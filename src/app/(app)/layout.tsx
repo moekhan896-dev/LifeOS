@@ -11,6 +11,7 @@ import VoiceCommandFab from '@/components/VoiceCommandFab'
 import OfflineBanner from '@/components/OfflineBanner'
 import PwaInstallPrompt from '@/components/PwaInstallPrompt'
 import MobileTabBar from '@/components/MobileTabBar'
+import ReengagementBanner from '@/components/ReengagementBanner'
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const {
@@ -65,6 +66,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       <Sidebar />
       <main className="flex-1 ml-0 md:ml-[240px] min-h-screen overflow-x-hidden pb-[49px] md:pb-0">
         <div className="p-4 md:p-5 max-w-[1200px] mx-auto">
+          <ReengagementBanner />
           {children}
         </div>
       </main>

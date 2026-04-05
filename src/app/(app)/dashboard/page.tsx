@@ -29,6 +29,7 @@ import TileLibrarySheet from '@/components/dashboard/TileLibrarySheet'
 import { useLongPress } from '@/hooks/useLongPress'
 import { renderDashboardTile, type DashboardTileRenderCtx } from '@/app/(app)/dashboard/dashboard-tile-render'
 import { isProactiveMessageVisible } from '@/lib/proactive-visibility'
+import { computeIdealSelfBenchmark } from '@/lib/ideal-self-benchmark'
 /* ── Helpers ── */
 
 function getGreeting() {
@@ -327,34 +328,10 @@ export default function DashboardPage() {
   ])
 
   /** PRD §9.5 — Ideal Self gap when returning after 2+ days. */
-  const idealSelfBenchmark = useMemo(() => {
-    const days = lastSessionDaysSinceOpen
-    if (days < 2) return null
-    const idealTasks = Math.min(Math.round(days * 2.5), 40)
-    const idealXp = idealTasks * 13
-    let actualDone = 0
-    let actualXp = 0
-    if (previousLastOpenedAt) {
-      const t0 = new Date(previousLastOpenedAt).getTime()
-      const t1 = Date.now()
-      for (const t of tasks) {
-        if (!t.done || !t.completedAt) continue
-        const ct = new Date(t.completedAt).getTime()
-        if (ct >= t0 && ct <= t1) {
-          actualDone += 1
-          actualXp += t.xpValue
-        }
-      }
-    }
-    return {
-      days,
-      idealTasks,
-      idealXp,
-      actualDone,
-      actualXp,
-      gapXp: Math.max(0, idealXp - actualXp),
-    }
-  }, [lastSessionDaysSinceOpen, previousLastOpenedAt, tasks])
+  const idealSelfBenchmark = useMemo(
+    () => computeIdealSelfBenchmark(lastSessionDaysSinceOpen, previousLastOpenedAt, tasks),
+    [lastSessionDaysSinceOpen, previousLastOpenedAt, tasks]
+  )
 
   const nextActionMotivation = useMemo(() => {
     if (yesterdayScore != null && executionScore > yesterdayScore) {

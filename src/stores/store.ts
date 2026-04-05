@@ -466,7 +466,8 @@ interface AppState {
 
   // ── AI Messages ──
   aiMessages: AiMessage[]
-  addAiMessage: (msg: Omit<AiMessage, 'id' | 'createdAt'>) => void
+  addAiMessage: (msg: Omit<AiMessage, 'id' | 'createdAt'>) => string
+  updateAiMessage: (id: string, content: string) => void
   clearAiMessages: () => void
 
   // ── Pipeline ──
@@ -1213,7 +1214,17 @@ export const useStore = create<AppState>()(
 
       // ── AI Messages ──
       aiMessages: [],
-      addAiMessage: (msg) => set((s) => ({ aiMessages: [...s.aiMessages, { ...msg, id: uid(), createdAt: new Date().toISOString() }] })),
+      addAiMessage: (msg) => {
+        const id = uid()
+        set((s) => ({
+          aiMessages: [...s.aiMessages, { ...msg, id, createdAt: new Date().toISOString() }],
+        }))
+        return id
+      },
+      updateAiMessage: (id, content) =>
+        set((s) => ({
+          aiMessages: s.aiMessages.map((m) => (m.id === id ? { ...m, content } : m)),
+        })),
       clearAiMessages: () => set({ aiMessages: [] }),
 
       // ── Pipeline ──

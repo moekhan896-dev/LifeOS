@@ -51,6 +51,17 @@ function priorityRank(p: Task['priority']) {
   return { crit: 0, high: 1, med: 2, low: 3 }[p] ?? 2
 }
 
+/** Avg days from create → complete for finished tasks of this priority (PRD §8.4 Day 3 copy). */
+function avgCompletionDaysForPriority(tasks: Task[], priority: Task['priority']): number | null {
+  const done = tasks.filter((t) => t.done && t.completedAt && t.priority === priority)
+  if (done.length < 2) return null
+  let sum = 0
+  for (const t of done) {
+    sum += (new Date(t.completedAt!).getTime() - new Date(t.createdAt).getTime()) / 86400000
+  }
+  return sum / done.length
+}
+
 /** §8.4 — incomplete tasks only; one message per task per tier window. */
 function buildEscalationCandidates(input: {
   tasks: Task[]
@@ -79,6 +90,7 @@ function buildEscalationCandidates(input: {
     totalCommits > 0 ? Math.round((fulfilledCommits / totalCommits) * 100) : 100
 
   for (const { t, days } of incomplete) {
+    /** Tier 1: days 1–2 (gentle, informational). Tier 2: 3–6 (important). Tier 3: 7–13 (critical). Tier 4: 14+ (critical, 48h dedup). */
     let tier: 1 | 2 | 3 | 4
     if (days >= 14) tier = 4
     else if (days >= 7) tier = 3
@@ -95,21 +107,27 @@ function buildEscalationCandidates(input: {
     const lost7 = dv > 0 ? Math.round((dv / 30) * Math.min(days, 30)) : Math.round(hourly * 0.5 * days)
     const skipNote = t.skipReason ? ` Last skip reason: "${t.skipReason.slice(0, 120)}".` : ''
     const skips = t.skipCount ?? 0
+    const avgDays = avgCompletionDaysForPriority(input.tasks, t.priority)
+    const valLine = dv > 0 ? `$${Math.round(dv)}` : 'not estimated — using hourly fallback'
 
     let body = ''
     let priority: ProactivePriority = 'informational'
 
     if (tier === 1) {
-      body = `I noticed "${t.text.slice(0, 120)}${t.text.length > 120 ? '…' : ''}" hasn't been started. It's worth approximately $${daily}/day based on your estimate${dv ? '' : ' (effective hourly fallback)'}. No pressure — just flagging it.`
+      body = `I noticed "${t.text.slice(0, 120)}${t.text.length > 120 ? '…' : ''}" hasn't been started. It's worth approximately $${daily}/day based on your estimate${dv ? ` (task ~${valLine})` : ' (effective hourly fallback)'}. No pressure — just flagging it.`
       priority = 'informational'
     } else if (tier === 2) {
-      body = `"${t.text.slice(0, 100)}${t.text.length > 100 ? '…' : ''}" has been pending for 3+ days. Based on your data, this is a high-priority item at ~$${hourly}/hr effective rate. What would it take to start today? I can help break it into subtasks.`
+      body = `"${t.text.slice(0, 100)}${t.text.length > 100 ? '…' : ''}" has been pending for ${days} days. Task value (estimate): ${valLine}. At ~$${hourly}/hr effective this is among your highest-ROI work right now.${
+        avgDays != null
+          ? ` Your similar ${t.priority}-priority tasks average ${avgDays.toFixed(1)} days to complete when you finish them.`
+          : ''
+      } What would it take to start today? I can break it into subtasks if that helps.`
       priority = 'important'
     } else if (tier === 3) {
-      body = `7 days. ~$${lost7} in estimated opportunity while "${t.text.slice(0, 80)}${t.text.length > 80 ? '…' : ''}" waits.${skips ? ` Skipped ${skips} time(s).` : ''} Your commitment follow-through is ${followPct}%.${skipNote} Before we discuss anything else — what's actually blocking this?`
+      body = `${days} days. ~$${lost7} in estimated lost value while "${t.text.slice(0, 80)}${t.text.length > 80 ? '…' : ''}" waits. Task value (estimate): ${valLine}.${skips ? ` Skipped ${skips} time(s).` : ''} Your commitment follow-through is ${followPct}%.${skipNote} Before we discuss anything else — what's actually blocking this?`
       priority = 'critical'
     } else {
-      body = `This has been on your list for ${days} days: "${t.text.slice(0, 90)}${t.text.length > 90 ? '…' : ''}". Cumulative estimated cost ~$${lost7}. Pick one: (1) Commit with a deadline now — I'll hold you to it. (2) Remove it — it's okay to deprioritize. (3) Tell me what's really going on.`
+      body = `${days} days on your list. Task value (estimate): ${valLine}. Cumulative estimated cost ~$${lost7}. You've skipped or deferred this ${skips} time(s); overall commitment follow-through is ${followPct}%. Pick one: (1) Commit right now with a specific plan and deadline — I'll hold you to it. (2) Remove it from your list — it's okay to decide this isn't a priority. (3) Tell me what's really going on — I can't help if I don't know.`
       priority = 'critical'
     }
 

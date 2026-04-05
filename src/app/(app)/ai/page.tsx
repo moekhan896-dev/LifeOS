@@ -50,11 +50,12 @@ function AIPageInner() {
   const businessFilter = searchParams.get('business')
 
   const {
-    aiMessages, addAiMessage, clearAiMessages,
+    aiMessages, addAiMessage, updateAiMessage, clearAiMessages,
     businesses, clients, tasks, commitments, streaks, pipeline, sprints, level, xp,
-    projects, goals, identityStatements, skillLevels, behavioralEvents,
+    projects, goals, identityStatements, skillLevels,
     addCommitment,
     addAiReport,
+    logEvent,
   } = useStore()
 
   const [input, setInput] = useState('')
@@ -69,7 +70,9 @@ function AIPageInner() {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [])
 
-  useEffect(() => { scrollToBottom() }, [aiMessages.length, scrollToBottom])
+  useEffect(() => {
+    scrollToBottom()
+  }, [aiMessages, scrollToBottom])
 
   useEffect(() => {
     if (textareaRef.current) {
@@ -144,6 +147,7 @@ function AIPageInner() {
     const currentMessages = useStore.getState().aiMessages
     const apiMessages = currentMessages.map(m => ({ role: m.role, content: m.content }))
 
+    let streamAssistantId: string | undefined
     try {
       const res = await fetch('/api/ai', {
         method: 'POST',
@@ -156,15 +160,40 @@ function AIPageInner() {
         }),
       })
 
+      const ct = res.headers.get('content-type') || ''
       if (!res.ok) {
-        const data = await res.json().catch(() => ({}))
-        throw new Error(data.error || 'Failed to get response')
+        const data = ct.includes('application/json') ? await res.json().catch(() => ({})) : {}
+        throw new Error((data as { error?: string }).error || (await res.text()) || 'Failed to get response')
       }
 
-      const data = await res.json()
-      addAiMessage({ role: 'assistant', content: data.content })
+      if (!res.body) {
+        throw new Error('No response body')
+      }
+
+      streamAssistantId = addAiMessage({ role: 'assistant', content: '' })
+      const reader = res.body.getReader()
+      const decoder = new TextDecoder()
+      let acc = ''
+      let started = false
+      while (true) {
+        const { done, value } = await reader.read()
+        if (done) break
+        acc += decoder.decode(value, { stream: true })
+        if (!started && acc.length > 0) {
+          started = true
+          setLoading(false)
+        }
+        updateAiMessage(streamAssistantId, acc)
+      }
+      if (!started) setLoading(false)
+      if (!acc.trim()) {
+        updateAiMessage(streamAssistantId, '(Empty response — try again or check your API key.)')
+      }
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : 'Unknown error'
+      if (streamAssistantId) {
+        updateAiMessage(streamAssistantId, `Could not complete response: ${msg}`)
+      }
       if (msg.includes('API key') || msg.includes('ANTHROPIC_API_KEY')) {
         setError('AI requires an Anthropic API key. Add ANTHROPIC_API_KEY to your environment variables, or use the \'Copy Context\' button to paste into Claude.ai.')
       } else {
@@ -273,9 +302,35 @@ function AIPageInner() {
                   }`}
                 >
                   {msg.role === 'assistant' ? (
-                    <div className="space-y-0.5">{renderMarkdown(msg.content)}</div>
+                    <div className="space-y-0.5">{renderMarkdown(msg.content || '…')}</div>
                   ) : (
                     <div className="whitespace-pre-wrap">{msg.content}</div>
+                  )}
+                  {msg.role === 'assistant' && msg.content.trim().length > 0 && (
+                    <div className="mt-2 flex items-center gap-2 border-t border-border/60 pt-2">
+                      <button
+                        type="button"
+                        aria-label="Thumbs up"
+                        className="rounded-lg px-2 py-1 text-[13px] text-text-mid hover:bg-surface3 hover:text-accent"
+                        onClick={() => {
+                          logEvent('ai_feedback', { messageId: msg.id, rating: 'up' })
+                          toast.success("Noted — I'll do more of this.")
+                        }}
+                      >
+                        👍
+                      </button>
+                      <button
+                        type="button"
+                        aria-label="Thumbs down"
+                        className="rounded-lg px-2 py-1 text-[13px] text-text-mid hover:bg-surface3 hover:text-rose"
+                        onClick={() => {
+                          logEvent('ai_feedback', { messageId: msg.id, rating: 'down' })
+                          toast.success('Thanks for the feedback.')
+                        }}
+                      >
+                        👎
+                      </button>
+                    </div>
                   )}
                   <div className="text-[10px] text-text-dim mt-2 opacity-60">
                     {new Date(msg.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}

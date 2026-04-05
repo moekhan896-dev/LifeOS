@@ -14,6 +14,95 @@ function commitmentFollowThrough30d(commitments: StoreState['commitments']) {
   return { total: recent.length, fulfilled, ratePct, unfulfilled }
 }
 
+/** Unfulfilled commitments in last 30d grouped by source — PRD §8.2 "most commonly broken". */
+function mostBrokenCommitmentPattern(commitments: StoreState['commitments']): string {
+  const cutoff = Date.now() - 30 * 86400000
+  const broken = commitments.filter(
+    (c) => !c.fulfilled && new Date(c.createdAt).getTime() >= cutoff
+  )
+  if (broken.length === 0) return 'none outstanding in window'
+  const bySource: Record<string, number> = {}
+  for (const c of broken) {
+    const k = (c.source || 'unknown').slice(0, 40)
+    bySource[k] = (bySource[k] ?? 0) + 1
+  }
+  const top = Object.entries(bySource)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 4)
+    .map(([s, n]) => `${s} (${n})`)
+    .join('; ')
+  return top || 'n/a'
+}
+
+function gymTaskCorrelation(history: StoreState['healthHistory'], tasks: StoreState['tasks']): string {
+  const days = [...history].filter((h) => h.date).sort((a, b) => b.date.localeCompare(a.date)).slice(0, 14)
+  if (days.length < 5) return 'Need more logged days with gym + tasks to correlate.'
+  let gymDays = 0
+  let gymTasks = 0
+  let restDays = 0
+  let restTasks = 0
+  for (const h of days) {
+    const done = tasks.filter((t) => t.done && t.completedAt?.startsWith(h.date)).length
+    if (h.gym) {
+      gymDays++
+      gymTasks += done
+    } else {
+      restDays++
+      restTasks += done
+    }
+  }
+  if (gymDays < 2 || restDays < 2) return 'Gym vs non-gym sample still small — keep logging.'
+  const ag = gymTasks / gymDays
+  const ar = restTasks / restDays
+  return `Gym days avg ${ag.toFixed(1)} tasks completed vs ${ar.toFixed(1)} on non-gym days (last ${days.length} logged days).`
+}
+
+function score7DayTrend(history: StoreState['healthHistory']): string {
+  const sorted = [...history]
+    .filter((h) => h.date && typeof h.dailyScore === 'number')
+    .sort((a, b) => b.date.localeCompare(a.date))
+    .slice(0, 7)
+  if (sorted.length < 3) return 'insufficient daily scores for trend'
+  const scores = sorted.map((h) => h.dailyScore).reverse()
+  const mid = Math.floor(scores.length / 2) || 1
+  const first = scores.slice(0, mid).reduce((a, b) => a + b, 0) / mid
+  const second = scores.slice(mid).reduce((a, b) => a + b, 0) / (scores.length - mid)
+  if (second > first + 4) return `improving (recent avg ${second.toFixed(0)} vs prior ${first.toFixed(0)})`
+  if (second < first - 4) return `declining (recent avg ${second.toFixed(0)} vs prior ${first.toFixed(0)})`
+  return `flat (~${((first + second) / 2).toFixed(0)} avg)`
+}
+
+function mostProductiveHourRange(tasks: StoreState['tasks']): string {
+  const done = tasks.filter((t) => t.done && t.completedAt)
+  if (done.length < 5) return 'insufficient completion timestamps — complete more tasks with logged times'
+  const hours: number[] = []
+  for (const t of done.slice(-80)) {
+    hours.push(new Date(t.completedAt!).getHours())
+  }
+  const buckets = [0, 0, 0, 0]
+  const labels = ['morning ~5am–12pm', 'afternoon ~12–5pm', 'early evening ~5–9pm', 'night']
+  for (const h of hours) {
+    if (h >= 5 && h < 12) buckets[0]++
+    else if (h >= 12 && h < 17) buckets[1]++
+    else if (h >= 17 && h < 21) buckets[2]++
+    else buckets[3]++
+  }
+  const maxI = buckets.indexOf(Math.max(...buckets))
+  return `${labels[maxI]} (mode of last ${hours.length} completions)`
+}
+
+function aiPartnerFeedbackSummary(events: StoreState['behavioralEvents']): string {
+  const fb = events.filter((e) => e.eventType === 'ai_feedback')
+  if (fb.length === 0) return 'No thumbs-up/down yet — encourage feedback on assistant replies.'
+  let up = 0
+  let down = 0
+  for (const e of fb.slice(-80)) {
+    if (e.eventData?.rating === 'up') up++
+    else if (e.eventData?.rating === 'down') down++
+  }
+  return `Thumbs-up ${up}, thumbs-down ${down} (recent window). Prefer approaches that earned up-votes.`
+}
+
 function prayerProductivityLines(history: StoreState['healthHistory'], tasks: StoreState['tasks']) {
   const hist = [...history].filter((h) => h.date).sort((a, b) => b.date.localeCompare(a.date)).slice(0, 21)
   if (hist.length < 3) {
@@ -94,12 +183,23 @@ function behavioralHeuristics(state: StoreState): { strength: string; weakness: 
 }
 
 function escalationBlock(state: StoreState): string {
+  const { net } = computeMonthlyMoneySnapshot({
+    businesses: state.businesses,
+    clients: state.clients,
+    expenseEntries: state.expenseEntries,
+  })
   const hourly =
-    state.incomeTarget > 0 ? Math.round(state.incomeTarget / 160) : 0
-  return `Day 1: Gentle observation on stalled work worth ~$${hourly}/hr effective.
-Day 3: Data-backed ROI nudge.
-Day 7: Cost of delay + commitment follow-through.
-Day 14+: Direct — commit, remove, or explain blockers.`
+    state.incomeTarget > 0
+      ? Math.round(state.incomeTarget / 160)
+      : Math.max(35, Math.round(net / 160) || 50)
+  const cf = commitmentFollowThrough30d(state.commitments)
+  const rate = cf.ratePct != null ? `${cf.ratePct}%` : 'n/a'
+  return `ESCALATION PROTOCOL (per task age for incomplete work — PRD §8.2 / §8.4):
+Day 1: Gentle, observational (informational). "I noticed [task] hasn't been started. Worth approximately $X/day." Use each task's dollar estimate from context.
+Day 3: Data-backed (important). "[Task] pending 3 days. Highest-ROI at ~$${hourly}/hr. What would it take?" Reference similar task completion times when available.
+Day 7: Firm, cost-focused (critical). "7 days. $[totalCost] in estimated lost value. Committed [x] times. Follow-through: ${rate}." Reference skip reasons if any.
+Day 14+: Direct confrontation (critical). "[x] days on list; cumulative cost $[z]; ${rate} follow-through. Options: commit with plan + deadline, remove from list, or explain what's blocking — no judgment."
+When generating proactive copy, match tier tone; include task dollar value and commitment follow-through rate in tier 2–4 messages.`
 }
 
 function conversationDigest(messages: StoreState['aiMessages']): string {
@@ -231,12 +331,12 @@ YOUR PERSONALITY:
 - You adapt your communication style based on what works for this specific user
 
 COMMUNICATION STYLE (from onboarding):
-Style: ${state.aiPushStyle || '—'}
+Avoidance style: ${state.aiAvoidanceStyle || '—'}
+Push style: ${state.aiPushStyle || '—'}
 Motivators: ${(state.aiMotivators ?? []).join(', ') || '—'}
 Frequency: ${state.aiFrequency || '—'}
-Reasoning: ${state.aiReasoningDisplay || '—'}
+Reasoning display: ${state.aiReasoningDisplay || '—'}
 
-ESCALATION PROTOCOL (summary):
 ${escalationBlock(state)}
 
 THE USER:
@@ -277,12 +377,13 @@ Energy pattern: ${energyPatternLine(state.energyLogs)}
 Correlations:
 - ${prayerProductivityLines(state.healthHistory, state.tasks)}
 - ${screenScoreCorrelation(state.healthHistory)}
+- ${gymTaskCorrelation(state.healthHistory, state.tasks)}
 
 FAITH:
 Tradition: ${state.faithTradition || '—'}
 Prayer tracking: ${state.trackPrayers ? 'enabled' : 'disabled'}
 Consistency (recent): ${faithPct}
-Prayer-productivity: ${prayerProductivityLines(state.healthHistory, state.tasks)}
+(Prayer–productivity correlation is under HEALTH & HABITS → Correlations.)
 
 STRUGGLES (handle with care):
 Procrastination: "${(state.procrastination || '').slice(0, 300)}"
@@ -294,12 +395,17 @@ What needs to be true: "${(state.whatNeedsToBeTrue || '').slice(0, 300)}"
 COMMITMENTS (last 30 days):
 Total: ${cf.total}, Fulfilled: ${cf.fulfilled}, Rate: ${cf.ratePct != null ? `${cf.ratePct}%` : 'n/a'}
 Outstanding: ${cf.unfulfilled.length ? cf.unfulfilled.join('; ') : 'none listed'}
+Most commonly broken (by source / pattern): ${mostBrokenCommitmentPattern(state.commitments)}
 
 BEHAVIORAL PATTERNS:
-Tasks avoided / stale (sample): ${avoidedTasks.map((t) => `"${t.text.slice(0, 60)}" (${t.days}d open${t.biz ? ` · ${t.biz}` : ''})`).join('; ') || 'none'}
-Most productive time: infer from energy logs + task completion times when available.
-Avg execution score today: ${execScore}/100 (${zone})
-Idea:execution ratio: ${state.ideas.length ? `${state.ideas.filter((i) => i.promoted).length} promoted / ${state.ideas.length} ideas` : 'no ideas logged'}
+Tasks avoided / stale (sample): ${avoidedTasks.map((t) => `"${t.text.slice(0, 60)}" (${t.days}d pending${t.biz ? ` · ${t.biz}` : ''})`).join('; ') || 'none'}
+Most productive time (from completion timestamps): ${mostProductiveHourRange(state.tasks)}
+7-day daily score trend: ${score7DayTrend(state.healthHistory)}
+Avg execution score (today): ${execScore}/100 (${zone})
+Idea → execution: ${state.ideas.filter((i) => !i.archived).length} active ideas, ${state.ideas.filter((i) => i.promoted).length} promoted; tasks completed last 7d: ${state.tasks.filter((t) => t.done && t.completedAt && Date.now() - new Date(t.completedAt).getTime() < 7 * 86400000).length}
+Action-to-result: use pipeline / task completion dates when present; cold outreach → closed deal timing varies by user data.
+AI PARTNER FEEDBACK (thumbs — PRD §8.8):
+${aiPartnerFeedbackSummary(state.behavioralEvents)}
 
 ACTIVE MENTOR PERSONAS:
 ${mentorBlock}
