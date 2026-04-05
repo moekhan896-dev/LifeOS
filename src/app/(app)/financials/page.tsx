@@ -5,7 +5,22 @@ import { useStore, getAgencyTotals, getClientNet } from '@/stores/store'
 import PageTransition from '@/components/PageTransition'
 import { StaggerContainer, StaggerItem } from '@/components/Stagger'
 import { motion } from 'framer-motion'
-import { BarChart, Bar, AreaChart, Area, ResponsiveContainer, XAxis, YAxis, Tooltip, CartesianGrid, Legend } from 'recharts'
+import {
+  FinancialsHero,
+  FinancialsProfitLossSection,
+  FinancialsRevenueByBusinessChart,
+  FinancialsConcentrationWarnings,
+  FinancialsDailySpending,
+} from '@/components/financials/FinancialsRound5'
+import {
+  grossRevenue,
+  businessCosts,
+  processingFeesGross,
+  netRevenue,
+  personalExpensesRecurring,
+  takeHome,
+  clientConcentrationWarnings,
+} from '@/lib/financials-metrics'
 
 function fmt(n: number) {
   return '$' + n.toLocaleString('en-US', { maximumFractionDigits: 0 })
@@ -40,6 +55,12 @@ export default function FinancialsPage() {
     profitFirstPct,
     setProfitFirstPct,
     estimatedIncomeTaxRatePct,
+    dailyNetSnapshots,
+    incomeTarget,
+    anthropicKey,
+    plaidConnected,
+    workDayStart,
+    workDayEnd,
   } = useStore()
   const savingsLabel = savingsRange || '—'
   const noGambleStreak = streaks.find(s => s.habit === 'no_gamble')
@@ -64,6 +85,20 @@ export default function FinancialsPage() {
   const TOTAL_COSTS = expenseEntries.filter((e) => e.recurring).reduce((s, e) => s + e.amount, 0)
   const NET_TAKE_HOME = TOTAL_INCOME - TOTAL_COSTS
 
+  const netTakeHomePL = useMemo(() => {
+    const g = grossRevenue(businesses)
+    const c = businessCosts(businesses, clients)
+    const p = processingFeesGross(g)
+    const nr = netRevenue(g, c, p)
+    const pe = personalExpensesRecurring(expenseEntries)
+    return takeHome(nr, pe)
+  }, [businesses, clients, expenseEntries])
+
+  const hasConcentrationWarnings = useMemo(
+    () => clientConcentrationWarnings(businesses, clients, 30).length > 0,
+    [businesses, clients]
+  )
+
   // Build scenarios from top revenue sources
   const scenarios = useMemo(() => {
     const sorted = [...incomeStreams].sort((a, b) => b.net - a.net)
@@ -73,18 +108,6 @@ export default function FinancialsPage() {
     if (sorted[0] && sorted[1]) result.push({ name: 'Top 2 Gone', lostIncome: sorted[0].net + sorted[1].net, description: `Lose ${sorted[0].label} + ${sorted[1].label}` })
     return result
   }, [incomeStreams])
-
-  // P&L chart placeholder (static shape scaled to real totals)
-  const plData = useMemo(() => {
-    return [
-      {
-        m: 'Now',
-        income: Math.round(TOTAL_INCOME),
-        expenses: Math.round(TOTAL_COSTS),
-      },
-    ]
-  }, [TOTAL_INCOME, TOTAL_COSTS])
-  const plTrend = plData.map((d) => ({ ...d, profit: d.income - d.expenses }))
 
   const pf = profitFirstPct
   const taxSnapshot = useMemo(() => {
@@ -111,6 +134,36 @@ export default function FinancialsPage() {
         <h1 className="page-title">Financials</h1>
 
         <StaggerContainer className="space-y-4">
+          <StaggerItem>
+            <FinancialsHero
+              netTakeHome={netTakeHomePL}
+              incomeTarget={incomeTarget}
+              dailyNetSnapshots={dailyNetSnapshots}
+              workDayStart={workDayStart || '09:00'}
+              workDayEnd={workDayEnd || '17:00'}
+            />
+          </StaggerItem>
+
+          <StaggerItem>
+            <FinancialsProfitLossSection
+              businesses={businesses}
+              clients={clients}
+              expenseEntries={expenseEntries}
+              dailyNetSnapshots={dailyNetSnapshots}
+              anthropicKey={anthropicKey}
+            />
+          </StaggerItem>
+
+          {hasConcentrationWarnings && (
+            <StaggerItem>
+              <FinancialsConcentrationWarnings businesses={businesses} clients={clients} />
+            </StaggerItem>
+          )}
+
+          <StaggerItem>
+            <FinancialsRevenueByBusinessChart businesses={businesses} clients={clients} />
+          </StaggerItem>
+
           {/* Income */}
           <StaggerItem>
             <div className="card px-5 py-4">
@@ -155,80 +208,6 @@ export default function FinancialsPage() {
                 </div>
               </div>
             </div>
-          </StaggerItem>
-
-          {/* P&L Summary */}
-          <StaggerItem>
-            <motion.div
-              whileHover={{ filter: 'brightness(1.05)' }}
-              className="card border-[var(--accent)]/25 bg-[var(--accent-bg)] px-5 py-4"
-            >
-              <span className="label text-[var(--accent)]">Net take-home</span>
-              <div className="mt-2 flex items-baseline gap-3">
-                <span className="data text-3xl font-bold text-[var(--accent)]">{fmt(NET_TAKE_HOME)}</span>
-                <span className="text-[17px] text-[var(--text-secondary)]">/ month</span>
-              </div>
-              <div className="mt-3 grid grid-cols-3 gap-3 text-center">
-                <div>
-                  <p className="label">Income</p>
-                  <p className="data font-semibold text-[var(--text)]">{fmt(TOTAL_INCOME)}</p>
-                </div>
-                <div>
-                  <p className="label">Expenses</p>
-                  <p className="data font-semibold text-[var(--rose)]">{fmt(TOTAL_COSTS)}</p>
-                </div>
-                <div>
-                  <p className="label">Margin</p>
-                  <p className="data font-semibold text-[var(--accent)]">
-                    {TOTAL_INCOME > 0 ? ((NET_TAKE_HOME / TOTAL_INCOME) * 100).toFixed(0) : '—'}%
-                  </p>
-                </div>
-              </div>
-            </motion.div>
-          </StaggerItem>
-
-          {/* Income vs Expenses BarChart */}
-          <StaggerItem>
-            <motion.div whileHover={{ filter: 'brightness(1.05)' }} className="card px-5 py-4">
-              <span className="label">Income vs expenses</span>
-              <div className="mt-3">
-                <ResponsiveContainer width="100%" height={220}>
-                  <BarChart data={plData}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
-                    <XAxis dataKey="m" tick={{ fill: 'var(--text-dim)', fontSize: 10 }} />
-                    <YAxis tick={{ fill: 'var(--text-dim)', fontSize: 10 }} />
-                    <Tooltip contentStyle={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 12, fontSize: 12 }} />
-                    <Legend wrapperStyle={{ fontSize: 10 }} />
-                    <Bar dataKey="income" fill="var(--positive)" radius={[4, 4, 0, 0]} />
-                    <Bar dataKey="expenses" fill="#FF453A" radius={[4, 4, 0, 0]} />
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
-            </motion.div>
-          </StaggerItem>
-
-          {/* P&L Trend */}
-          <StaggerItem>
-            <motion.div whileHover={{ filter: 'brightness(1.05)' }} className="card px-5 py-4">
-              <span className="label">P&amp;L trend</span>
-              <div className="mt-3">
-                <ResponsiveContainer width="100%" height={180}>
-                  <AreaChart data={plTrend}>
-                    <defs>
-                      <linearGradient id="profitGrad" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="var(--positive)" stopOpacity={0.3} />
-                        <stop offset="95%" stopColor="var(--positive)" stopOpacity={0} />
-                      </linearGradient>
-                    </defs>
-                    <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
-                    <XAxis dataKey="m" tick={{ fill: 'var(--text-dim)', fontSize: 10 }} />
-                    <YAxis tick={{ fill: 'var(--text-dim)', fontSize: 10 }} />
-                    <Tooltip contentStyle={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 12, fontSize: 12 }} />
-                    <Area type="monotone" dataKey="profit" stroke="var(--positive)" fill="url(#profitGrad)" strokeWidth={2} />
-                  </AreaChart>
-                </ResponsiveContainer>
-              </div>
-            </motion.div>
           </StaggerItem>
 
           {/* Emergency Scenario Planner */}
@@ -413,6 +392,15 @@ export default function FinancialsPage() {
             </div>
           </StaggerItem>
           {/* Days Clean */}
+          <StaggerItem>
+            <FinancialsDailySpending
+              plaidConnected={plaidConnected}
+              netTakeHome={netTakeHomePL}
+              workDayStart={workDayStart || '09:00'}
+              workDayEnd={workDayEnd || '17:00'}
+            />
+          </StaggerItem>
+
           {noGambleStreak && (
             <StaggerItem>
               <motion.div whileHover={{ filter: 'brightness(1.05)' }} className="card px-5 py-4 flex items-center gap-3 opacity-90 hover:opacity-100 transition-opacity">

@@ -13,6 +13,7 @@ import {
   BUSINESS_STATUSES, COLOR_SWATCHES, MEETING_FREQUENCIES,
 } from '@/lib/constants'
 import { applyTaskDollarEstimateAfterCreate } from '@/lib/task-dollar-client'
+import { clientConcentrationWarnings } from '@/lib/financials-metrics'
 
 /* ── Constants ── */
 
@@ -100,6 +101,14 @@ export default function BusinessPage() {
   const bizRevenue = useMemo(() => revenueEntries.filter((r) => r.businessId === id).sort((a, b) => a.date.localeCompare(b.date)), [revenueEntries, id])
   const incompleteTasks = bizTasks.filter((t) => !t.done).length
   const agencyTotals = biz?.type === 'agency' ? getAgencyTotals(bizClients) : null
+  const globalNetTotal = useMemo(
+    () => getAgencyTotals(clients.filter((c) => c.active)).net,
+    [clients]
+  )
+  const concentrationAlertsThisBiz = useMemo(
+    () => clientConcentrationWarnings(businesses, clients, 30).filter((w) => w.business.id === id),
+    [businesses, clients, id]
+  )
 
   // ── Not Found ──
   if (!biz) {
@@ -357,6 +366,22 @@ export default function BusinessPage() {
         {biz.type === 'agency' && (
           <motion.div variants={fadeUp} className="card rounded-[16px] p-5 overflow-x-auto">
             <p className="section-label text-xs text-text-dim uppercase tracking-wide mb-4">Clients</p>
+            {concentrationAlertsThisBiz.length > 0 && (
+              <div className="mb-4 space-y-3">
+                {concentrationAlertsThisBiz.map(({ client: cl, business: bb, clientNet, pctOfTotal }) => (
+                  <div
+                    key={cl.id}
+                    className="rounded-[14px] border border-border border-l-[3px] border-l-rose bg-surface/80 p-4"
+                  >
+                    <p className="text-[15px] text-text-primary">
+                      ⚠ {cl.name} represents {pctOfTotal.toFixed(0)}% of net revenue from {bb.name}. If they leave, you lose $
+                      {Math.round(clientNet).toLocaleString()}
+                      /mo. Diversify.
+                    </p>
+                  </div>
+                ))}
+              </div>
+            )}
             <table className="w-full text-sm">
               <thead>
                 <tr className="text-text-dim text-xs uppercase border-b border-border">
@@ -365,6 +390,7 @@ export default function BusinessPage() {
                   <th className="text-right py-2 px-2">Ad Spend</th>
                   <th className="text-right py-2 px-2">Stripe 3%</th>
                   <th className="text-right py-2 px-2">Net</th>
+                  <th className="text-right py-2 px-2">% of total net</th>
                   <th className="text-left py-2 px-2">Service</th>
                   <th className="text-left py-2 px-2">Meeting</th>
                   <th className="py-2 w-8"></th>
@@ -373,8 +399,8 @@ export default function BusinessPage() {
               <tbody>
                 {bizClients.map((c) => {
                   const net = getClientNet(c)
-                  const totalNet = agencyTotals?.net ?? 1
-                  const concentrated = totalNet > 0 && net / totalNet > 0.4
+                  const pctGlobal = globalNetTotal > 0 ? (net / globalNetTotal) * 100 : 0
+                  const concentrated = pctGlobal > 30
                   return (
                     <tr key={c.id} className="border-b border-border/50 group hover:bg-surface/50">
                       {(['name', 'grossMonthly', 'adSpend'] as const).map((field) => (
@@ -396,6 +422,9 @@ export default function BusinessPage() {
                       <td className="py-2 px-2 text-right data">
                         <span className={concentrated ? 'text-rose font-medium' : ''}>${Math.round(net).toLocaleString()}</span>
                         {concentrated && <span className="ml-1 text-[10px] bg-rose/15 text-rose px-1.5 py-0.5 rounded-full">HIGH</span>}
+                      </td>
+                      <td className="py-2 px-2 text-right data text-text-dim tabular-nums">
+                        {globalNetTotal > 0 ? `${pctGlobal.toFixed(0)}%` : '—'}
                       </td>
                       {(['serviceType', 'meetingFrequency'] as const).map((field) => (
                         <td key={field} className="py-2 px-2 text-left" onClick={() => startEditClient(c.id, field, c[field])}>
@@ -431,6 +460,7 @@ export default function BusinessPage() {
                     <td className="py-2 px-2 text-right data">${agencyTotals.adSpend.toLocaleString()}</td>
                     <td className="py-2 px-2 text-right data text-text-dim">${Math.round(agencyTotals.gross * 0.03).toLocaleString()}</td>
                     <td className="py-2 px-2 text-right data">${agencyTotals.net.toLocaleString()}</td>
+                    <td className="py-2 px-2 text-right data text-text-dim">—</td>
                     <td colSpan={3}></td>
                   </tr>
                 )}
