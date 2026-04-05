@@ -1,10 +1,10 @@
 'use client'
 
-import { useState, useRef, useEffect, useCallback, Suspense } from 'react'
+import { useState, useRef, useEffect, useCallback, useMemo, Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
 import { toast } from 'sonner'
-import { useStore } from '@/stores/store'
+import { useStore, isArchived } from '@/stores/store'
 import { buildFullSystemPrompt } from '@/lib/ai-context'
 import { extractCommitmentsFromUserMessage } from '@/lib/extract-commitments'
 
@@ -58,6 +58,14 @@ function AIPageInner() {
     logEvent,
   } = useStore()
 
+  const activeBusinesses = useMemo(
+    () => businesses.filter((b) => !isArchived(b)),
+    [businesses]
+  )
+  const filterBizName = businessFilter
+    ? activeBusinesses.find((b) => b.id === businessFilter)?.name
+    : undefined
+
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -65,6 +73,7 @@ function AIPageInner() {
   const [inputFocused, setInputFocused] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
+  const askPrefillDone = useRef(false)
 
   const scrollToBottom = useCallback(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
@@ -73,6 +82,13 @@ function AIPageInner() {
   useEffect(() => {
     scrollToBottom()
   }, [aiMessages, scrollToBottom])
+
+  useEffect(() => {
+    const ask = searchParams.get('ask')
+    if (!ask || askPrefillDone.current) return
+    askPrefillDone.current = true
+    setInput((prev) => (prev.trim() ? prev : ask))
+  }, [searchParams])
 
   useEffect(() => {
     if (textareaRef.current) {
@@ -94,9 +110,7 @@ function AIPageInner() {
       toast.success(extracted.length === 1 ? 'Commitment saved from your message' : `${extracted.length} commitments saved`)
     }
 
-    const userContent = businessFilter && businesses.find(b => b.id === businessFilter)?.name
-      ? `Context: ${businesses.find(b => b.id === businessFilter)?.name}\n\n${raw}`
-      : raw
+    const userContent = filterBizName ? `Context: ${filterBizName}\n\n${raw}` : raw
 
     addAiMessage({ role: 'user', content: userContent, businessContext: businessFilter || undefined })
     setInput('')
@@ -232,9 +246,7 @@ function AIPageInner() {
           <div>
             <h1 className="text-lg font-semibold text-text">AI Strategist</h1>
             <p className="text-[10px] font-mono uppercase tracking-[2px] text-text-dim mt-0.5">
-              {businessFilter && businesses.find(b => b.id === businessFilter)?.name
-                ? `Focused: ${businesses.find(b => b.id === businessFilter)?.name}`
-                : 'Your AI co-founder. Hard truths only.'}
+              {filterBizName ? `Focused: ${filterBizName}` : 'Your AI co-founder. Hard truths only.'}
             </p>
           </div>
           {aiMessages.length > 0 && (
@@ -271,11 +283,10 @@ function AIPageInner() {
                     key={p}
                     initial={{ opacity: 0, y: 8 }}
                     animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: i * 0.04, duration: 0.25 }}
-                    whileHover={{ scale: 1.02, y: -1, boxShadow: '0 4px 12px rgba(0,0,0,0.08)' }}
-                    whileTap={{ scale: 0.98 }}
+                    transition={{ delay: i * 0.03, duration: 0.25, ease: [0.25, 0.1, 0.25, 1] }}
+                    whileTap={{ scale: 0.97, transition: { duration: 0.1 } }}
                     onClick={() => sendMessage(p)}
-                    className="text-left text-[14px] px-4 py-3 rounded-[12px] bg-surface2 border border-border hover:border-accent/40 hover:bg-surface3 text-text-mid hover:text-text transition-all duration-200"
+                    className="text-left text-[17px] px-4 py-3 rounded-[12px] bg-surface2 border border-border hover:border-[var(--border-hover)] hover:bg-[var(--bg-secondary)] text-text-mid hover:text-text transition-colors duration-200"
                   >
                     {p}
                   </motion.button>
@@ -295,7 +306,7 @@ function AIPageInner() {
                 className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
               >
                 <div
-                  className={`max-w-[85%] md:max-w-[75%] px-4 py-3 rounded-[16px] text-[14px] leading-relaxed ${
+                  className={`max-w-[85%] md:max-w-[75%] px-4 py-3 rounded-[16px] text-[17px] leading-relaxed ${
                     msg.role === 'user'
                       ? 'bg-surface3 border border-border text-text rounded-br-md'
                       : 'bg-surface2 border border-border text-text rounded-bl-md'
@@ -431,8 +442,8 @@ function AIPageInner() {
           <div>
             <h3 className="text-[10px] font-mono uppercase tracking-[2px] text-text-dim mb-2">Revenue Streams</h3>
             <div className="space-y-2">
-              {businesses.map(b => (
-                <motion.div key={b.id} whileHover={{ x: 2, y: -1, boxShadow: '0 4px 12px rgba(0,0,0,0.08)' }} className="bg-surface2 border border-border rounded-[12px] px-3 py-2">
+              {activeBusinesses.map((b) => (
+                <motion.div key={b.id} className="rounded-[12px] border border-border bg-surface2 px-3 py-2 transition-colors hover:border-[var(--border-hover)] hover:bg-[var(--bg-secondary)]">
                   <div className="flex items-center gap-2">
                     <div className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: b.color }} />
                     <span className="text-text font-medium">{b.name}</span>
@@ -449,7 +460,7 @@ function AIPageInner() {
             <h3 className="text-[10px] font-mono uppercase tracking-[2px] text-text-dim mb-2">Streaks</h3>
             <div className="grid grid-cols-2 gap-1.5">
               {streaks.map(s => (
-                <motion.div key={s.habit} whileHover={{ y: -1, boxShadow: '0 4px 12px rgba(0,0,0,0.08)' }} className="bg-surface2 border border-border rounded-[12px] px-2.5 py-1.5">
+                <motion.div key={s.habit} className="rounded-[12px] border border-border bg-surface2 px-2.5 py-1.5 transition-colors hover:border-[var(--border-hover)] hover:bg-[var(--bg-secondary)]">
                   <span className="text-text capitalize">{s.habit.replace('_', ' ')}</span>
                   <span className={`ml-1 font-mono font-bold ${s.currentStreak > 0 ? 'text-accent' : 'text-text-dim'}`}>
                     {s.currentStreak}d
@@ -546,10 +557,9 @@ function AIPageInner() {
 
           {/* Copy Context Button */}
           <motion.button
-            whileHover={{ scale: 1.02, y: -1 }}
-            whileTap={{ scale: 0.97 }}
+            whileTap={{ scale: 0.97, transition: { duration: 0.1 } }}
             onClick={copyContext}
-            className="w-full py-2.5 rounded-[12px] bg-surface3 border border-border hover:border-accent/40 text-text-mid hover:text-text text-xs font-medium transition-all duration-200 flex items-center justify-center gap-2"
+            className="flex w-full items-center justify-center gap-2 rounded-[12px] border border-border bg-surface3 py-2.5 text-[17px] font-medium text-text-mid transition-colors duration-200 hover:border-[var(--border-hover)] hover:bg-[var(--bg-secondary)] hover:text-text"
           >
             {copied ? (
               <>

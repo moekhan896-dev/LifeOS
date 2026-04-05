@@ -4,6 +4,7 @@ import { useState, type ReactNode } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { Drawer } from 'vaul'
+import { DRAWER_CONTENT_CLASS, DrawerDragHandle } from '@/components/ui/drawer-primitives'
 import { NAV_SECTIONS } from '@/config/navigation'
 
 const TABS: { href: string; label: string; icon: (active: boolean) => ReactNode }[] = [
@@ -121,8 +122,8 @@ export default function MobileTabBar() {
       <Drawer.Root open={moreOpen} onOpenChange={setMoreOpen}>
         <Drawer.Portal>
           <Drawer.Overlay className="fixed inset-0 z-[130] bg-black/60" />
-          <Drawer.Content className="fixed bottom-0 left-0 right-0 z-[140] max-h-[85vh] overflow-hidden rounded-t-[20px] border border-[var(--border)] bg-[var(--bg-elevated)]">
-            <div className="mx-auto mt-3 h-1 w-10 shrink-0 rounded-full bg-[var(--text-tertiary)]/30" />
+          <Drawer.Content className={`${DRAWER_CONTENT_CLASS} z-[140] overflow-hidden`}>
+            <DrawerDragHandle />
             <Drawer.Title className="sr-only">All pages</Drawer.Title>
             <div className="max-h-[min(75vh,600px)] overflow-y-auto px-4 pb-8 pt-2">
               {NAV_SECTIONS.map((section) => (

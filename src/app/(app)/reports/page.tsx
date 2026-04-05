@@ -89,15 +89,22 @@ export default function ReportsPage() {
       <div className="space-y-4 pb-24">
         <div>
           <h1 className="text-2xl font-bold text-[var(--text)]">AI Reports</h1>
-          <p className="mt-1 text-sm text-[var(--text-dim)]">
+          <p className="mt-1 text-[17px] text-[var(--text-dim)]">
             PRD §22 — cascading intelligence. Weekly auto-runs after Sunday on first load when an API key is set.
           </p>
         </div>
 
-        <div className="flex gap-1.5 overflow-x-auto pb-1 no-scrollbar">
+        <div
+          className="flex gap-1.5 overflow-x-auto pb-1 no-scrollbar"
+          role="tablist"
+          aria-label="Report period"
+        >
           {LEVELS.map((l) => (
             <button
               key={l}
+              type="button"
+              role="tab"
+              aria-selected={activeLevel === l}
               onClick={() => {
                 setActiveLevel(l)
                 setExpanded(null)
@@ -105,7 +112,7 @@ export default function ReportsPage() {
               className={`whitespace-nowrap rounded-full px-3 py-1.5 text-xs transition-colors ${
                 activeLevel === l
                   ? 'bg-[var(--accent)] text-white'
-                  : 'border border-[var(--border)] bg-[var(--bg)] text-[var(--text-dim)] hover:border-[var(--accent)]'
+                  : 'border border-[var(--border)] bg-[var(--bg)] text-[var(--text-dim)] hover:border-[var(--accent)] hover:bg-[var(--bg-secondary)]'
               }`}
             >
               {LEVEL_LABELS[l]}
@@ -123,8 +130,9 @@ export default function ReportsPage() {
         )}
 
         <motion.button
-          whileHover={{ scale: 1.01 }}
-          whileTap={{ scale: 0.98 }}
+          type="button"
+          whileTap={{ scale: 0.97 }}
+          transition={{ duration: 0.1 }}
           onClick={generateReport}
           disabled={loading}
           className="w-full rounded-[12px] border border-[var(--accent)]/30 bg-[var(--accent)]/10 py-3 text-sm font-medium text-[var(--accent)] transition-colors hover:bg-[var(--accent)]/20 disabled:opacity-50"

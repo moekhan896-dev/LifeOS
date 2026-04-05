@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { Drawer } from 'vaul'
+import { DRAWER_CONTENT_CLASS, DrawerDragHandle } from '@/components/ui/drawer-primitives'
 import { motion } from 'framer-motion'
 import { toast } from 'sonner'
 import { useStore } from '@/stores/store'
@@ -62,7 +63,7 @@ export default function EveningVoiceReview() {
         eveningVoiceTranscript: t,
         reflectionKind: 'evening_voice',
       })
-      logEvent('evening_voice_review_saved', { length: t.length })
+      logEvent('voice_review_completed', { transcriptLength: t.length })
       toast.success('Voice review saved')
     } else {
       toast.message('No transcript captured.')
@@ -118,8 +119,8 @@ export default function EveningVoiceReview() {
       <Drawer.Root open={open} onOpenChange={setOpen}>
         <Drawer.Portal>
           <Drawer.Overlay className="fixed inset-0 z-[110] bg-black/60" />
-          <Drawer.Content className="fixed bottom-0 left-0 right-0 z-[120] max-h-[88vh] overflow-y-auto rounded-t-[20px] border border-[var(--border)] bg-[var(--bg-elevated)] p-5">
-            <div className="mx-auto mb-3 h-1 w-10 rounded-full bg-white/10" />
+          <Drawer.Content className={`${DRAWER_CONTENT_CLASS} z-[120]`}>
+            <DrawerDragHandle />
             <Drawer.Title className="text-lg font-semibold text-[var(--text-primary)]">End-of-day review</Drawer.Title>
             <p className="mt-2 text-[15px] leading-relaxed text-[var(--text-secondary)]">{PROMPT}</p>
             <div className="mt-4 flex items-center justify-between text-[13px] text-[var(--text-dim)]">

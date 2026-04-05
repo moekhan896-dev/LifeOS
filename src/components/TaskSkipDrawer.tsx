@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { Drawer } from 'vaul'
+import { DRAWER_CONTENT_CLASS, DrawerDragHandle } from '@/components/ui/drawer-primitives'
 import { toast } from 'sonner'
 import { useStore } from '@/stores/store'
 
@@ -40,12 +41,12 @@ export default function TaskSkipDrawer({ taskId, onDismiss }: TaskSkipDrawerProp
     <Drawer.Root open={open} onOpenChange={(o) => !o && close()}>
       <Drawer.Portal>
         <Drawer.Overlay className="fixed inset-0 z-[130] bg-black/60" />
-        <Drawer.Content className="fixed bottom-0 left-0 right-0 z-[140] max-h-[85vh] rounded-t-[20px] border border-[var(--border)] bg-[var(--bg-elevated)] p-5">
-          <div className="mx-auto mb-3 h-1 w-10 rounded-full bg-white/10" />
+        <Drawer.Content className={`${DRAWER_CONTENT_CLASS} z-[140]`}>
+          <DrawerDragHandle />
           <Drawer.Title className="text-lg font-semibold text-[var(--text-primary)]">
             What&apos;s preventing you from doing this?
           </Drawer.Title>
-          <p className="mt-1 text-[14px] text-[var(--text-secondary)]">
+          <p className="mt-1 text-[17px] text-[var(--text-secondary)]">
             Your answer is logged on the task. Skips add up toward follow-up nudges.
           </p>
           <div className="mt-4 flex flex-wrap gap-2">
@@ -54,7 +55,7 @@ export default function TaskSkipDrawer({ taskId, onDismiss }: TaskSkipDrawerProp
                 key={c.value}
                 type="button"
                 onClick={() => submit(c.value)}
-                className="rounded-full border border-[var(--border)] bg-[var(--bg-secondary)] px-4 py-2.5 text-left text-[14px] text-[var(--text-primary)] hover:border-[var(--accent)]"
+                className="rounded-full border border-[var(--border)] bg-[var(--bg-secondary)] px-4 py-2.5 text-left text-[17px] text-[var(--text-primary)] hover:border-[var(--accent)]"
               >
                 {c.label}
               </button>
@@ -62,7 +63,7 @@ export default function TaskSkipDrawer({ taskId, onDismiss }: TaskSkipDrawerProp
             <button
               type="button"
               onClick={() => setShowBlocked(true)}
-              className="rounded-full border border-[var(--border)] bg-[var(--bg-secondary)] px-4 py-2.5 text-[14px] text-[var(--text-primary)] hover:border-[var(--warning)]"
+              className="rounded-full border border-[var(--border)] bg-[var(--bg-secondary)] px-4 py-2.5 text-[17px] text-[var(--text-primary)] hover:border-[var(--warning)]"
             >
               Blocked by…
             </button>

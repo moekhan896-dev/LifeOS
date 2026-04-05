@@ -1,10 +1,9 @@
 'use client'
 
 import { useMemo } from 'react'
-import { useStore, getAgencyTotals, getClientNet } from '@/stores/store'
+import { useStore, getAgencyTotals, getClientNet, isArchived } from '@/stores/store'
 import PageTransition from '@/components/PageTransition'
 import { StaggerContainer, StaggerItem } from '@/components/Stagger'
-import { motion } from 'framer-motion'
 import {
   FinancialsHero,
   FinancialsProfitLossSection,
@@ -65,10 +64,15 @@ export default function FinancialsPage() {
   const savingsLabel = savingsRange || '—'
   const noGambleStreak = streaks.find(s => s.habit === 'no_gamble')
 
+  const activeBusinesses = useMemo(
+    () => businesses.filter((b) => !isArchived(b)),
+    [businesses]
+  )
+
   const agencyTotals = getAgencyTotals(clients)
 
   const incomeStreams = useMemo(() => {
-    return businesses
+    return activeBusinesses
       .filter(b => b.monthlyRevenue > 0 || clients.some(c => c.businessId === b.id && c.active))
       .map(b => {
         const bizClients = clients.filter(c => c.businessId === b.id && c.active)
@@ -79,24 +83,24 @@ export default function FinancialsPage() {
           : b.notes || ''
         return { label: b.name, net, detail }
       })
-  }, [businesses, clients])
+  }, [activeBusinesses, clients])
 
   const TOTAL_INCOME = incomeStreams.reduce((s, i) => s + i.net, 0)
   const TOTAL_COSTS = expenseEntries.filter((e) => e.recurring).reduce((s, e) => s + e.amount, 0)
   const NET_TAKE_HOME = TOTAL_INCOME - TOTAL_COSTS
 
   const netTakeHomePL = useMemo(() => {
-    const g = grossRevenue(businesses)
-    const c = businessCosts(businesses, clients)
+    const g = grossRevenue(activeBusinesses)
+    const c = businessCosts(activeBusinesses, clients)
     const p = processingFeesGross(g)
     const nr = netRevenue(g, c, p)
     const pe = personalExpensesRecurring(expenseEntries)
     return takeHome(nr, pe)
-  }, [businesses, clients, expenseEntries])
+  }, [activeBusinesses, clients, expenseEntries])
 
   const hasConcentrationWarnings = useMemo(
-    () => clientConcentrationWarnings(businesses, clients, 30).length > 0,
-    [businesses, clients]
+    () => clientConcentrationWarnings(activeBusinesses, clients, 30).length > 0,
+    [activeBusinesses, clients]
   )
 
   // Build scenarios from top revenue sources
@@ -156,12 +160,12 @@ export default function FinancialsPage() {
 
           {hasConcentrationWarnings && (
             <StaggerItem>
-              <FinancialsConcentrationWarnings businesses={businesses} clients={clients} />
+              <FinancialsConcentrationWarnings businesses={activeBusinesses} clients={clients} />
             </StaggerItem>
           )}
 
           <StaggerItem>
-            <FinancialsRevenueByBusinessChart businesses={businesses} clients={clients} />
+            <FinancialsRevenueByBusinessChart businesses={activeBusinesses} clients={clients} />
           </StaggerItem>
 
           {/* Income */}
@@ -220,10 +224,9 @@ export default function FinancialsPage() {
                   const deficit = newIncome - TOTAL_COSTS
                   const runwayMonths = deficit < 0 ? NaN : Infinity
                   return (
-                    <motion.div
+                    <div
                       key={s.name}
-                      whileHover={{ filter: 'brightness(1.05)' }}
-                      className="rounded-[12px] border border-[var(--border)] bg-[var(--bg-elevated)] p-4"
+                      className="rounded-[12px] border border-[var(--border)] bg-[var(--bg-elevated)] p-4 transition-colors hover:border-[var(--border-hover)] hover:bg-[var(--bg-secondary)]"
                     >
                       <p className="text-[17px] font-semibold text-[var(--text)]">{s.name}</p>
                       <p className="text-[15px] text-[var(--text-secondary)] mb-2">{s.description}</p>
@@ -253,7 +256,7 @@ export default function FinancialsPage() {
                           </span>
                         </div>
                       </div>
-                    </motion.div>
+                    </div>
                   )
                 })}
               </div>
@@ -344,7 +347,7 @@ export default function FinancialsPage() {
 
           {/* Agency Valuation */}
           <StaggerItem>
-            <motion.div whileHover={{ filter: 'brightness(1.05)' }} className="card px-5 py-4">
+            <div className="card px-5 py-4">
               <span className="label text-[var(--info)]">Estimated net worth</span>
               <div className="mt-3 space-y-2">
                 <div className="flex justify-between text-[17px]">
@@ -361,7 +364,7 @@ export default function FinancialsPage() {
                   </p>
                 </div>
               </div>
-            </motion.div>
+            </div>
           </StaggerItem>
 
           {/* Time vs Money Matrix */}
@@ -369,7 +372,7 @@ export default function FinancialsPage() {
             <div className="card px-5 py-4">
               <span className="label text-[var(--info)]">Time vs money matrix</span>
               <div className="mt-3 space-y-3">
-                {businesses.map((b) => {
+                {activeBusinesses.map((b) => {
                   const bizClients = clients.filter(c => c.businessId === b.id && c.active)
                   const income = bizClients.length > 0
                     ? bizClients.reduce((s, c) => s + getClientNet(c), 0)
@@ -403,13 +406,13 @@ export default function FinancialsPage() {
 
           {noGambleStreak && (
             <StaggerItem>
-              <motion.div whileHover={{ filter: 'brightness(1.05)' }} className="card px-5 py-4 flex items-center gap-3 opacity-90 hover:opacity-100 transition-opacity">
-                <div className="data flex h-9 w-9 items-center justify-center rounded-full bg-[rgba(48,209,88,0.15)] text-[15px] font-bold text-[var(--positive)]">{noGambleStreak.currentStreak}</div>
+              <div className="card flex items-center gap-3 px-5 py-4 opacity-90 transition-opacity hover:opacity-100">
+                <div className="data flex h-9 w-9 items-center justify-center rounded-full bg-[color-mix(in_srgb,var(--positive)_15%,transparent)] text-[17px] font-bold text-[var(--positive)]">{noGambleStreak.currentStreak}</div>
                 <div>
                   <p className="text-[15px] font-medium text-[var(--text-secondary)]">Days clean</p>
                   <p className="text-[13px] text-[var(--text-dim)]">Longest: {noGambleStreak.longestStreak}d</p>
                 </div>
-              </motion.div>
+              </div>
             </StaggerItem>
           )}
         </StaggerContainer>

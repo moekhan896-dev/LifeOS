@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { useStore, type DriverStatus } from '@/stores/store'
+import { useStore, type DriverStatus, isArchived } from '@/stores/store'
 import { DRIVER_STATUSES, DRIVER_STATUS_COLORS } from '@/lib/constants'
 import PageTransition from '@/components/PageTransition'
 import { StaggerContainer, StaggerItem } from '@/components/Stagger'
@@ -58,7 +58,7 @@ export default function RevenueDriversPage() {
 
         {/* Business sections */}
         <StaggerContainer className="space-y-4">
-          {businesses.map((biz) => {
+          {businesses.filter((b) => !isArchived(b)).map((biz) => {
             const bizDrivers = filtered.filter((d) => d.businessId === biz.id)
             if (filter !== 'ALL' && bizDrivers.length === 0) return null
             return (
@@ -74,7 +74,6 @@ export default function RevenueDriversPage() {
                     {bizDrivers.map((d) => (
                       <motion.div
                         key={d.id}
-                        whileHover={{ y: -1, boxShadow: '0 4px 12px rgba(0,0,0,0.08)' }}
                         className={`flex items-center gap-3 rounded-lg border p-3 ${
                           d.status === 'STALE' ? 'border-[var(--rose)]/50 bg-[var(--rose)]/5' : 'border-[var(--border)] bg-[var(--bg)]'
                         }`}

@@ -54,7 +54,7 @@ export default function PrayerBar({ times = {} }: PrayerBarProps) {
           style={{ color: count === 5 ? 'var(--gold)' : 'var(--text-mid)' }}
           initial={{ scale: 1.3, opacity: 0.5 }}
           animate={{ scale: 1, opacity: 1 }}
-          transition={{ type: 'spring', stiffness: 400, damping: 15 }}
+          transition={{ duration: 0.25, ease: [0.25, 0.1, 0.25, 1] }}
         >
           {count}/5
         </motion.span>
@@ -78,7 +78,7 @@ export default function PrayerBar({ times = {} }: PrayerBarProps) {
               } : undefined}
               whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.95 }}
-              transition={{ type: 'spring', stiffness: 400, damping: 20 }}
+              transition={{ duration: 0.25, ease: [0.25, 0.1, 0.25, 1] }}
             >
               <span className="relative text-[12px] font-semibold">{label}</span>
               {times[key] && (

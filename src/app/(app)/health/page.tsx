@@ -10,6 +10,7 @@ import { toast } from 'sonner'
 import { BarChart, Bar, AreaChart, Area, ResponsiveContainer, XAxis, YAxis, Tooltip, CartesianGrid } from 'recharts'
 import { computeHealthBusinessCorrelations } from '@/lib/health-correlations'
 import { Drawer } from 'vaul'
+import { DRAWER_CONTENT_CLASS, DrawerDragHandle } from '@/components/ui/drawer-primitives'
 
 const weeklyPrayerData = [
   { day: 'Mon', completed: 5 },
@@ -100,8 +101,9 @@ export default function HealthPage() {
   const productivityScore = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 40) : 0 // 40 max
 
   const dailyScore = prayerScore + healthScore + productivityScore
-  const xpToNext = 500 - (xp % 500)
-  const xpProgress = ((xp % 500) / 500) * 100
+  const xpInLevel = xp % 100
+  const xpToNext = 100 - xpInLevel
+  const xpProgress = xpInLevel
 
   return (
     <PageTransition>
@@ -147,7 +149,6 @@ export default function HealthPage() {
                   return (
                     <motion.button
                       key={p.key}
-                      whileHover={{ y: -1, boxShadow: '0 4px 12px rgba(0,0,0,0.08)' }}
                       whileTap={{ scale: 0.97 }}
                       onClick={() => {
                         togglePrayer(p.key)
@@ -203,7 +204,7 @@ export default function HealthPage() {
 
           {/* Weekly Prayer Chart */}
           <StaggerItem>
-            <motion.div whileHover={{ y: -2 }} className="card p-4">
+            <motion.div className="card p-4">
               <div className="flex items-center gap-2.5 mb-3">
                 <span className="text-lg">📊</span>
                 <h2 className="text-[14px] font-bold tracking-tight text-[var(--text)] uppercase">Weekly Prayer Completion</h2>
@@ -222,7 +223,7 @@ export default function HealthPage() {
 
           {/* Daily Score Trend */}
           <StaggerItem>
-            <motion.div whileHover={{ y: -2 }} className="card p-4">
+            <motion.div className="card p-4">
               <div className="flex items-center gap-2.5 mb-3">
                 <span className="text-lg">📈</span>
                 <h2 className="text-[14px] font-bold tracking-tight text-[var(--text)] uppercase">Daily Score Trend</h2>
@@ -292,8 +293,8 @@ export default function HealthPage() {
               </Section>
               <Drawer.Portal>
                 <Drawer.Overlay className="fixed inset-0 z-[100] bg-black/60" />
-                <Drawer.Content className="fixed bottom-0 left-0 right-0 z-[110] max-h-[80vh] rounded-t-[20px] border border-[var(--border)] bg-[var(--bg-elevated)] p-5">
-                  <div className="mx-auto mb-3 h-1 w-10 rounded-full bg-white/10" />
+                <Drawer.Content className={`${DRAWER_CONTENT_CLASS} z-[110]`}>
+                  <DrawerDragHandle />
                   <Drawer.Title className="text-lg font-semibold text-[var(--text-primary)]">Gym &amp; your work</Drawer.Title>
                   <p className="mt-3 text-[15px] text-[var(--text-secondary)]">
                     {correlations.lines.find((l) => l.id === 'gym-tasks')?.text ??
@@ -434,8 +435,8 @@ export default function HealthPage() {
             </div>
           </StaggerItem>
 
-          {/* Gamification */}
-          <StaggerItem>
+          {/* Gamification / habits anchor (PRD §5 — Foundation → Habits) */}
+          <StaggerItem id="habits">
             <Section title="Gamification" icon="🎮">
               <div className="flex flex-col sm:flex-row items-center gap-6">
                 <div className="text-center">

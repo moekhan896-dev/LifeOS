@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Command } from 'cmdk'
 import { motion, AnimatePresence } from 'framer-motion'
-import { useStore } from '@/stores/store'
+import { useStore, isArchived } from '@/stores/store'
 
 const PAGES = [
   { name: 'Dashboard', href: '/dashboard', icon: '◆' },
@@ -12,8 +12,12 @@ const PAGES = [
   { name: 'Schedule', href: '/schedule', icon: '◷' },
   { name: 'Tasks', href: '/tasks', icon: '☐' },
   { name: 'Insights', href: '/insights', icon: '◈' },
-  { name: 'AI Strategist', href: '/ai', icon: '🧠' },
-  { name: 'Financials', href: '/financials', icon: '⊟' },
+  { name: 'AI Partner', href: '/ai', icon: '🧠' },
+  { name: 'Pipeline', href: '/pipeline', icon: '🎯' },
+  { name: 'Clients', href: '/clients', icon: '👤' },
+  { name: 'Businesses', href: '/businesses', icon: '🏢' },
+  { name: 'Expenses', href: '/expenses', icon: '⊟' },
+  { name: 'Financials', href: '/financials', icon: '⊞' },
   { name: 'Revenue Drivers', href: '/revenue-drivers', icon: '↗' },
   { name: 'Health & Deen', href: '/health', icon: '♡' },
   { name: 'Idea Bank', href: '/idea-bank', icon: '💡' },
@@ -151,7 +155,7 @@ export default function CommandPalette() {
                 </Command.Group>
 
                 <Command.Group heading={<span className="label block px-2 pb-1 pt-3">Businesses</span>}>
-                  {businesses.map((b) => (
+                  {businesses.filter((b) => !isArchived(b)).map((b) => (
                     <Command.Item
                       key={b.id}
                       value={`${b.name} ${b.id}`}

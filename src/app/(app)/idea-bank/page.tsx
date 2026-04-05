@@ -97,7 +97,6 @@ export default function IdeaBankPage() {
               <StaggerItem key={idea.id}>
                 <motion.div
                   layout
-                  whileHover={{ y: -1, boxShadow: '0 4px 12px rgba(0,0,0,0.08)' }}
                   className={`card p-3 ${idea.promoted ? 'border-[var(--accent)]/40' : ''}`}
                 >
                   <div className="flex items-start gap-3">

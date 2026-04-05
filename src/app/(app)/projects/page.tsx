@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { toast } from 'sonner'
-import { useStore, type ProjectStatus } from '@/stores/store'
+import { useStore, isArchived, type ProjectStatus } from '@/stores/store'
 import PageTransition from '@/components/PageTransition'
 
 const card = 'bg-[var(--bg-elevated)] border border-[var(--border)] rounded-2xl p-5'
@@ -37,9 +37,11 @@ function ProgressRing({ progress, size = 48 }: { progress: number; size?: number
 
 export default function ProjectsPage() {
   const {
-    projects, addProject, updateProject, deleteProject,
+    projects, addProject, updateProject, archiveProject,
     tasks, goals, businesses,
   } = useStore()
+
+  const visibleProjects = projects.filter((p) => !isArchived(p))
 
   const [showForm, setShowForm] = useState(false)
   const [expanded, setExpanded] = useState<string | null>(null)
@@ -50,17 +52,20 @@ export default function ProjectsPage() {
     impact: 5, confidence: 5, ease: 5, deadline: '',
   })
 
-  const active = projects.filter(p => p.status === 'in_progress')
-  const backlog = [...projects.filter(p => p.status === 'not_started')]
-    .sort((a, b) => (b.impact * b.confidence * b.ease) - (a.impact * a.confidence * a.ease))
-  const blocked = projects.filter(p => p.status === 'blocked')
-  const completed = projects.filter(p => p.status === 'complete')
+  const active = visibleProjects.filter((p) => p.status === 'in_progress')
+  const backlog = [...visibleProjects.filter((p) => p.status === 'not_started')].sort(
+    (a, b) => b.impact * b.confidence * b.ease - a.impact * a.confidence * a.ease
+  )
+  const blocked = visibleProjects.filter((p) => p.status === 'blocked')
+  const completed = visibleProjects.filter((p) => p.status === 'complete')
 
   function ice(p: { impact: number; confidence: number; ease: number }) {
     return p.impact * p.confidence * p.ease
   }
 
-  function getBiz(id?: string) { return businesses.find(b => b.id === id) }
+  function getBiz(id?: string) {
+    return businesses.find((b) => b.id === id && !isArchived(b))
+  }
   function getGoal(id?: string) { return goals.find(g => g.id === id) }
   function taskCount(projectId: string) { return tasks.filter(t => t.projectId === projectId).length }
 
@@ -145,8 +150,17 @@ export default function ProjectsPage() {
           )}
           <button onClick={() => setExpanded(isExpanded ? null : p.id)}
             className="text-xs text-slate-400 hover:text-white transition">{isExpanded ? 'Collapse' : 'Expand'}</button>
-          <button onClick={() => { deleteProject(p.id); toast('Deleted') }}
-            className="text-xs text-slate-600 hover:text-rose-400 transition ml-auto">Delete</button>
+          <button
+            type="button"
+            onClick={() => {
+              if (!confirm('Abandon this project? Tasks will be unlinked.')) return
+              archiveProject(p.id)
+              toast.success('Project abandoned')
+            }}
+            className="ml-auto text-xs text-slate-600 transition hover:text-rose-400"
+          >
+            Abandon
+          </button>
         </div>
 
         {/* Expanded: linked tasks + edit */}
@@ -243,7 +257,9 @@ export default function ProjectsPage() {
                   <select value={form.businessId} onChange={e => setForm(p => ({ ...p, businessId: e.target.value }))}
                     className="bg-slate-900/50 border border-[#1e2338] rounded-lg px-3 py-2 text-sm text-white outline-none">
                     <option value="">No business</option>
-                    {businesses.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
+                    {businesses.filter((b) => !isArchived(b)).map((b) => (
+                      <option key={b.id} value={b.id}>{b.name}</option>
+                    ))}
                   </select>
                   <select value={form.goalId} onChange={e => setForm(p => ({ ...p, goalId: e.target.value }))}
                     className="bg-slate-900/50 border border-[#1e2338] rounded-lg px-3 py-2 text-sm text-white outline-none">

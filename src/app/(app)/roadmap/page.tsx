@@ -12,9 +12,10 @@ import {
   startOfDay,
 } from 'date-fns'
 import { Drawer } from 'vaul'
+import { DRAWER_CONTENT_CLASS, DrawerDragHandle } from '@/components/ui/drawer-primitives'
 import { motion } from 'framer-motion'
 import PageTransition from '@/components/PageTransition'
-import { useStore, type Project, type Task } from '@/stores/store'
+import { useStore, isArchived, type Project, type Task } from '@/stores/store'
 
 type Horizon = '90d' | '6mo' | '12mo'
 
@@ -35,7 +36,7 @@ function projectStart(p: Project): Date {
 }
 
 function projectTasks(tasks: Task[], projectId: string) {
-  return tasks.filter((t) => t.projectId === projectId)
+  return tasks.filter((t) => !isArchived(t) && t.projectId === projectId)
 }
 
 function projectedEndDate(project: Project, tasks: Task[], today: Date): Date {
@@ -73,7 +74,7 @@ export default function RoadmapPage() {
   }, [horizon])
 
   const bizColor = (businessId?: string) =>
-    businesses.find((b) => b.id === businessId)?.color ?? 'var(--accent)'
+    businesses.find((b) => b.id === businessId && !isArchived(b))?.color ?? 'var(--accent)'
 
   const layout = useMemo(() => {
     const rows: {
@@ -86,7 +87,7 @@ export default function RoadmapPage() {
       projectedEnd: Date
     }[] = []
 
-    for (const p of projects.filter((x) => x.status !== 'complete')) {
+    for (const p of projects.filter((x) => !isArchived(x) && x.status !== 'complete')) {
       const start = projectStart(p)
       const deadline = parseDay(p.deadline)
       const projEnd = projectedEndDate(p, tasks, today)
@@ -201,7 +202,7 @@ export default function RoadmapPage() {
                     background: row.color,
                     borderStyle: row.openEnded ? 'dashed' : 'solid',
                     borderWidth: row.openEnded ? 2 : 0,
-                    borderColor: 'rgba(255,255,255,0.35)',
+                    borderColor: 'var(--border-hover)',
                     opacity: row.openEnded ? 0.92 : 1,
                   }}
                   onClick={() => setOpenProject(row.project)}
@@ -230,8 +231,8 @@ export default function RoadmapPage() {
         <Drawer.Root open={openProject !== null} onOpenChange={(o) => !o && setOpenProject(null)}>
           <Drawer.Portal>
             <Drawer.Overlay className="fixed inset-0 z-50 bg-black/60" />
-            <Drawer.Content className="fixed bottom-0 left-0 right-0 z-50 max-h-[85vh] overflow-y-auto rounded-t-[20px] border-t border-[var(--border)] bg-[var(--bg-elevated)] p-5">
-              <div className="mx-auto mb-3 h-1 w-10 rounded-full bg-white/10" />
+            <Drawer.Content className={`${DRAWER_CONTENT_CLASS} z-50`}>
+              <DrawerDragHandle />
               {openProject && (
                 <>
                   <Drawer.Title className="text-lg font-semibold text-[var(--text-primary)]">

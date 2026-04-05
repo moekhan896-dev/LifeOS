@@ -1,9 +1,9 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { motion } from 'framer-motion'
 import { toast } from 'sonner'
-import { useStore } from '@/stores/store'
+import { useStore, isArchived } from '@/stores/store'
 import PageTransition from '@/components/PageTransition'
 import { StaggerContainer, StaggerItem } from '@/components/Stagger'
 
@@ -15,18 +15,19 @@ function fmt(n: number) {
 
 export default function WinsPage() {
   const { wins, businesses, addWin, deleteWin } = useStore()
+  const activeBusinesses = useMemo(() => businesses.filter((b) => !isArchived(b)), [businesses])
   const [title, setTitle] = useState('')
   const [dollarValue, setDollarValue] = useState('')
   const [businessId, setBusinessId] = useState('')
   const [category, setCategory] = useState<string>('New Client')
 
   useEffect(() => {
-    if (businesses.length && !businessId) setBusinessId(businesses[0].id)
-  }, [businesses, businessId])
+    if (activeBusinesses.length && !businessId) setBusinessId(activeBusinesses[0].id)
+  }, [activeBusinesses, businessId])
 
   const handleAdd = () => {
     if (!title.trim()) return
-    const bid = businessId || businesses[0]?.id
+    const bid = businessId || activeBusinesses[0]?.id
     if (!bid) {
       toast.error('Add a business first')
       return
@@ -108,7 +109,7 @@ export default function WinsPage() {
                   onChange={(e) => setBusinessId(e.target.value)}
                   className="rounded-lg border border-[var(--border)] bg-[var(--bg)] px-2 py-2 text-xs text-[var(--text)] outline-none"
                 >
-                  {businesses.map((b) => (
+                  {activeBusinesses.map((b) => (
                     <option key={b.id} value={b.id}>{b.name}</option>
                   ))}
                 </select>
@@ -137,12 +138,12 @@ export default function WinsPage() {
         {/* Wins list */}
         <div className="space-y-2">
           {sortedWins.map((win) => {
-            const biz = businesses.find((b) => b.id === win.businessId)
+            const biz = businesses.find((b) => b.id === win.businessId && !isArchived(b))
             return (
               <StaggerItem key={win.id}>
                 <motion.div
                   whileHover={{ scale: 1.01 }}
-                  transition={{ type: 'spring', stiffness: 400, damping: 25 }}
+                  transition={{ duration: 0.25, ease: [0.25, 0.1, 0.25, 1] }}
                   className="card border border-[var(--border)] border-l-[3px] border-l-[var(--positive)] p-3"
                 >
                   <div className="flex items-start gap-3">

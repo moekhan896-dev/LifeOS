@@ -272,14 +272,9 @@ export function OnboardingWizard({ mode = 'default' as 'default' | 'profileUpdat
   }
 
   return (
-    <div
-      className="relative min-h-screen text-[#F5F5F7]"
-      style={{
-        background: 'radial-gradient(ellipse at 50% 0%, rgba(60, 55, 50, 0.12) 0%, #1C1C1E 70%)',
-      }}
-    >
+    <div className="relative min-h-screen bg-[var(--bg-primary)] text-[var(--text-primary)]" style={{ background: 'var(--bg-warm-gradient)' }}>
       {step > 0 && (
-        <div className="fixed left-0 right-0 top-0 z-50 h-[2px] bg-[rgba(255,255,255,0.08)]">
+        <div className="fixed left-0 right-0 top-0 z-50 h-[2px] bg-[var(--separator)]">
           <motion.div
             className="h-full bg-[var(--accent)]"
             animate={{ width: `${progressPct}%` }}
@@ -291,7 +286,7 @@ export function OnboardingWizard({ mode = 'default' as 'default' | 'profileUpdat
       <div className="mx-auto flex min-h-screen max-w-[1280px] flex-col px-4 pb-28 pt-10 md:flex-row md:gap-8 md:px-8 md:pb-12 md:pt-14">
         <div className="flex min-w-0 flex-1 flex-col md:max-w-[55%]">
           {step > 0 && (
-            <p className="label mb-4 text-[rgba(255,255,255,0.45)]">
+            <p className="label mb-4 text-[var(--text-dim)]">
               {step < 12 ? `Step ${step + 1} of 13 · ${catLabel}` : catLabel}
             </p>
           )}
@@ -312,8 +307,8 @@ export function OnboardingWizard({ mode = 'default' as 'default' | 'profileUpdat
                 className="mx-auto w-full max-w-md"
               >
                 <div className={glassPanel + ' text-center'}>
-                  <h2 className="text-[28px] font-bold tracking-[-0.5px] text-[#F5F5F7]">Lock it down</h2>
-                  <p className="mt-1 text-[17px] text-[rgba(255,255,255,0.55)]">
+                  <h2 className="text-[28px] font-bold tracking-[-0.5px] text-[var(--text-primary)]">Lock it down</h2>
+                  <p className="mt-1 text-[17px] text-[var(--text-secondary)]">
                     {pinPhase === 'set' ? 'Choose a 4-digit PIN' : 'Confirm your PIN'}
                   </p>
                   <div className={`mt-6 flex justify-center gap-3 ${pinErr ? 'animate-shake' : ''}`}>
@@ -508,7 +503,7 @@ export function OnboardingWizard({ mode = 'default' as 'default' | 'profileUpdat
         </div>
       </div>
 
-      <div className="border-t border-[var(--separator)] bg-[rgba(0,0,0,0.15)] px-4 py-3 md:hidden">
+      <div className="border-t border-[var(--separator)] bg-[var(--bg-secondary)] px-4 py-3 md:hidden">
         <p className="label text-center">Preview updates as you go</p>
         <p className="body mt-1 text-center text-[17px] text-[var(--accent)]">
           {draft.identity.name.trim()

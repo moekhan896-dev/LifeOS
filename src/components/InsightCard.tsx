@@ -29,17 +29,13 @@ export default function InsightCard({ insight }: InsightCardProps) {
       <motion.div
         layout
         key={insight.id}
-        className="card bg-[var(--surface)] border border-[var(--border)] rounded-[16px] p-4 group"
+        className="card group rounded-[16px] border border-[var(--border)] bg-[var(--surface)] p-4 hover:border-[var(--border-hover)] hover:bg-[var(--bg-secondary)]"
         style={{
           borderLeft: `3px solid ${typeStyle.border}`,
         }}
         initial={{ opacity: 0, y: 12 }}
         animate={{ opacity: 1, y: 0 }}
         exit={{ opacity: 0, height: 0, marginBottom: 0, padding: 0, overflow: 'hidden' }}
-        whileHover={{
-          y: -2,
-          boxShadow: '0 8px 32px rgba(0,0,0,0.14)',
-        }}
         transition={{ duration: 0.2 }}
       >
         {/* Badges */}
@@ -53,8 +49,8 @@ export default function InsightCard({ insight }: InsightCardProps) {
         </div>
 
         {/* Content */}
-        <h3 className="text-[14px] font-semibold text-[var(--text)] mb-1.5">{insight.title}</h3>
-        <p className="text-[12px] text-[var(--text-mid)] leading-[1.6] mb-3">{insight.body}</p>
+        <h3 className="mb-1.5 text-[17px] font-semibold text-[var(--text)]">{insight.title}</h3>
+        <p className="mb-3 text-[17px] leading-[1.6] text-[var(--text-mid)]">{insight.body}</p>
 
         {/* Actions */}
         <div className="flex items-center gap-1.5">
@@ -66,12 +62,15 @@ export default function InsightCard({ insight }: InsightCardProps) {
             <motion.button
               key={i}
               onClick={btn.action}
-              className={`w-8 h-8 flex items-center justify-center rounded-[8px] text-sm ${
-                btn.active ? 'bg-[var(--accent)]/15 scale-105' : 'hover:bg-[var(--surface2)]'
+              type="button"
+              aria-label={
+                i === 0 ? 'Thumbs up' : i === 1 ? 'Thumbs down' : 'Snooze insight'
+              }
+              className={`flex h-8 w-8 items-center justify-center rounded-[8px] text-sm ${
+                btn.active ? 'bg-[var(--accent)]/15' : 'hover:bg-[var(--surface2)]'
               }`}
-              whileHover={{ scale: 1.15 }}
-              whileTap={{ scale: 0.9 }}
-              transition={{ type: 'spring', stiffness: 400, damping: 17 }}
+              whileTap={{ scale: 0.97 }}
+              transition={{ duration: 0.1 }}
             >
               {btn.emoji}
             </motion.button>

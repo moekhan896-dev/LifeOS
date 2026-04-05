@@ -18,8 +18,10 @@ import {
   getTaskPriorityScore,
   computeMonthlyMoneySnapshot,
   type Priority,
+  isArchived,
 } from '@/stores/store'
 import { Drawer } from 'vaul'
+import { DRAWER_CONTENT_CLASS, DrawerDragHandle } from '@/components/ui/drawer-primitives'
 import PageTransition from '@/components/PageTransition'
 import CommandInput from '@/components/CommandInput'
 import { XP_VALUES } from '@/lib/constants'
@@ -29,6 +31,7 @@ import SortableDashboardTile from '@/components/dashboard/SortableDashboardTile'
 import TileLibrarySheet from '@/components/dashboard/TileLibrarySheet'
 import { useLongPress } from '@/hooks/useLongPress'
 import { renderDashboardTile, type DashboardTileRenderCtx } from '@/app/(app)/dashboard/dashboard-tile-render'
+import TaskSkipDrawer from '@/components/TaskSkipDrawer'
 import { isProactiveMessageVisible } from '@/lib/proactive-visibility'
 import { computeIdealSelfBenchmark } from '@/lib/ideal-self-benchmark'
 /* ── Helpers ── */
@@ -67,7 +70,16 @@ export default function DashboardPage() {
     showDashboardTile,
     customHabits,
     addIdea,
+    balanceSheetAssets,
+    balanceSheetDebts,
   } = useStore()
+
+  const activeBusinesses = useMemo(
+    () => businesses.filter((b) => !isArchived(b)),
+    [businesses]
+  )
+
+  const visibleTasks = useMemo(() => tasks.filter((t) => !isArchived(t)), [tasks])
 
   const unreadProactive = useMemo(
     () => proactiveMessages.filter((m) => !m.read && isProactiveMessageVisible(m)).length,
@@ -109,10 +121,12 @@ export default function DashboardPage() {
   /* ── Interactive state ── */
   const [showAddTask, setShowAddTask] = useState(false)
   const [newTaskText, setNewTaskText] = useState('')
-  const [newTaskBiz, setNewTaskBiz] = useState(businesses[0]?.id || '')
+  const [newTaskBiz, setNewTaskBiz] = useState(() => businesses.filter((b) => !isArchived(b))[0]?.id || '')
   const [newTaskPriority, setNewTaskPriority] = useState<Priority>('med')
   const [expandedAlert, setExpandedAlert] = useState<number | null>(null)
   const [habitDrawerOpen, setHabitDrawerOpen] = useState(false)
+  const [skipTaskId, setSkipTaskId] = useState<string | null>(null)
+  const openSkipForTask = useCallback((id: string) => setSkipTaskId(id), [])
   const [ideaFabOpen, setIdeaFabOpen] = useState(false)
   const [ideaText, setIdeaText] = useState('')
 
@@ -132,21 +146,30 @@ export default function DashboardPage() {
   const [quickTaskText, setQuickTaskText] = useState('')
   const [newProjectName, setNewProjectName] = useState('')
   const [newProjectDesc, setNewProjectDesc] = useState('')
-  const [newProjectBiz, setNewProjectBiz] = useState(businesses[0]?.id || '')
+  const [newProjectBiz, setNewProjectBiz] = useState(() => businesses.filter((b) => !isArchived(b))[0]?.id || '')
   const [editMode, setEditMode] = useState(false)
   const [libraryOpen, setLibraryOpen] = useState(false)
 
   // ── Core metrics ──
   const agencyTotals = getAgencyTotals(clients)
   const { totalIncome, recurringCosts: totalExpenses, net: netIncome } = computeMonthlyMoneySnapshot({
-    businesses,
+    businesses: activeBusinesses,
     clients,
     expenseEntries,
   })
 
-  const tasksDoneToday = tasks.filter(t => t.done && t.completedAt?.startsWith(todayStr)).length
+  const netWorth = useMemo(
+    () =>
+      balanceSheetAssets.reduce((s, a) => s + a.value, 0) -
+      balanceSheetDebts.reduce((s, d) => s + d.balance, 0),
+    [balanceSheetAssets, balanceSheetDebts]
+  )
+
+  const tasksDoneToday = visibleTasks.filter((t) => t.done && t.completedAt?.startsWith(todayStr)).length
   const todayFocusSessions = focusSessions.filter(s => s.startedAt.startsWith(todayStr)).length
-  const tasksCommitted = tasks.filter(t => t.createdAt.startsWith(todayStr) || (!t.done && t.priority !== 'low')).length
+  const tasksCommitted = visibleTasks.filter(
+    (t) => t.createdAt.startsWith(todayStr) || (!t.done && t.priority !== 'low')
+  ).length
   const executionScore = getExecutionScore(
     todayHealth,
     tasksCommitted,
@@ -197,22 +220,24 @@ export default function DashboardPage() {
 
   // ── THE ONE THING (highest priority incomplete task) ──
   const sortedTasks = useMemo(() => {
-    return [...tasks]
-      .filter(t => !t.done)
-      .map(t => {
-        const biz = businesses.find(b => b.id === t.businessId)
+    return [...visibleTasks]
+      .filter((t) => !t.done)
+      .map((t) => {
+        const biz = businesses.find((b) => b.id === t.businessId && !isArchived(b))
         return { ...t, score: getTaskPriorityScore(t, biz) }
       })
       .sort((a, b) => b.score - a.score)
-  }, [tasks, businesses])
+  }, [visibleTasks, businesses])
 
   const theOneThing = sortedTasks[0]
-  const theOneThingBiz = theOneThing ? businesses.find(b => b.id === theOneThing.businessId) : null
-  const theOneThingProject = theOneThing?.projectId ? projects.find(p => p.id === theOneThing.projectId) : null
+  const theOneThingBiz = theOneThing ? businesses.find((b) => b.id === theOneThing.businessId && !isArchived(b)) : null
+  const theOneThingProject = theOneThing?.projectId
+    ? projects.find((p) => p.id === theOneThing.projectId && !isArchived(p))
+    : null
   const theOneThingGoal = theOneThingProject?.goalId ? goals.find(g => g.id === theOneThingProject.goalId) : null
 
   // ── Active projects ──
-  const activeProjects = projects.filter(p => p.status === 'in_progress').slice(0, 3)
+  const activeProjects = projects.filter((p) => !isArchived(p) && p.status === 'in_progress').slice(0, 3)
 
   // ── Alerts (proactive inbox first, then computed) ──
   const alerts = useMemo(() => {
@@ -234,26 +259,30 @@ export default function DashboardPage() {
         })
       })
     // Concentration risk
-    const activeClients = clients.filter(c => c.active)
+    const activeClients = clients.filter((c) => c.active && !isArchived(c))
     const totalNet = activeClients.reduce((s, c) => s + getClientNet(c), 0)
     activeClients.forEach(c => {
       const pct = totalNet > 0 ? (getClientNet(c) / totalNet) * 100 : 0
       if (pct > 40) list.push({ text: `${c.name} is ${Math.round(pct)}% of revenue — concentration risk`, color: 'var(--rose)', type: 'risk' })
     })
     // Business health
-    businesses.filter(b => b.status !== 'dormant' && b.status !== 'idea').forEach(b => {
-      const health = getBusinessHealth(b, tasks, revenueEntries)
+    businesses
+      .filter((b) => !isArchived(b) && b.status !== 'dormant' && b.status !== 'idea')
+      .forEach((b) => {
+      const health = getBusinessHealth(b, visibleTasks, revenueEntries)
       if (health === 'flatline') list.push({ text: `${b.name} is flatlined — 0 tasks done in 7 days`, color: 'var(--rose)', type: 'health' })
     })
     // Stale tasks
-    const staleTasks = tasks.filter(t => !t.done && (Date.now() - new Date(t.createdAt).getTime()) > 7 * 86400000)
+    const staleTasks = visibleTasks.filter(
+      (t) => !t.done && Date.now() - new Date(t.createdAt).getTime() > 7 * 86400000
+    )
     if (staleTasks.length > 0) list.push({ text: `${staleTasks.length} stale task${staleTasks.length > 1 ? 's' : ''} older than 7 days`, color: 'var(--amber)', type: 'stale' })
     // Commitment rate
     const total = commitments.length
     const fulfilled = commitments.filter(c => c.fulfilled).length
     if (total > 0 && (fulfilled / total) < 0.5) list.push({ text: `Commitment rate is ${Math.round((fulfilled / total) * 100)}% — below 50%`, color: 'var(--amber)', type: 'commitment' })
     return list.slice(0, 8)
-  }, [clients, businesses, tasks, revenueEntries, commitments, proactiveMessages])
+  }, [clients, businesses, visibleTasks, revenueEntries, commitments, proactiveMessages])
 
   /** PRD GAP 17 — dollar tasks + live recompute every 1s */
   const workingHoursPerDay = useMemo(() => {
@@ -270,7 +299,7 @@ export default function DashboardPage() {
 
   const costOfInaction = useMemo(() => {
     const gap = computeCostOfInactionGap17({
-      tasks,
+      tasks: visibleTasks,
       wakeUpTime,
       workingHoursPerDay,
       now,
@@ -286,7 +315,7 @@ export default function DashboardPage() {
       totalDailyValue: gap.totalDailyValue,
       allClear,
     }
-  }, [tasks, wakeUpTime, workingHoursPerDay, now, coiTick])
+  }, [visibleTasks, wakeUpTime, workingHoursPerDay, now, coiTick])
 
   // ── Days remaining ──
   const daysRemaining = targetDate ? Math.max(0, Math.ceil((new Date(targetDate).getTime() - Date.now()) / 86400000)) : 0
@@ -311,7 +340,7 @@ export default function DashboardPage() {
       let partialTaskSum = 0
       for (const h of hist) {
         const pc = Object.values(h.prayers).filter(Boolean).length
-        const done = tasks.filter((t) => t.done && t.completedAt?.startsWith(h.date)).length
+        const done = visibleTasks.filter((t) => t.done && t.completedAt?.startsWith(h.date)).length
         if (pc >= 5) {
           fullDays++
           fullTaskSum += done
@@ -383,7 +412,7 @@ export default function DashboardPage() {
     }
   }, [
     healthHistory,
-    tasks,
+    visibleTasks,
     energyLogs,
     trackPrayers,
     prayersDone,
@@ -393,8 +422,8 @@ export default function DashboardPage() {
 
   /** PRD §9.5 — Ideal Self gap when returning after 2+ days. */
   const idealSelfBenchmark = useMemo(
-    () => computeIdealSelfBenchmark(lastSessionDaysSinceOpen, previousLastOpenedAt, tasks),
-    [lastSessionDaysSinceOpen, previousLastOpenedAt, tasks]
+    () => computeIdealSelfBenchmark(lastSessionDaysSinceOpen, previousLastOpenedAt, visibleTasks),
+    [lastSessionDaysSinceOpen, previousLastOpenedAt, visibleTasks]
   )
 
   const nextActionMotivation = useMemo(() => {
@@ -508,7 +537,6 @@ export default function DashboardPage() {
 
   const tileCtx: DashboardTileRenderCtx = useMemo(
     () => ({
-      router,
       isMorningBriefWindow,
       editMode,
       morningBrief,
@@ -524,7 +552,7 @@ export default function DashboardPage() {
       setNewTaskBiz,
       newTaskPriority,
       setNewTaskPriority,
-      businesses,
+      businesses: activeBusinesses,
       toggleTask,
       addTask,
       theOneThingProject,
@@ -582,7 +610,7 @@ export default function DashboardPage() {
       quickTaskText,
       setQuickTaskText,
       sortedTasks,
-      tasks,
+      tasks: visibleTasks,
       xp,
       level,
       streaks,
@@ -600,9 +628,10 @@ export default function DashboardPage() {
       userLng,
       prayerCalcMethod,
       prayerAsrHanafi,
+      onSkipTask: openSkipForTask,
+      netWorth,
     }),
     [
-      router,
       isMorningBriefWindow,
       editMode,
       morningBrief,
@@ -614,7 +643,7 @@ export default function DashboardPage() {
       newTaskText,
       newTaskBiz,
       newTaskPriority,
-      businesses,
+      activeBusinesses,
       toggleTask,
       addTask,
       theOneThingProject,
@@ -666,7 +695,7 @@ export default function DashboardPage() {
       targetDate,
       quickTaskText,
       sortedTasks,
-      tasks,
+      visibleTasks,
       xp,
       level,
       streaks,
@@ -683,6 +712,8 @@ export default function DashboardPage() {
       userLng,
       prayerCalcMethod,
       prayerAsrHanafi,
+      openSkipForTask,
+      netWorth,
     ]
   )
 
@@ -771,8 +802,8 @@ export default function DashboardPage() {
         <Drawer.Root open={ideaFabOpen} onOpenChange={setIdeaFabOpen}>
           <Drawer.Portal>
             <Drawer.Overlay className="fixed inset-0 z-[110] bg-black/60" />
-            <Drawer.Content className="fixed bottom-0 left-0 right-0 z-[120] max-h-[55vh] rounded-t-[20px] border border-[var(--border)] bg-[var(--bg-elevated)] p-5">
-              <div className="mx-auto mb-3 h-1 w-10 rounded-full bg-white/10" />
+            <Drawer.Content className={`${DRAWER_CONTENT_CLASS} z-[120]`}>
+              <DrawerDragHandle />
               <p className="text-lg font-semibold text-[var(--text-primary)]">Capture idea</p>
               <textarea
                 value={ideaText}
@@ -801,6 +832,8 @@ export default function DashboardPage() {
             </Drawer.Content>
           </Drawer.Portal>
         </Drawer.Root>
+
+        <TaskSkipDrawer taskId={skipTaskId} onDismiss={() => setSkipTaskId(null)} />
 
         {/* ── ROW 7: QUICK CAPTURE (sticky bottom) ── */}
         <div className="fixed bottom-0 left-0 right-0 z-40 p-4" style={{ background: 'linear-gradient(to top, var(--bg) 80%, transparent)' }}>

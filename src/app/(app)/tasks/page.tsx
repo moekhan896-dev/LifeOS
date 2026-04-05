@@ -4,7 +4,7 @@ import { Suspense, useEffect, useMemo, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
 import { toast } from 'sonner'
-import { useStore, type Task, type Priority } from '@/stores/store'
+import { useStore, isArchived, type Task, type Priority } from '@/stores/store'
 import { TAGS, XP_VALUES } from '@/lib/constants'
 import { applyTaskDollarEstimateAfterCreate } from '@/lib/task-dollar-client'
 import { buildTaskSuggestContext } from '@/lib/ai-context'
@@ -60,13 +60,14 @@ const PRIORITY_PILL: Record<Priority, string> = {
   crit: 'bg-[rgba(255,69,58,0.15)] text-[var(--negative)]',
   high: 'bg-[rgba(255,159,10,0.15)] text-[var(--warning)]',
   med: 'bg-[var(--accent-bg)] text-[var(--accent)]',
-  low: 'bg-[rgba(255,255,255,0.06)] text-[var(--text-tertiary)]',
+  low: 'bg-[var(--bg-secondary)] text-[var(--text-tertiary)]',
 }
 
 function TasksPageInner() {
   const searchParams = useSearchParams()
   const { tasks, businesses, addTask, toggleTask, deleteTask, updateTask, anthropicKey } = useStore()
   const mobile = useIsMobileViewport()
+  const activeBusinesses = useMemo(() => businesses.filter((b) => !isArchived(b)), [businesses])
 
   const [search, setSearch] = useState('')
   const [filterBusiness, setFilterBusiness] = useState<string>('all')
@@ -94,18 +95,19 @@ function TasksPageInner() {
     if (tid) setDetailTaskId(tid)
   }, [searchParams])
 
-  const totalTasks = tasks.length
-  const doneTasks = tasks.filter((t) => t.done).length
+  const visibleTasks = useMemo(() => tasks.filter((t) => !isArchived(t)), [tasks])
+  const totalTasks = visibleTasks.length
+  const doneTasks = visibleTasks.filter((t) => t.done).length
   const todayStr = new Date().toISOString().split('T')[0]
   const weekAgo = new Date(Date.now() - 7 * 86400000).toISOString()
-  const todayUndone = tasks.filter((t) => !t.done && t.createdAt.startsWith(todayStr)).length
-  const thisWeekCount = tasks.filter((t) => t.createdAt >= weekAgo).length
+  const todayUndone = visibleTasks.filter((t) => !t.done && t.createdAt.startsWith(todayStr)).length
+  const thisWeekCount = visibleTasks.filter((t) => t.createdAt >= weekAgo).length
   const completionPct = totalTasks > 0 ? Math.round((doneTasks / totalTasks) * 100) : 0
-  const doneToday = tasks.filter((t) => t.done && t.completedAt?.startsWith(todayStr))
+  const doneToday = visibleTasks.filter((t) => t.done && t.completedAt?.startsWith(todayStr))
   const xpToday = doneToday.reduce((s, t) => s + t.xpValue, 0)
 
   const filtered = useMemo(() => {
-    let result = tasks
+    let result = visibleTasks
     if (search) {
       const q = search.toLowerCase()
       result = result.filter((t) => t.text.toLowerCase().includes(q))
@@ -114,7 +116,7 @@ function TasksPageInner() {
     if (filterPriority !== 'all') result = result.filter((t) => t.priority === filterPriority)
     if (filterTag !== 'all') result = result.filter((t) => t.tag === filterTag)
     return result
-  }, [tasks, search, filterBusiness, filterPriority, filterTag])
+  }, [visibleTasks, search, filterBusiness, filterPriority, filterTag])
 
   const incompleteTasks = useMemo(() => sortTasks(filtered.filter((t) => !t.done)), [filtered])
   const completedTasks = useMemo(
@@ -134,7 +136,7 @@ function TasksPageInner() {
     const parsed = parseTaskInput(raw)
     const priority = newPriority !== 'med' ? newPriority : parsed.priority
     const tag = newTag || parsed.tag
-    const businessId = newBusiness || businesses[0]?.id || ''
+    const businessId = newBusiness || activeBusinesses[0]?.id || ''
     const id = addTask({ businessId, text: parsed.text, priority, tag, done: false, xpValue: XP_VALUES[priority] })
     void applyTaskDollarEstimateAfterCreate(id, parsed.text)
     setNewText('')
@@ -165,7 +167,7 @@ function TasksPageInner() {
         toast.message('No tasks returned — try again.')
         return
       }
-      const biz = businesses[0]?.id || ''
+      const biz = activeBusinesses[0]?.id || ''
       if (!biz) {
         toast.error('Add a business first.')
         return
@@ -217,7 +219,7 @@ function TasksPageInner() {
     else updateTask(taskId, { kanbanLane: 'in_progress' })
   }
 
-  const getBusiness = (id: string) => businesses.find((b) => b.id === id)
+  const getBusiness = (id: string) => activeBusinesses.find((b) => b.id === id)
 
   const stats = [
     { label: 'Today', value: todayUndone, color: 'text-[var(--text-primary)]' },
@@ -332,7 +334,8 @@ function TasksPageInner() {
         <button
           onClick={() => deleteTask(task.id)}
           type="button"
-          className="min-h-[44px] min-w-[44px] rounded-xl flex items-center justify-center opacity-0 group-hover:opacity-100 hover:bg-[var(--bg-secondary)] text-[var(--negative)] transition-all flex-shrink-0"
+          aria-label="Delete task"
+          className="flex min-h-[44px] min-w-[44px] flex-shrink-0 items-center justify-center rounded-xl text-[var(--negative)] opacity-0 transition-all group-hover:opacity-100 hover:bg-[var(--bg-secondary)]"
         >
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
             <line x1="18" y1="6" x2="6" y2="18" />
@@ -363,7 +366,7 @@ function TasksPageInner() {
         initial={{ opacity: 0, y: 8 }}
         animate={{ opacity: 1, y: 0 }}
         exit={{ opacity: 0, height: 0, marginBottom: 0, overflow: 'hidden' }}
-        transition={{ duration: 0.2, delay: index * 0.04, ease: [0.25, 0.1, 0.25, 1] as const }}
+        transition={{ duration: 0.2, delay: index * 0.03, ease: [0.25, 0.1, 0.25, 1] as const }}
         className="group bg-[var(--bg-elevated)] border border-[var(--border)] rounded-2xl px-5 py-3.5 mb-2 flex items-center gap-[14px] hover:border-[var(--border-hover)] hover:bg-[var(--bg-secondary)] transition-[background,border-color] duration-150 relative"
       >
         {rowInner}
@@ -382,9 +385,15 @@ function TasksPageInner() {
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
-            <div className="inline-flex rounded-xl border border-[var(--border)] bg-[var(--bg-secondary)] p-1">
+            <div
+              className="inline-flex rounded-xl border border-[var(--border)] bg-[var(--bg-secondary)] p-1"
+              role="tablist"
+              aria-label="Task view"
+            >
               <button
                 type="button"
+                role="tab"
+                aria-selected={viewMode === 'list'}
                 onClick={() => setViewMode('list')}
                 className={`rounded-lg px-4 py-2 text-[14px] font-medium ${
                   viewMode === 'list' ? 'bg-[var(--accent-bg)] text-[var(--accent)]' : 'text-[var(--text-secondary)]'
@@ -394,6 +403,8 @@ function TasksPageInner() {
               </button>
               <button
                 type="button"
+                role="tab"
+                aria-selected={viewMode === 'board'}
                 onClick={() => setViewMode('board')}
                 className={`rounded-lg px-4 py-2 text-[14px] font-medium ${
                   viewMode === 'board' ? 'bg-[var(--accent-bg)] text-[var(--accent)]' : 'text-[var(--text-secondary)]'
@@ -405,7 +416,7 @@ function TasksPageInner() {
             <motion.button
               whileTap={{ scale: 0.97 }}
               onClick={() => {
-                setNewBusiness(businesses[0]?.id || '')
+                setNewBusiness(activeBusinesses[0]?.id || '')
                 setShowNewTask(true)
               }}
               type="button"
@@ -434,7 +445,8 @@ function TasksPageInner() {
         <div className="flex flex-wrap items-center gap-3">
           <div className="relative">
             <svg
-              className="absolute left-3 top-1/2 -translate-y-1/2 text-[#4a5278]"
+              className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-dim)]"
+              aria-hidden
               width="14"
               height="14"
               viewBox="0 0 24 24"
@@ -450,7 +462,8 @@ function TasksPageInner() {
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Search tasks..."
-              className="w-64 min-h-[44px] bg-[var(--bg-secondary)] border border-[var(--border)] rounded-xl pl-9 pr-3 py-2 text-[17px] text-[var(--text-primary)] placeholder:text-[var(--text-tertiary)] outline-none focus:border-[var(--accent)] transition-colors"
+              aria-label="Search tasks"
+              className="min-h-[44px] w-64 rounded-xl border border-[var(--border)] bg-[var(--bg-secondary)] py-2 pl-9 pr-3 text-[17px] text-[var(--text-primary)] outline-none transition-colors placeholder:text-[var(--text-tertiary)] focus:border-[var(--accent)]"
             />
           </div>
 
@@ -465,12 +478,14 @@ function TasksPageInner() {
             >
               All
             </button>
-            {businesses.map((b) => (
+            {activeBusinesses.map((b) => (
               <button
                 key={b.id}
                 onClick={() => setFilterBusiness(b.id)}
-                className={`rounded-full px-4 py-2 text-[12px] border transition-all flex items-center gap-1.5 ${
-                  filterBusiness === b.id ? `border-opacity-20 bg-opacity-10` : 'text-[#8892b0] border-transparent hover:bg-[#1a1f2e]'
+                className={`flex items-center gap-1.5 rounded-full border px-4 py-2 text-[12px] transition-all ${
+                  filterBusiness === b.id
+                    ? `border-opacity-20 bg-opacity-10`
+                    : 'border-transparent text-[var(--text-secondary)] hover:bg-[var(--bg-secondary)]'
                 }`}
                 style={
                   filterBusiness === b.id
@@ -553,7 +568,7 @@ function TasksPageInner() {
                       onChange={(e) => setNewBusiness(e.target.value)}
                       className="bg-[var(--bg-secondary)] border border-[var(--border)] rounded-[10px] px-3 py-1.5 min-h-[44px] text-[15px] text-[var(--text-primary)] outline-none focus:border-[var(--accent)]"
                     >
-                      {businesses.map((b) => (
+                      {activeBusinesses.map((b) => (
                         <option key={b.id} value={b.id}>
                           {b.name}
                         </option>
@@ -592,7 +607,7 @@ function TasksPageInner() {
             </AnimatePresence>
 
             {incompleteTasks.length === 0 && !showNewTask && (
-              <p className="text-center text-[13px] text-[#4a5278] py-8">No tasks to show</p>
+              <p className="py-8 text-center text-[17px] text-[var(--text-secondary)]">No tasks to show</p>
             )}
           </div>
         ) : (
@@ -607,7 +622,7 @@ function TasksPageInner() {
           <div>
             <button
               onClick={() => setShowCompleted(!showCompleted)}
-              className="flex items-center gap-2 text-[13px] text-[#8892b0] hover:text-white transition-colors mb-2"
+              className="mb-2 flex items-center gap-2 text-[17px] text-[var(--text-secondary)] transition-colors hover:text-[var(--text-primary)]"
             >
               <motion.svg
                 width="14"

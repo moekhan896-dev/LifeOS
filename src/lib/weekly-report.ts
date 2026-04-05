@@ -1,4 +1,4 @@
-import { useStore } from '@/stores/store'
+import { useStore, isArchived } from '@/stores/store'
 import { getLocalSundayKey } from '@/lib/weekly-scorecard'
 
 /**
@@ -12,11 +12,13 @@ export async function runWeeklyReportIfDue() {
   const context = JSON.stringify({
     weekKey,
     generatedAt: new Date().toISOString(),
-    businesses: s.businesses.map((b) => ({
-      name: b.name,
-      monthlyRevenue: b.monthlyRevenue,
-      status: b.status,
-    })),
+    businesses: s.businesses
+      .filter((b) => !isArchived(b))
+      .map((b) => ({
+        name: b.name,
+        monthlyRevenue: b.monthlyRevenue,
+        status: b.status,
+      })),
     clientsActive: s.clients.filter((c) => c.active).length,
     tasksOpen: s.tasks.filter((t) => !t.done).length,
     tasksDoneWeek: s.tasks.filter(

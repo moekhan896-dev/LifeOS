@@ -13,12 +13,14 @@ import OfflineBanner from '@/components/OfflineBanner'
 import PwaInstallPrompt from '@/components/PwaInstallPrompt'
 import MobileTabBar from '@/components/MobileTabBar'
 import ReengagementBanner from '@/components/ReengagementBanner'
+import { ErrorBoundary } from '@/components/ErrorBoundary'
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const {
     authenticated,
     theme,
     touchLastOpened,
+    maybeRollHealthDay,
     appendDailyNetSnapshot,
     runProactiveEvaluation,
     notificationPrefs,
@@ -37,6 +39,14 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (authenticated) touchLastOpened()
   }, [authenticated, touchLastOpened])
+
+  useEffect(() => {
+    if (!authenticated) return
+    const id = window.setInterval(() => {
+      maybeRollHealthDay()
+    }, 60_000)
+    return () => clearInterval(id)
+  }, [authenticated, maybeRollHealthDay])
 
   useEffect(() => {
     if (!authenticated) return
@@ -62,20 +72,22 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   if (!authenticated) return null
 
   return (
-    <div className="scanline flex min-h-screen">
-      <OfflineBanner />
-      <Sidebar />
-      <main className="flex-1 ml-0 md:ml-[240px] min-h-screen overflow-x-hidden pb-[49px] md:pb-0">
-        <div className="p-4 md:p-5 max-w-[1200px] mx-auto">
-          <ReengagementBanner />
-          {children}
-        </div>
-      </main>
-      <MobileTabBar />
-      <PwaInstallPrompt />
-      <CommandPalette />
-      <QuickAddFab />
-      <VoiceCommandFab />
-    </div>
+    <ErrorBoundary>
+      <div className="scanline flex min-h-screen">
+        <OfflineBanner />
+        <Sidebar />
+        <main className="flex-1 ml-0 md:ml-[240px] min-h-screen overflow-x-hidden pb-[49px] md:pb-0">
+          <div className="p-4 md:p-5 max-w-[1200px] mx-auto">
+            <ReengagementBanner />
+            {children}
+          </div>
+        </main>
+        <MobileTabBar />
+        <PwaInstallPrompt />
+        <CommandPalette />
+        <QuickAddFab />
+        <VoiceCommandFab />
+      </div>
+    </ErrorBoundary>
   )
 }

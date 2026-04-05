@@ -2,7 +2,16 @@
 
 import { useEffect, useState } from 'react'
 import { Drawer } from 'vaul'
-import { useStore, type Task } from '@/stores/store'
+import { DRAWER_CONTENT_CLASS, DrawerDragHandle } from '@/components/ui/drawer-primitives'
+import { useStore, type Task, type DripZone, isArchived } from '@/stores/store'
+
+const DRIP_OPTIONS: { value: DripZone | 'none'; label: string }[] = [
+  { value: 'none', label: 'None' },
+  { value: 'double_down', label: 'Double down' },
+  { value: 'replace', label: 'Replace' },
+  { value: 'design', label: 'Design' },
+  { value: 'eliminate', label: 'Eliminate' },
+]
 import TaskDollarHint from '@/components/TaskDollarHint'
 import { initialNextDue, type RecurringFrequency } from '@/lib/task-recurring'
 
@@ -10,7 +19,7 @@ const PRIORITY_PILL: Record<Task['priority'], string> = {
   crit: 'bg-[rgba(255,69,58,0.15)] text-[var(--negative)]',
   high: 'bg-[rgba(255,159,10,0.15)] text-[var(--warning)]',
   med: 'bg-[var(--accent-bg)] text-[var(--accent)]',
-  low: 'bg-[rgba(255,255,255,0.06)] text-[var(--text-tertiary)]',
+  low: 'bg-[var(--bg-secondary)] text-[var(--text-tertiary)]',
 }
 
 interface TaskDetailDrawerProps {
@@ -39,6 +48,8 @@ export default function TaskDetailDrawer({ task, open, onOpenChange, onRequestSk
   }, [open, task?.id, task?.done, task?.kanbanLane, updateTask])
 
   if (!task) return null
+
+  const taskBusiness = businesses.find((b) => b.id === task.businessId && !isArchived(b))
 
   const subtasks = task.subtasks ?? []
   const doneSubs = subtasks.filter((s) => s.done).length
@@ -89,8 +100,8 @@ export default function TaskDetailDrawer({ task, open, onOpenChange, onRequestSk
     <Drawer.Root open={open} onOpenChange={onOpenChange}>
       <Drawer.Portal>
         <Drawer.Overlay className="fixed inset-0 z-[115] bg-black/60" />
-        <Drawer.Content className="fixed bottom-0 left-0 right-0 z-[116] max-h-[92vh] overflow-y-auto rounded-t-[20px] border border-[var(--border)] bg-[var(--bg-elevated)] p-5 pb-10">
-          <div className="mx-auto mb-3 h-1 w-10 rounded-full bg-white/10" />
+        <Drawer.Content className={`${DRAWER_CONTENT_CLASS} z-[116] pb-10`}>
+          <DrawerDragHandle />
           <Drawer.Title className="sr-only">Task details</Drawer.Title>
 
           <input
@@ -109,11 +120,30 @@ export default function TaskDetailDrawer({ task, open, onOpenChange, onRequestSk
                 {task.tag}
               </span>
             ) : null}
-            {businesses.find((b) => b.id === task.businessId) ? (
-              <span className="text-[12px] text-[var(--text-secondary)]">
-                {businesses.find((b) => b.id === task.businessId)?.name}
-              </span>
+            {taskBusiness ? (
+              <span className="text-[12px] text-[var(--text-secondary)]">{taskBusiness.name}</span>
             ) : null}
+          </div>
+
+          <div className="mt-4">
+            <label className="text-[11px] font-semibold uppercase tracking-wide text-[var(--text-tertiary)]">
+              Strategic zone (DRIP)
+            </label>
+            <select
+              value={task.drip ?? 'none'}
+              disabled={task.done}
+              onChange={(e) => {
+                const v = e.target.value as DripZone | 'none'
+                updateTask(task.id, { drip: v === 'none' ? undefined : v })
+              }}
+              className="mt-1.5 min-h-[44px] w-full rounded-xl border border-[var(--border)] bg-[var(--bg-secondary)] px-3 text-[15px] text-[var(--text-primary)] outline-none focus:border-[var(--accent)] disabled:opacity-50"
+            >
+              {DRIP_OPTIONS.map((o) => (
+                <option key={o.value} value={o.value}>
+                  {o.label}
+                </option>
+              ))}
+            </select>
           </div>
 
           <div className="mt-3 flex items-center justify-between gap-3">

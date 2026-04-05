@@ -92,7 +92,7 @@ export function OnboardingVoiceFab({ onTranscript }: { onTranscript: (text: stri
             className="card-floating fixed bottom-[5.5rem] right-4 z-[100] max-w-[min(100vw-2rem,320px)] rounded-[16px] p-4 md:bottom-8 md:right-8"
           >
             <p className="label text-[var(--accent)]">{processing ? 'Applying…' : 'Listening…'}</p>
-            <p className="mt-2 text-[17px] text-[rgba(255,255,255,0.85)]">{transcript || 'Speak now…'}</p>
+            <p className="mt-2 text-[17px] text-[var(--text-primary)]">{transcript || 'Speak now…'}</p>
           </motion.div>
         )}
       </AnimatePresence>
@@ -100,16 +100,18 @@ export function OnboardingVoiceFab({ onTranscript }: { onTranscript: (text: stri
         type="button"
         aria-label="Voice input"
         onClick={toggle}
-        whileHover={{ filter: 'brightness(1.08)' }}
         whileTap={{ scale: 0.97 }}
-        className={`fixed bottom-4 right-4 z-[100] flex h-14 w-14 min-h-[44px] min-w-[44px] items-center justify-center rounded-full shadow-lg md:bottom-8 md:right-8 ${
-          recording ? 'bg-[var(--negative)]' : 'bg-[var(--accent)]'
+        transition={{ duration: 0.1 }}
+        className={`fixed bottom-4 right-4 z-[100] flex h-14 w-14 min-h-[44px] min-w-[44px] items-center justify-center rounded-full shadow-lg transition-colors md:bottom-8 md:right-8 ${
+          recording ? 'bg-[var(--negative)] hover:opacity-95' : 'bg-[var(--accent)] hover:bg-[var(--accent-hover)]'
         }`}
         style={{
-          boxShadow: recording ? '0 4px 24px rgba(255, 69, 58, 0.35)' : '0 4px 24px rgba(10, 132, 255, 0.35)',
+          boxShadow: recording
+            ? '0 4px 24px color-mix(in srgb, var(--negative) 35%, transparent)'
+            : '0 4px 24px color-mix(in srgb, var(--accent) 35%, transparent)',
         }}
       >
-        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#000" strokeWidth="2" strokeLinecap="round">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round">
           <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z" />
           <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
           <line x1="12" y1="19" x2="12" y2="23" />

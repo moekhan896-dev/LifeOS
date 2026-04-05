@@ -151,7 +151,11 @@ export default function DecisionLabPage() {
     })
     setResultDecisionId(id)
     addCommitment(`Commit to Option ${opt}: ${decision.trim().slice(0, 140)}`, 'decision_lab_option', undefined)
-    logEvent('decision_made', { decisionId: id, optionChosen: opt })
+    logEvent('decision_made', {
+      decisionId: id,
+      optionChosen: opt,
+      aiConfidence: analysisStructured?.aiRecommendation.confidencePercent ?? null,
+    })
     toast.success(`Option ${opt} saved — commitment added`)
   }
 
@@ -391,7 +395,7 @@ export default function DecisionLabPage() {
             <div className="flex flex-wrap items-center gap-2 border-t border-[var(--border)] pt-4">
               <Link
                 href={argueWithMeHref}
-                className="rounded-[12px] border border-[var(--border)] bg-[rgba(255,255,255,0.06)] px-4 py-2 text-[15px] font-medium text-[var(--text-primary)]"
+                className="rounded-[12px] border border-[var(--border)] bg-[var(--bg-secondary)] px-4 py-2 text-[15px] font-medium text-[var(--text-primary)]"
               >
                 Argue with me
               </Link>
@@ -422,14 +426,14 @@ export default function DecisionLabPage() {
                   setResultDecisionId(id)
                   toast.success('Saved to decision journal')
                 }}
-                className="rounded-[12px] bg-[rgba(255,255,255,0.08)] px-4 py-2 text-[15px] font-medium text-[var(--text-primary)]"
+                className="rounded-[12px] bg-[var(--bg-secondary)] px-4 py-2 text-[15px] font-medium text-[var(--text-primary)]"
               >
                 Save to journal
               </button>
               <button
                 type="button"
                 onClick={logCommitment}
-                className="rounded-[12px] bg-[rgba(255,255,255,0.08)] px-4 py-2 text-[15px] font-medium text-[var(--text-primary)]"
+                className="rounded-[12px] bg-[var(--bg-secondary)] px-4 py-2 text-[15px] font-medium text-[var(--text-primary)]"
               >
                 Log commitment
               </button>

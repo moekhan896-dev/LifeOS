@@ -2,6 +2,7 @@
 
 import { motion } from 'framer-motion'
 import { Drawer } from 'vaul'
+import { DRAWER_CONTENT_CLASS, DrawerDragHandle } from '@/components/ui/drawer-primitives'
 import { useState } from 'react'
 import { capitalizeDisplayName } from '@/lib/display-name'
 import type { OnboardingDraft } from './onboarding-types'
@@ -289,8 +290,8 @@ export function LiveDashboardPreview({
       <Drawer.Root open={open !== null} onOpenChange={(o) => !o && setOpen(null)}>
         <Drawer.Portal>
           <Drawer.Overlay className="fixed inset-0 z-[80] bg-black/50 backdrop-blur-sm" />
-          <Drawer.Content className="card-floating fixed bottom-0 left-0 right-0 z-[90] max-h-[85vh] rounded-t-[20px] p-6 text-[var(--text-primary)]">
-            <div className="mx-auto mb-4 h-1 w-10 rounded-full bg-[rgba(255,255,255,0.2)]" />
+          <Drawer.Content className={`${DRAWER_CONTENT_CLASS} z-[90] text-[var(--text-primary)]`}>
+            <DrawerDragHandle />
             <Drawer.Title className="title-small">
               {open === 'greeting' && 'Greeting tile'}
               {open === 'income' && 'Income snapshot'}

@@ -47,10 +47,27 @@ export function validateStep(
       add(`business.${i}.revenue`, typeof b.monthlyRevenue === 'number' && b.monthlyRevenue >= 0)
       add(`business.${i}.role`, !!b.role.trim())
       add(`business.${i}.color`, !!b.color.trim())
+      if (b.hasTeam) {
+        const hasNamedMember = (b.team ?? []).some((m) => m.name.trim().length > 0)
+        add(`business.${i}.team`, hasNamedMember)
+      }
       break
     }
-    case 3:
+    case 3: {
+      for (let bi = 0; bi < draft.businesses.length; bi++) {
+        const b = draft.businesses[bi]
+        if (!b.recurringClients) continue
+        const clients = b.clients ?? []
+        const hasValid = clients.some(
+          (c) =>
+            c.name.trim().length > 0 &&
+            typeof c.monthlyPayment === 'number' &&
+            c.monthlyPayment > 0
+        )
+        add(`business.${bi}.recurringClient`, hasValid)
+      }
       break
+    }
     case 4: {
       const f = draft.finance
       add('finance.plaidIntent', f.plaidIntent === 'connect' || f.plaidIntent === 'manual' || f.plaidIntent === 'later')

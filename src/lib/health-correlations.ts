@@ -1,5 +1,5 @@
 /**
- * PRD GAP 30 — health ↔ business correlations (14+ days, min 5/5 split).
+ * PRD GAP 30 — health ↔ business correlations (three tiers by days logged).
  */
 
 import type { HealthLog, Task } from '@/stores/store'
@@ -9,8 +9,9 @@ export interface CorrelationLine {
   text: string
 }
 
-const MIN_DAYS = 14
 const MIN_EACH = 5
+const TIER_BOUNDARY = 14
+const FULL_TRUST_DAYS = 30
 
 function dayTaskScore(tasks: Task[], day: string): number {
   const done = tasks.filter((t) => t.done && t.completedAt?.startsWith(day)).length
@@ -18,26 +19,15 @@ function dayTaskScore(tasks: Task[], day: string): number {
   return Math.min(100, (done / denom) * 100)
 }
 
-export function computeHealthBusinessCorrelations(input: {
-  healthHistory: HealthLog[]
-  tasks: Task[]
-}): { ready: boolean; lines: CorrelationLine[] } {
+/** Core correlations — only call when uniqueDays.length >= TIER_BOUNDARY. */
+function buildRawLines(input: { healthHistory: HealthLog[]; tasks: Task[] }, uniqueDays: string[]): CorrelationLine[] {
   const byDate = new Map<string, HealthLog>()
   for (const h of input.healthHistory) {
     if (h.date) byDate.set(h.date, h)
   }
-  const uniqueDays = [...byDate.keys()].sort((a, b) => a.localeCompare(b))
-
-  if (uniqueDays.length < MIN_DAYS) {
-    return {
-      ready: false,
-      lines: [{ id: 'need-data', text: 'I need more data to identify patterns. Keep logging.' }],
-    }
-  }
 
   const lines: CorrelationLine[] = []
 
-  // Gym vs task completion
   const gymDays = uniqueDays.filter((d) => byDate.get(d)?.gym === true)
   const noGymDays = uniqueDays.filter((d) => byDate.get(d)?.gym === false)
   if (gymDays.length >= MIN_EACH && noGymDays.length >= MIN_EACH) {
@@ -52,7 +42,6 @@ export function computeHealthBusinessCorrelations(input: {
     }
   }
 
-  // Prayer (5/5) vs daily score
   const fullPrayer = uniqueDays.filter((d) => {
     const h = byDate.get(d)
     return h && Object.values(h.prayers).filter(Boolean).length >= 5
@@ -73,7 +62,6 @@ export function computeHealthBusinessCorrelations(input: {
     }
   }
 
-  // Sleep (logged) vs next calendar day score
   const sleepNext: { hour: number; score: number }[] = []
   for (let i = 0; i < uniqueDays.length - 1; i++) {
     const d = uniqueDays[i]
@@ -85,7 +73,7 @@ export function computeHealthBusinessCorrelations(input: {
       sleepNext.push({ hour: sh, score: next.dailyScore })
     }
   }
-  if (sleepNext.length >= MIN_DAYS) {
+  if (sleepNext.length >= TIER_BOUNDARY) {
     const early = sleepNext.filter((x) => x.hour < 22)
     const late = sleepNext.filter((x) => x.hour >= 23 || x.hour < 4)
     if (early.length >= MIN_EACH && late.length >= MIN_EACH) {
@@ -101,7 +89,6 @@ export function computeHealthBusinessCorrelations(input: {
     }
   }
 
-  // Screen time vs same-day score
   const withScreen = [...byDate.values()].filter((h) => typeof h.screenTimeHours === 'number')
   const low = withScreen.filter((h) => h.screenTimeHours <= 4)
   const high = withScreen.filter((h) => h.screenTimeHours > 8)
@@ -115,12 +102,54 @@ export function computeHealthBusinessCorrelations(input: {
     })
   }
 
-  if (lines.length === 0) {
+  return lines
+}
+
+export function computeHealthBusinessCorrelations(input: {
+  healthHistory: HealthLog[]
+  tasks: Task[]
+}): { ready: boolean; lines: CorrelationLine[] } {
+  const byDate = new Map<string, HealthLog>()
+  for (const h of input.healthHistory) {
+    if (h.date) byDate.set(h.date, h)
+  }
+  const uniqueDays = [...byDate.keys()].sort((a, b) => a.localeCompare(b))
+  const n = uniqueDays.length
+
+  if (n < TIER_BOUNDARY) {
+    const remaining = TIER_BOUNDARY - n
     return {
       ready: false,
-      lines: [{ id: 'need-data', text: 'I need more data to identify patterns. Keep logging.' }],
+      lines: [
+        {
+          id: 'need-data',
+          text: `I need more data (${remaining} day${remaining === 1 ? '' : 's'} to go). Keep logging health and tasks.`,
+        },
+      ],
     }
   }
 
-  return { ready: true, lines }
+  const lines = buildRawLines(input, uniqueDays)
+
+  if (lines.length === 0) {
+    return {
+      ready: false,
+      lines: [
+        {
+          id: 'need-pattern',
+          text: 'Not enough contrasting days yet (e.g. gym vs rest, prayer splits, screen buckets) — keep logging.',
+        },
+      ],
+    }
+  }
+
+  const withDisclaimer = n <= FULL_TRUST_DAYS
+  const finalLines: CorrelationLine[] = withDisclaimer
+    ? lines.map((l) => ({
+        ...l,
+        text: `${l.text} Based on ${n} days of data, this is a pattern — not a guarantee.`,
+      }))
+    : lines
+
+  return { ready: true, lines: finalLines }
 }

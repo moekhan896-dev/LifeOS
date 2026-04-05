@@ -34,14 +34,14 @@ export default function SwipeableTaskRow({
     <div className="relative overflow-hidden rounded-2xl">
       <motion.div
         className="pointer-events-none absolute inset-0 flex items-center justify-between rounded-2xl px-6"
-        style={{ opacity: leftReveal, background: 'rgba(239,68,68,0.22)' }}
+        style={{ opacity: leftReveal, background: 'color-mix(in srgb, var(--negative) 22%, transparent)' }}
       >
         <span className="text-[22px] text-[var(--negative)]">✕</span>
         <span className="text-[12px] font-medium text-[var(--negative)]">Skip</span>
       </motion.div>
       <motion.div
         className="pointer-events-none absolute inset-0 flex items-center justify-between rounded-2xl px-6"
-        style={{ opacity: rightReveal, background: 'rgba(16,185,129,0.22)' }}
+        style={{ opacity: rightReveal, background: 'color-mix(in srgb, var(--positive) 22%, transparent)' }}
       >
         <span className="text-[12px] font-medium text-[var(--positive)]">Complete</span>
         <span className="text-[22px] text-[var(--positive)]">✓</span>
@@ -55,13 +55,13 @@ export default function SwipeableTaskRow({
         onDragEnd={(_, info) => {
           const ox = info.offset.x
           if (ox > SWIPE_THRESHOLD) {
-            void animate(x, 0, { type: 'spring', stiffness: 420, damping: 32 })
+            void animate(x, 0, { duration: 0.25, ease: [0.25, 0.1, 0.25, 1] })
             onSwipeComplete()
           } else if (ox < -SWIPE_THRESHOLD) {
-            void animate(x, 0, { type: 'spring', stiffness: 420, damping: 32 })
+            void animate(x, 0, { duration: 0.25, ease: [0.25, 0.1, 0.25, 1] })
             onSwipeSkip()
           } else {
-            void animate(x, 0, { type: 'spring', stiffness: 420, damping: 32 })
+            void animate(x, 0, { duration: 0.25, ease: [0.25, 0.1, 0.25, 1] })
           }
         }}
         className={`relative touch-pan-y ${className}`}

@@ -1,9 +1,9 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { motion } from 'framer-motion'
 import { toast } from 'sonner'
-import { useStore, type SOP } from '@/stores/store'
+import { useStore, type SOP, isArchived } from '@/stores/store'
 import PageTransition from '@/components/PageTransition'
 import { StaggerContainer, StaggerItem } from '@/components/Stagger'
 
@@ -15,17 +15,19 @@ const STATUS_STYLES: Record<string, { bg: string; label: string }> = {
 
 export default function SopsPage() {
   const { sops, businesses, addSop, updateSop } = useStore()
+  const activeBusinesses = useMemo(() => businesses.filter((b) => !isArchived(b)), [businesses])
+  const visibleSops = useMemo(() => sops.filter((s) => !isArchived(s)), [sops])
   const [newTitle, setNewTitle] = useState('')
   const [newBiz, setNewBiz] = useState('')
   const [expandedId, setExpandedId] = useState<string | null>(null)
 
   useEffect(() => {
-    if (businesses.length && !newBiz) setNewBiz(businesses[0].id)
-  }, [businesses, newBiz])
+    if (activeBusinesses.length && !newBiz) setNewBiz(activeBusinesses[0].id)
+  }, [activeBusinesses, newBiz])
 
   const handleAdd = () => {
     if (!newTitle.trim()) return
-    const bid = newBiz || businesses[0]?.id
+    const bid = newBiz || activeBusinesses[0]?.id
     if (!bid) {
       toast.error('Add a business first')
       return
@@ -35,8 +37,8 @@ export default function SopsPage() {
     toast.success('SOP added')
   }
 
-  const documented = sops.filter((s) => s.status === 'documented').length
-  const pct = sops.length > 0 ? Math.round((documented / sops.length) * 100) : 0
+  const documented = visibleSops.filter((s) => s.status === 'documented').length
+  const pct = visibleSops.length > 0 ? Math.round((documented / visibleSops.length) * 100) : 0
 
   return (
     <PageTransition>
@@ -62,7 +64,7 @@ export default function SopsPage() {
                 transition={{ duration: 0.6, ease: 'easeOut' }}
               />
             </div>
-            <p className="mt-2 text-xs text-[var(--text-dim)]">{documented} of {sops.length} SOPs documented</p>
+            <p className="mt-2 text-xs text-[var(--text-dim)]">{documented} of {visibleSops.length} SOPs documented</p>
           </div>
         </StaggerItem>
 
@@ -75,7 +77,7 @@ export default function SopsPage() {
                 onChange={(e) => setNewBiz(e.target.value)}
                 className="rounded-lg border border-[var(--border)] bg-[var(--bg)] px-2 py-2 text-xs text-[var(--text)] outline-none"
               >
-                {businesses.map((b) => (
+                {activeBusinesses.map((b) => (
                   <option key={b.id} value={b.id}>{b.name}</option>
                 ))}
               </select>
@@ -101,15 +103,15 @@ export default function SopsPage() {
 
         {/* SOPs list */}
         <div className="space-y-2">
-          {sops.map((sop) => {
+          {visibleSops.map((sop) => {
             const expanded = expandedId === sop.id
-            const biz = businesses.find((b) => b.id === sop.businessId)
+            const biz = businesses.find((b) => b.id === sop.businessId && !isArchived(b))
             const st = STATUS_STYLES[sop.status]
             return (
               <StaggerItem key={sop.id}>
                 <motion.div
                   whileHover={{ scale: 1.01 }}
-                  transition={{ type: 'spring', stiffness: 400, damping: 25 }}
+                  transition={{ duration: 0.25, ease: [0.25, 0.1, 0.25, 1] }}
                   className="card overflow-hidden"
                 >
                   <div

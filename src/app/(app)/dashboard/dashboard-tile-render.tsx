@@ -2,7 +2,6 @@
 
 import type { ReactNode } from 'react'
 import Link from 'next/link'
-import { useRouter } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Drawer } from 'vaul'
 import { AreaChart, Area, LineChart, Line, ResponsiveContainer } from 'recharts'
@@ -12,9 +11,11 @@ import { XP_VALUES } from '@/lib/constants'
 import { applyTaskDollarEstimateAfterCreate } from '@/lib/task-dollar-client'
 import EveningVoiceReview from '@/components/EveningVoiceReview'
 import ScoreDetailDrawerContent from '@/components/dashboard/ScoreDetailDrawerContent'
+import ExecutionDetailDrawerContent from '@/components/dashboard/ExecutionDetailDrawerContent'
 import PrayerDetailDrawerContent from '@/components/dashboard/PrayerDetailDrawerContent'
 import HabitsDetailDrawerContent from '@/components/dashboard/HabitsDetailDrawerContent'
 import type { LifeAdjustment } from '@/lib/life-expectancy'
+import { DRAWER_CONTENT_CLASS, DrawerDragHandle } from '@/components/ui/drawer-primitives'
 
 const cardAnim = (delay: number) => ({
   initial: { opacity: 0, y: 8 } as const,
@@ -48,7 +49,6 @@ function ProgressRing({ value, max, size, color }: { value: number; max: number;
 export type DashboardTileRenderCtx = Record<string, unknown>
 
 export function renderDashboardTile(tileId: string, x: DashboardTileRenderCtx): ReactNode {
-  const router = x.router as ReturnType<typeof useRouter>
   const isMorningBriefWindow = x.isMorningBriefWindow as boolean
   const editMode = x.editMode as boolean
   const morningBrief = x.morningBrief as { prayerLine: string; energyLine: string; screenLine: string; beatTips: string[] }
@@ -181,6 +181,8 @@ export function renderDashboardTile(tileId: string, x: DashboardTileRenderCtx): 
   }[]
   const updateHealth = x.updateHealth as (h: Partial<HealthLog>) => void
   const markProactiveRead = x.markProactiveRead as (id: string) => void
+  const onSkipTask = x.onSkipTask as ((id: string) => void) | undefined
+  const netWorth = x.netWorth as number
 
   switch (tileId) {
 
@@ -332,7 +334,6 @@ export function renderDashboardTile(tileId: string, x: DashboardTileRenderCtx): 
                       toast.success('Task added!')
                     }
                   }}
-                  whileHover={{ filter: 'brightness(1.08)' }}
                   whileTap={{ scale: 0.97 }}
                   className="btn-primary flex-1 min-h-[44px]"
                 >
@@ -412,9 +413,13 @@ export function renderDashboardTile(tileId: string, x: DashboardTileRenderCtx): 
                       >
                         ✓ Done
                       </motion.button>
-                      <Link href="/tasks" className="text-[17px] text-[var(--accent)] hover:underline">
+                      <button
+                        type="button"
+                        className="text-[17px] text-[var(--accent)] hover:underline"
+                        onClick={() => onSkipTask?.(theOneThing.id)}
+                      >
                         Skip →
-                      </Link>
+                      </button>
                     </div>
                   </div>
                 ) : (
@@ -447,9 +452,13 @@ export function renderDashboardTile(tileId: string, x: DashboardTileRenderCtx): 
                             >
                               Done
                             </button>
-                            <Link href="/tasks" className="text-[13px] text-[var(--text-secondary)] hover:underline">
+                            <button
+                              type="button"
+                              className="text-[13px] text-[var(--text-secondary)] hover:underline"
+                              onClick={() => onSkipTask?.(t.id)}
+                            >
                               Skip
-                            </Link>
+                            </button>
                           </div>
                         </li>
                       ))}
@@ -487,9 +496,8 @@ export function renderDashboardTile(tileId: string, x: DashboardTileRenderCtx): 
 <Drawer.Root>
   <Drawer.Trigger asChild>
     <motion.div
-      className="w-full cursor-pointer rounded-2xl border border-[var(--border)] bg-[var(--bg-elevated)] p-5 shadow-[0_2px_12px_rgba(0,0,0,0.35)]"
+      className="w-full cursor-pointer rounded-2xl border border-[var(--border)] bg-[var(--bg-elevated)] p-5"
       {...cardAnim(0.08)}
-      whileHover={{ filter: 'brightness(1.06)' }}
     >
       <span className="text-[13px] font-semibold text-[var(--text-secondary)]">Net income</span>
       <div className="data mt-2" style={{ fontSize: 32, fontWeight: 700, color: netIncome >= 0 ? 'var(--positive)' : 'var(--negative)' }}>
@@ -510,9 +518,9 @@ export function renderDashboardTile(tileId: string, x: DashboardTileRenderCtx): 
   </Drawer.Trigger>
   <Drawer.Portal>
     <Drawer.Overlay className="fixed inset-0 z-50 bg-black/60" />
-    <Drawer.Content className="fixed bottom-0 left-0 right-0 z-50 rounded-t-[20px] border-t border-white/[0.06] bg-[var(--bg-elevated)] p-5 max-h-[85vh] overflow-y-auto">
-      <div className="mx-auto mb-4 h-1 w-10 rounded-full bg-white/10" />
-      <Drawer.Title className="text-lg font-semibold text-white mb-4">Net Income Breakdown</Drawer.Title>
+    <Drawer.Content className={`${DRAWER_CONTENT_CLASS} z-50`}>
+      <DrawerDragHandle />
+      <Drawer.Title className="text-lg font-semibold text-[var(--text-primary)] mb-4">Net Income Breakdown</Drawer.Title>
       <div className="mb-5 rounded-[12px] p-4" style={{ background: 'var(--surface2)' }}>
         <p className="mb-3 text-[13px] font-semibold text-[var(--text-secondary)]">14-day income trajectory</p>
         <ResponsiveContainer width="100%" height={120}>
@@ -540,7 +548,7 @@ export function renderDashboardTile(tileId: string, x: DashboardTileRenderCtx): 
           </div>
         ))}
       </div>
-      <div className="mt-4 pt-4 border-t border-white/[0.06] space-y-2">
+        <div className="mt-4 pt-4 border-t border-white/[0.06] space-y-2">
         <div className="flex justify-between text-[12px]">
           <span className="text-[var(--text-mid)]">Total Revenue</span>
           <span className="data" style={{ color: 'var(--positive)' }}>${Math.round(totalIncome).toLocaleString()}</span>
@@ -550,24 +558,85 @@ export function renderDashboardTile(tileId: string, x: DashboardTileRenderCtx): 
           <span className="data text-[var(--rose)]">-${Math.round(totalExpenses).toLocaleString()}</span>
         </div>
         <div className="flex justify-between text-[14px] font-semibold pt-2 border-t border-white/[0.06]">
-          <span className="text-white">Net Income</span>
+          <span className="text-[var(--text-primary)]">Net Income</span>
           <span className="data" style={{ color: netIncome >= 0 ? 'var(--positive)' : 'var(--negative)' }}>${Math.round(netIncome).toLocaleString()}</span>
         </div>
+        <div className="flex justify-between text-[12px] pt-2">
+          <span className="text-[var(--text-mid)]">Net worth (balance sheet)</span>
+          <span className="data tabular-nums" style={{ color: netWorth >= 0 ? 'var(--positive)' : 'var(--negative)' }}>
+            ${Math.round(netWorth).toLocaleString()}
+          </span>
+        </div>
       </div>
+      <Link
+        href="/financials"
+        className="mt-4 block w-full rounded-xl border border-[var(--border)] py-3 text-center text-[13px] font-semibold text-[var(--accent)]"
+      >
+        View full page →
+      </Link>
     </Drawer.Content>
   </Drawer.Portal>
 </Drawer.Root>
 
 
       )
+    case 'daily_score': {
+      const dailyScore = typeof todayHealth.dailyScore === 'number' ? todayHealth.dailyScore : 0
+      return (
+        <Drawer.Root>
+          <Drawer.Trigger asChild>
+            <motion.div
+              className="w-full cursor-pointer rounded-2xl border border-[var(--border)] bg-[var(--bg-elevated)] p-5"
+              {...cardAnim(0.1)}
+            >
+              <span className="text-[13px] font-semibold text-[var(--text-secondary)]">Score ring</span>
+              <div className="relative mx-auto mt-2 flex h-[56px] w-[56px] items-center justify-center">
+                <ProgressRing value={dailyScore} max={100} size={56} color="var(--accent)" />
+                <span className="absolute inset-0 flex items-center justify-center data text-[12px] font-bold text-[var(--text)]">
+                  {dailyScore}
+                </span>
+              </div>
+              <p className="mt-1 text-center text-[11px] text-[var(--text-mid)]">Health scorecard · tap</p>
+            </motion.div>
+          </Drawer.Trigger>
+          <Drawer.Portal>
+            <Drawer.Overlay className="fixed inset-0 z-50 bg-black/60" />
+            <Drawer.Content className={`${DRAWER_CONTENT_CLASS} z-50 max-h-[90vh] overflow-y-auto`}>
+              <DrawerDragHandle />
+              <Drawer.Title className="mb-2 text-lg font-semibold text-[var(--text-primary)]">Daily scorecard</Drawer.Title>
+              <ScoreDetailDrawerContent
+                todayStr={todayStr}
+                executionScore={executionScore}
+                tasks={tasksFull}
+                todayHealth={todayHealth}
+                tasksDoneToday={tasksDoneToday}
+                tasksCommitted={tasksCommitted}
+                todayFocusSessions={todayFocusSessions}
+                trackPrayers={trackPrayers}
+                healthHistory={healthHistory}
+                xp={xp}
+                level={level}
+                togglePrayer={togglePrayer}
+                toggleTask={toggleTask}
+              />
+              <Link
+                href="/health"
+                className="mt-4 block w-full rounded-xl border border-[var(--border)] py-3 text-center text-[13px] font-semibold text-[var(--accent)]"
+              >
+                View full page →
+              </Link>
+            </Drawer.Content>
+          </Drawer.Portal>
+        </Drawer.Root>
+      )
+    }
     case 'execution':
       return (
 <Drawer.Root>
   <Drawer.Trigger asChild>
     <motion.div
-      className="w-full cursor-pointer rounded-2xl border border-[var(--border)] bg-[var(--bg-elevated)] p-5 shadow-[0_2px_12px_rgba(0,0,0,0.35)]"
+      className="w-full cursor-pointer rounded-2xl border border-[var(--border)] bg-[var(--bg-elevated)] p-5"
       {...cardAnim(0.12)}
-      whileHover={{ filter: 'brightness(1.06)' }}
     >
       <span className="text-[13px] font-semibold text-[var(--text-secondary)]">Execution</span>
       <div className="data mt-2" style={{ fontSize: 32, fontWeight: 700, color: scoreZone.color }}>
@@ -582,28 +651,29 @@ export function renderDashboardTile(tileId: string, x: DashboardTileRenderCtx): 
   </Drawer.Trigger>
   <Drawer.Portal>
     <Drawer.Overlay className="fixed inset-0 z-50 bg-black/60" />
-    <Drawer.Content className="fixed bottom-0 left-0 right-0 z-50 rounded-t-[20px] border-t border-white/[0.06] bg-[var(--bg-elevated)] p-5 max-h-[85vh] overflow-y-auto">
-      <div className="mx-auto mb-4 h-1 w-10 rounded-full bg-white/10" />
-      <Drawer.Title className="text-lg font-semibold text-white mb-2">Daily score</Drawer.Title>
+    <Drawer.Content className={`${DRAWER_CONTENT_CLASS} z-50`}>
+      <DrawerDragHandle />
+      <Drawer.Title className="text-lg font-semibold text-[var(--text-primary)] mb-2">Execution score</Drawer.Title>
       <div className="flex justify-center mb-4 relative" style={{ width: 80, height: 80, margin: '0 auto 16px' }}>
         <ProgressRing value={executionScore} max={100} size={80} color="var(--accent)" />
         <span className="absolute inset-0 flex items-center justify-center data text-[18px] font-bold text-white">{executionScore}</span>
       </div>
-      <ScoreDetailDrawerContent
+      <ExecutionDetailDrawerContent
         todayStr={todayStr}
         executionScore={executionScore}
-        tasks={tasksFull}
         todayHealth={todayHealth}
         tasksDoneToday={tasksDoneToday}
         tasksCommitted={tasksCommitted}
         todayFocusSessions={todayFocusSessions}
         trackPrayers={trackPrayers}
         healthHistory={healthHistory}
-        xp={xp}
-        level={level}
-        togglePrayer={togglePrayer}
-        toggleTask={toggleTask}
       />
+      <Link
+        href="/tasks"
+        className="mt-4 block w-full rounded-xl border border-[var(--border)] py-3 text-center text-[13px] font-semibold text-[var(--accent)]"
+      >
+        View full page →
+      </Link>
     </Drawer.Content>
   </Drawer.Portal>
 </Drawer.Root>
@@ -615,9 +685,8 @@ export function renderDashboardTile(tileId: string, x: DashboardTileRenderCtx): 
 <Drawer.Root>
   <Drawer.Trigger asChild>
     <motion.div
-      className="w-full cursor-pointer rounded-2xl border border-[var(--border)] bg-[var(--bg-elevated)] p-5 shadow-[0_2px_12px_rgba(0,0,0,0.35)]"
+      className="w-full cursor-pointer rounded-2xl border border-[var(--border)] bg-[var(--bg-elevated)] p-5"
       {...cardAnim(0.16)}
-      whileHover={{ filter: 'brightness(1.06)' }}
     >
       <span className="text-[13px] font-semibold text-[var(--text-secondary)]">Energy</span>
       <div className="data mt-2" style={{ fontSize: 32, fontWeight: 700, color: latestEnergy ? (latestEnergy.level >= 7 ? 'var(--accent)' : latestEnergy.level >= 4 ? 'var(--amber)' : 'var(--rose)') : 'var(--text-dim)' }}>
@@ -628,9 +697,9 @@ export function renderDashboardTile(tileId: string, x: DashboardTileRenderCtx): 
   </Drawer.Trigger>
   <Drawer.Portal>
     <Drawer.Overlay className="fixed inset-0 z-50 bg-black/60" />
-    <Drawer.Content className="fixed bottom-0 left-0 right-0 z-50 rounded-t-[20px] border-t border-white/[0.06] bg-[var(--bg-elevated)] p-5 max-h-[85vh] overflow-y-auto">
-      <div className="mx-auto mb-4 h-1 w-10 rounded-full bg-white/10" />
-      <Drawer.Title className="text-lg font-semibold text-white mb-4">Log Your Energy</Drawer.Title>
+    <Drawer.Content className={`${DRAWER_CONTENT_CLASS} z-50`}>
+      <DrawerDragHandle />
+      <Drawer.Title className="text-lg font-semibold text-[var(--text-primary)] mb-4">Log Your Energy</Drawer.Title>
 
       <div className="space-y-5">
         {(['morning', 'afternoon', 'evening'] as const).map(slot => {
@@ -681,6 +750,12 @@ export function renderDashboardTile(tileId: string, x: DashboardTileRenderCtx): 
           </div>
         </div>
       )}
+      <Link
+        href="/energy"
+        className="mt-4 block w-full rounded-xl border border-[var(--border)] py-3 text-center text-[13px] font-semibold text-[var(--accent)]"
+      >
+        View full page →
+      </Link>
     </Drawer.Content>
   </Drawer.Portal>
 </Drawer.Root>
@@ -692,9 +767,8 @@ export function renderDashboardTile(tileId: string, x: DashboardTileRenderCtx): 
 <Drawer.Root>
   <Drawer.Trigger asChild>
     <motion.div
-      className="w-full cursor-pointer rounded-2xl border border-[var(--border)] bg-[var(--bg-elevated)] p-5 shadow-[0_2px_12px_rgba(0,0,0,0.35)]"
+      className="w-full cursor-pointer rounded-2xl border border-[var(--border)] bg-[var(--bg-elevated)] p-5"
       {...cardAnim(0.2)}
-      whileHover={{ filter: 'brightness(1.06)' }}
     >
       <span className="text-[13px] font-semibold text-[var(--text-secondary)]">Prayers</span>
       <div className="data mt-2" style={{ fontSize: 32, fontWeight: 700, color: 'var(--gold)' }}>
@@ -713,9 +787,9 @@ export function renderDashboardTile(tileId: string, x: DashboardTileRenderCtx): 
   </Drawer.Trigger>
   <Drawer.Portal>
     <Drawer.Overlay className="fixed inset-0 z-50 bg-black/60" />
-    <Drawer.Content className="fixed bottom-0 left-0 right-0 z-50 rounded-t-[20px] border-t border-white/[0.06] bg-[var(--bg-elevated)] p-5 max-h-[85vh] overflow-y-auto">
-      <div className="mx-auto mb-4 h-1 w-10 rounded-full bg-white/10" />
-      <Drawer.Title className="text-lg font-semibold text-white mb-4">Prayers</Drawer.Title>
+    <Drawer.Content className={`${DRAWER_CONTENT_CLASS} z-50`}>
+      <DrawerDragHandle />
+      <Drawer.Title className="text-lg font-semibold text-[var(--text-primary)] mb-4">Prayers</Drawer.Title>
       <div className="flex items-center gap-2 mb-4">
         <span className="data text-[24px] font-bold" style={{ color: 'var(--gold)' }}>{prayersDone}/5</span>
         <span className="text-[12px] text-[var(--text-dim)]">completed today</span>
@@ -731,6 +805,12 @@ export function renderDashboardTile(tileId: string, x: DashboardTileRenderCtx): 
         prayerCalcMethod={prayerCalcMethod}
         prayerAsrHanafi={prayerAsrHanafi}
       />
+      <Link
+        href="/health"
+        className="mt-4 block w-full rounded-xl border border-[var(--border)] py-3 text-center text-[13px] font-semibold text-[var(--accent)]"
+      >
+        View full page →
+      </Link>
     </Drawer.Content>
   </Drawer.Portal>
 </Drawer.Root>
@@ -740,9 +820,8 @@ export function renderDashboardTile(tileId: string, x: DashboardTileRenderCtx): 
 <Drawer.Root>
   <Drawer.Trigger asChild>
     <motion.div
-      className="w-full flex cursor-pointer flex-col gap-3 rounded-2xl border border-[var(--border)] bg-[var(--bg-elevated)] p-4 shadow-[0_2px_12px_rgba(0,0,0,0.35)] sm:flex-row sm:items-center sm:justify-between"
+      className="w-full flex cursor-pointer flex-col gap-3 rounded-2xl border border-[var(--border)] bg-[var(--bg-elevated)] p-4 sm:flex-row sm:items-center sm:justify-between"
       {...cardAnim(0.22)}
-      whileHover={{ filter: 'brightness(1.06)' }}
     >
       <div>
         <span className="text-[13px] font-semibold text-[var(--text-secondary)]">Life horizon</span>
@@ -760,9 +839,9 @@ export function renderDashboardTile(tileId: string, x: DashboardTileRenderCtx): 
   </Drawer.Trigger>
   <Drawer.Portal>
     <Drawer.Overlay className="fixed inset-0 z-50 bg-black/60" />
-    <Drawer.Content className="fixed bottom-0 left-0 right-0 z-50 max-h-[85vh] overflow-y-auto rounded-t-[20px] border-t border-white/[0.06] bg-[var(--bg-elevated)] p-5">
-      <div className="mx-auto mb-4 h-1 w-10 rounded-full bg-white/10" />
-      <Drawer.Title className="text-lg font-semibold text-white">Life expectancy model</Drawer.Title>
+    <Drawer.Content className={`${DRAWER_CONTENT_CLASS} z-50`}>
+      <DrawerDragHandle />
+      <Drawer.Title className="text-lg font-semibold text-[var(--text-primary)]">Life expectancy model</Drawer.Title>
       <p className="mt-2 text-[14px] text-[var(--text-secondary)]">
         Illustrative blend of actuarial baseline and your logged health behaviors — not a medical prognosis.
       </p>
@@ -799,6 +878,12 @@ export function renderDashboardTile(tileId: string, x: DashboardTileRenderCtx): 
         Motivational: every hour you move execution forward is an hour reclaimed from drift — use the scorecard,
         not this number, for business decisions.
       </p>
+      <Link
+        href="/health"
+        className="mt-4 block w-full rounded-xl border border-[var(--border)] py-3 text-center text-[13px] font-semibold text-[var(--accent)]"
+      >
+        View full page →
+      </Link>
     </Drawer.Content>
   </Drawer.Portal>
 </Drawer.Root>
@@ -807,7 +892,7 @@ export function renderDashboardTile(tileId: string, x: DashboardTileRenderCtx): 
       return (
 <Drawer.Root>
   <Drawer.Trigger asChild>
-    <motion.div className="card rounded-[16px] p-5 w-full cursor-pointer" {...cardAnim(0.24)} whileHover={{ filter: 'brightness(1.06)' }}>
+    <motion.div className="card rounded-[16px] p-5 w-full cursor-pointer" {...cardAnim(0.24)} >
       <span className="text-[13px] font-semibold text-[var(--text-secondary)]">Today&apos;s schedule</span>
       {todaySchedule.length > 0 ? (
         <div className="mt-3 relative h-10 rounded-[8px] overflow-hidden" style={{ background: 'var(--surface2)' }}>
@@ -853,9 +938,9 @@ export function renderDashboardTile(tileId: string, x: DashboardTileRenderCtx): 
   </Drawer.Trigger>
   <Drawer.Portal>
     <Drawer.Overlay className="fixed inset-0 z-50 bg-black/60" />
-    <Drawer.Content className="fixed bottom-0 left-0 right-0 z-50 rounded-t-[20px] border-t border-white/[0.06] bg-[var(--bg-elevated)] p-5 max-h-[85vh] overflow-y-auto">
-      <div className="mx-auto mb-4 h-1 w-10 rounded-full bg-white/10" />
-      <Drawer.Title className="text-lg font-semibold text-white mb-4">Today&apos;s Schedule</Drawer.Title>
+    <Drawer.Content className={`${DRAWER_CONTENT_CLASS} z-50`}>
+      <DrawerDragHandle />
+      <Drawer.Title className="text-lg font-semibold text-[var(--text-primary)] mb-4">Today&apos;s Schedule</Drawer.Title>
 
       {todaySchedule.length > 0 ? (
         <div className="space-y-2">
@@ -892,7 +977,7 @@ export function renderDashboardTile(tileId: string, x: DashboardTileRenderCtx): 
       return (
 <Drawer.Root>
   <Drawer.Trigger asChild>
-    <motion.div className="card rounded-[16px] p-5 w-full cursor-pointer" {...cardAnim(0.28)} whileHover={{ filter: 'brightness(1.06)' }}>
+    <motion.div className="card rounded-[16px] p-5 w-full cursor-pointer" {...cardAnim(0.28)} >
       <span className="text-[13px] font-semibold text-[var(--text-secondary)]">Active projects</span>
       {activeProjects.length > 0 ? (
         <div className="mt-3 space-y-3">
@@ -921,9 +1006,9 @@ export function renderDashboardTile(tileId: string, x: DashboardTileRenderCtx): 
   </Drawer.Trigger>
   <Drawer.Portal>
     <Drawer.Overlay className="fixed inset-0 z-50 bg-black/60" />
-    <Drawer.Content className="fixed bottom-0 left-0 right-0 z-50 rounded-t-[20px] border-t border-white/[0.06] bg-[var(--bg-elevated)] p-5 max-h-[85vh] overflow-y-auto">
-      <div className="mx-auto mb-4 h-1 w-10 rounded-full bg-white/10" />
-      <Drawer.Title className="text-lg font-semibold text-white mb-4">
+    <Drawer.Content className={`${DRAWER_CONTENT_CLASS} z-50`}>
+      <DrawerDragHandle />
+      <Drawer.Title className="text-lg font-semibold text-[var(--text-primary)] mb-4">
         {activeProjects.length > 0 ? 'Active Projects' : 'Start a Project'}
       </Drawer.Title>
 
@@ -987,93 +1072,135 @@ export function renderDashboardTile(tileId: string, x: DashboardTileRenderCtx): 
           </motion.button>
         </div>
       </div>
+      <Link
+        href="/projects"
+        className="mt-4 block w-full rounded-xl border border-[var(--border)] py-3 text-center text-[13px] font-semibold text-[var(--accent)]"
+      >
+        View full page →
+      </Link>
     </Drawer.Content>
   </Drawer.Portal>
 </Drawer.Root>
       )
-    case 'ai_insights':
-      return (
-<motion.div
-  className="card rounded-[16px] p-5 w-full cursor-pointer"
-  {...cardAnim(0.32)}
-  whileHover={{ filter: 'brightness(1.06)' }}
-  role="button"
-  tabIndex={0}
-  onClick={() => router.push('/ai-insights')}
-  onKeyDown={(e) => {
-    if (e.key === 'Enter' || e.key === ' ') {
-      e.preventDefault()
-      router.push('/ai-insights')
-    }
-  }}
->
-  <div className="flex items-center justify-between gap-2">
-    <span className="text-[13px] font-semibold text-[var(--text-secondary)]">AI Insights</span>
-    {unreadProactive > 0 && (
-      <span className="rounded-full bg-[var(--accent)] px-2 py-0.5 text-[11px] font-bold text-white">
-        {unreadProactive > 99 ? '99+' : unreadProactive}
-      </span>
-    )}
-  </div>
-  <p className="mt-1 text-[11px] text-[var(--text-dim)]">Tap for full proactive inbox</p>
-  {alerts.length > 0 ? (
-    <div className="mt-3 space-y-2">
-      {alerts.map((a, i) => {
-        const action = getAlertAction(a)
-        return (
-          <div key={a.id ?? `alert-${i}`}>
-            <motion.div
-              onClick={(e) => {
-                e.stopPropagation()
-                setExpandedAlert(expandedAlert === i ? null : i)
-              }}
-              className="rounded-[10px] px-3 py-2.5 cursor-pointer flex items-center justify-between"
-              style={{ borderLeft: `3px solid ${a.color}`, background: 'var(--surface2)' }}
-              whileHover={{ scale: 1.005 }}
-            >
-              <p className="text-[12px] text-[var(--text-mid)] flex-1">{a.text}</p>
-              {action && (
-                'href' in action ? (
-                  <Link href={action.href!} onClick={e => e.stopPropagation()} className="flex-shrink-0 ml-2 px-2.5 py-1 rounded-[6px] text-[10px] font-semibold" style={{ background: `color-mix(in srgb, ${a.color} 15%, transparent)`, color: a.color }}>
-                    {action.label}
-                  </Link>
-                ) : (
-                  <button onClick={e => { e.stopPropagation(); action.action!() }} className="flex-shrink-0 ml-2 px-2.5 py-1 rounded-[6px] text-[10px] font-semibold" style={{ background: `color-mix(in srgb, ${a.color} 15%, transparent)`, color: a.color }}>
-                    {action.label}
-                  </button>
+    case 'ai_insights': {
+      const insightBody = (
+        <>
+          {alerts.length > 0 ? (
+            <div className="mt-3 space-y-2">
+              {alerts.map((a, i) => {
+                const action = getAlertAction(a)
+                return (
+                  <div key={a.id ?? `alert-${i}`}>
+                    <motion.div
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        setExpandedAlert(expandedAlert === i ? null : i)
+                      }}
+                      className="flex cursor-pointer items-center justify-between rounded-[10px] px-3 py-2.5"
+                      style={{ borderLeft: `3px solid ${a.color}`, background: 'var(--surface2)' }}
+                      whileHover={{ scale: 1.005 }}
+                    >
+                      <p className="flex-1 text-[12px] text-[var(--text-mid)]">{a.text}</p>
+                      {action &&
+                        ('href' in action ? (
+                          <Link
+                            href={action.href!}
+                            onClick={(e) => e.stopPropagation()}
+                            className="ml-2 flex-shrink-0 rounded-[6px] px-2.5 py-1 text-[10px] font-semibold"
+                            style={{
+                              background: `color-mix(in srgb, ${a.color} 15%, transparent)`,
+                              color: a.color,
+                            }}
+                          >
+                            {action.label}
+                          </Link>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              action.action!()
+                            }}
+                            className="ml-2 flex-shrink-0 rounded-[6px] px-2.5 py-1 text-[10px] font-semibold"
+                            style={{
+                              background: `color-mix(in srgb, ${a.color} 15%, transparent)`,
+                              color: a.color,
+                            }}
+                          >
+                            {action.label}
+                          </button>
+                        ))}
+                    </motion.div>
+                    <AnimatePresence>
+                      {expandedAlert === i && (
+                        <motion.div
+                          initial={{ height: 0, opacity: 0 }}
+                          animate={{ height: 'auto', opacity: 1 }}
+                          exit={{ height: 0, opacity: 0 }}
+                          transition={{ duration: 0.2 }}
+                          className="overflow-hidden"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <div className="px-3 py-2 text-[11px] text-[var(--text-dim)]">
+                            {a.type === 'proactive' &&
+                              'Template insight from your data. Add an Anthropic API key in Settings for fully personalized recommendations.'}
+                            {a.type === 'risk' &&
+                              'High client concentration puts your revenue at risk. Consider diversifying by acquiring new clients or increasing revenue from smaller accounts.'}
+                            {a.type === 'health' &&
+                              'This business has had no task completions in the past week. Assign tasks or reconsider its priority.'}
+                            {a.type === 'stale' &&
+                              'Stale tasks drag down your execution score. Review and either complete, reschedule, or delete them.'}
+                            {a.type === 'commitment' &&
+                              'Low commitment fulfillment erodes trust. Review pending commitments and prioritize follow-through.'}
+                          </div>
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
+                  </div>
                 )
+              })}
+            </div>
+          ) : (
+            <p className="mt-3 text-[12px] italic text-[var(--text-dim)]">All clear. Keep it up.</p>
+          )}
+        </>
+      )
+      return (
+        <Drawer.Root>
+          <Drawer.Trigger asChild>
+            <motion.div className="card w-full cursor-pointer rounded-[16px] p-5 text-left" {...cardAnim(0.32)}>
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-[13px] font-semibold text-[var(--text-secondary)]">AI Insights</span>
+                {unreadProactive > 0 && (
+                  <span className="rounded-full bg-[var(--accent)] px-2 py-0.5 text-[11px] font-bold text-white">
+                    {unreadProactive > 99 ? '99+' : unreadProactive}
+                  </span>
+                )}
+              </div>
+              <p className="mt-1 text-[11px] text-[var(--text-dim)]">Tap for detail and actions</p>
+              {alerts[0] && (
+                <p className="mt-2 line-clamp-2 text-[12px] text-[var(--text-mid)]">{alerts[0].text}</p>
               )}
             </motion.div>
-            <AnimatePresence>
-              {expandedAlert === i && (
-                <motion.div
-                  initial={{ height: 0, opacity: 0 }}
-                  animate={{ height: 'auto', opacity: 1 }}
-                  exit={{ height: 0, opacity: 0 }}
-                  transition={{ duration: 0.2 }}
-                  className="overflow-hidden"
-                  onClick={(e) => e.stopPropagation()}
-                >
-                  <div className="px-3 py-2 text-[11px] text-[var(--text-dim)]">
-                    {a.type === 'proactive' &&
-                      'Template insight from your data. Add an Anthropic API key in Settings for fully personalized recommendations.'}
-                    {a.type === 'risk' && 'High client concentration puts your revenue at risk. Consider diversifying by acquiring new clients or increasing revenue from smaller accounts.'}
-                    {a.type === 'health' && 'This business has had no task completions in the past week. Assign tasks or reconsider its priority.'}
-                    {a.type === 'stale' && 'Stale tasks drag down your execution score. Review and either complete, reschedule, or delete them.'}
-                    {a.type === 'commitment' && 'Low commitment fulfillment erodes trust. Review pending commitments and prioritize follow-through.'}
-                  </div>
-                </motion.div>
-              )}
-            </AnimatePresence>
-          </div>
-        )
-      })}
-    </div>
-  ) : (
-    <p className="text-[12px] text-[var(--text-dim)] mt-3 italic">All clear. Keep it up.</p>
-  )}
-</motion.div>
+          </Drawer.Trigger>
+          <Drawer.Portal>
+            <Drawer.Overlay className="fixed inset-0 z-50 bg-black/60" />
+            <Drawer.Content className={`${DRAWER_CONTENT_CLASS} z-50 max-h-[88vh] overflow-y-auto`}>
+              <DrawerDragHandle />
+              <Drawer.Title className="mb-1 text-lg font-semibold text-[var(--text-primary)]">AI Insights</Drawer.Title>
+              <p className="mb-3 text-[13px] text-[var(--text-secondary)]">Proactive inbox — expand for context.</p>
+              {insightBody}
+              <Link
+                href="/ai-insights"
+                className="mt-5 block w-full rounded-xl border border-[var(--border)] py-3 text-center text-[13px] font-semibold text-[var(--accent)]"
+              >
+                View full page →
+              </Link>
+            </Drawer.Content>
+          </Drawer.Portal>
+        </Drawer.Root>
       )
+    }
     case 'cost_inaction':
       return (
 <Drawer.Root>
@@ -1082,7 +1209,6 @@ export function renderDashboardTile(tileId: string, x: DashboardTileRenderCtx): 
       className="card-urgent rounded-[16px] p-5 w-full cursor-pointer"
       style={{ background: 'linear-gradient(135deg, color-mix(in srgb, var(--rose) 5%, var(--surface)), var(--surface))' }}
       {...cardAnim(0.36)}
-      whileHover={{ filter: 'brightness(1.05)' }}
     >
       <span className="text-[13px] font-semibold text-[var(--negative)]">Cost of inaction</span>
       <div
@@ -1115,9 +1241,9 @@ export function renderDashboardTile(tileId: string, x: DashboardTileRenderCtx): 
   </Drawer.Trigger>
   <Drawer.Portal>
     <Drawer.Overlay className="fixed inset-0 z-50 bg-black/60" />
-    <Drawer.Content className="fixed bottom-0 left-0 right-0 z-50 rounded-t-[20px] border-t border-white/[0.06] bg-[var(--bg-elevated)] p-5 max-h-[85vh] overflow-y-auto">
-      <div className="mx-auto mb-4 h-1 w-10 rounded-full bg-white/10" />
-      <Drawer.Title className="text-lg font-semibold text-white mb-4">Cost of Inaction</Drawer.Title>
+    <Drawer.Content className={`${DRAWER_CONTENT_CLASS} z-50`}>
+      <DrawerDragHandle />
+      <Drawer.Title className="text-lg font-semibold text-[var(--text-primary)] mb-4">Cost of Inaction</Drawer.Title>
 
       <div
         className="data text-[32px] font-bold mb-1"
@@ -1153,13 +1279,19 @@ export function renderDashboardTile(tileId: string, x: DashboardTileRenderCtx): 
           </Link>
         </div>
       )}
+      <Link
+        href="/tasks"
+        className="mt-3 block w-full rounded-xl border border-[var(--border)] py-3 text-center text-[13px] font-semibold text-[var(--accent)]"
+      >
+        View full page →
+      </Link>
     </Drawer.Content>
   </Drawer.Portal>
 </Drawer.Root>
       )
     case 'days_tasks':
       return (
-<motion.div className="card rounded-[16px] p-5 w-full cursor-pointer" {...cardAnim(0.4)} whileHover={{ filter: 'brightness(1.05)' }}>
+<motion.div className="card rounded-[16px] p-5 w-full" {...cardAnim(0.4)} >
   <div className="grid grid-cols-2 gap-4 h-full">
     <Drawer.Root>
       <Drawer.Trigger asChild>
@@ -1176,9 +1308,9 @@ export function renderDashboardTile(tileId: string, x: DashboardTileRenderCtx): 
       </Drawer.Trigger>
       <Drawer.Portal>
         <Drawer.Overlay className="fixed inset-0 z-50 bg-black/60" />
-        <Drawer.Content className="fixed bottom-0 left-0 right-0 z-50 rounded-t-[20px] border-t border-white/[0.06] bg-[var(--bg-elevated)] p-5 max-h-[85vh] overflow-y-auto">
-          <div className="mx-auto mb-4 h-1 w-10 rounded-full bg-white/10" />
-          <Drawer.Title className="text-lg font-semibold text-white mb-4">Days to Target</Drawer.Title>
+        <Drawer.Content className={`${DRAWER_CONTENT_CLASS} z-50`}>
+          <DrawerDragHandle />
+          <Drawer.Title className="mb-4 text-lg font-semibold text-[var(--text-primary)]">Days to Target</Drawer.Title>
 
           <div className="grid grid-cols-2 gap-4 mb-5">
             <div className="rounded-[12px] p-4" style={{ background: 'var(--surface2)' }}>
@@ -1216,7 +1348,7 @@ export function renderDashboardTile(tileId: string, x: DashboardTileRenderCtx): 
               {[
                 { text: 'Land 1 new client this week', link: '/pipeline' },
                 { text: 'Upsell existing clients', link: '/clients' },
-                { text: 'Cut unnecessary expenses', link: '/finances' },
+                { text: 'Cut unnecessary expenses', link: '/financials' },
                 { text: 'Ask AI for revenue strategy', link: '/ai?q=Help me close the income gap' },
               ].map((action, i) => (
                 <Link key={i} href={action.link} className="flex items-center justify-between rounded-[10px] p-3 transition-colors hover:bg-white/[0.03]" style={{ background: 'var(--surface2)' }}>
@@ -1229,66 +1361,177 @@ export function renderDashboardTile(tileId: string, x: DashboardTileRenderCtx): 
         </Drawer.Content>
       </Drawer.Portal>
     </Drawer.Root>
-    <div className="overflow-y-auto max-h-[200px]">
-      <span className="text-[13px] font-semibold text-[var(--text-secondary)]">Today&apos;s tasks</span>
-      <form className="mt-2 mb-2" onSubmit={e => {
-        e.preventDefault()
-        if (quickTaskText.trim()) {
-          const q = quickTaskText.trim()
-          const tid = addTask({ businessId: businesses[0]?.id || '', text: q, tag: '', priority: 'med', done: false, xpValue: XP_VALUES.med })
-          void applyTaskDollarEstimateAfterCreate(tid, q)
-          setQuickTaskText('')
-          toast.success('Task added!')
-        }
-      }}>
-        <input
-          value={quickTaskText}
-          onChange={e => setQuickTaskText(e.target.value)}
-          placeholder="Add task..."
-          className="w-full bg-[var(--surface2)] border border-[var(--border)] rounded-[8px] px-2.5 py-1.5 text-[11px] text-white placeholder:text-[var(--text-dim)] outline-none focus:border-[var(--accent)]/50"
-        />
-      </form>
-
-      <div className="space-y-1.5">
-        {sortedTasks.slice(0, 6).map(t => (
-          <div key={t.id} className="flex items-center gap-2 group">
-            <motion.button
-              onClick={() => { toggleTask(t.id); toast.success(`Done! +${t.xpValue} XP`) }}
-              className="flex-shrink-0 w-4 h-4 rounded-[4px] border transition-colors hover:bg-white/[0.05]"
-              style={{ borderColor: t.priority === 'crit' ? 'var(--rose)' : t.priority === 'high' ? 'var(--amber)' : 'var(--border)' }}
-              whileHover={{ scale: 1.2 }}
-              whileTap={{ scale: 0.8 }}
-            />
-            <span className="text-[11px] text-[var(--text-mid)] truncate group-hover:text-white transition-colors">{t.text}</span>
+    <Drawer.Root>
+      <Drawer.Trigger asChild>
+        <div className="max-h-[200px] cursor-pointer overflow-y-auto text-left">
+          <span className="text-[13px] font-semibold text-[var(--text-secondary)]">Today&apos;s tasks</span>
+          <p className="mt-0.5 text-[10px] text-[var(--text-dim)]">{sortedTasks.length} open · tap to manage</p>
+          <div className="mt-2 space-y-1">
+            {sortedTasks.slice(0, 5).map((t) => (
+              <div key={t.id} className="truncate text-[11px] text-[var(--text-mid)]">
+                • {t.text}
+              </div>
+            ))}
+            {sortedTasks.length === 0 && <p className="text-[11px] italic text-[var(--text-dim)]">No tasks</p>}
           </div>
-        ))}
-        {sortedTasks.length === 0 && <p className="text-[11px] text-[var(--text-dim)] italic">No tasks</p>}
-      </div>
-    </div>
+        </div>
+      </Drawer.Trigger>
+      <Drawer.Portal>
+        <Drawer.Overlay className="fixed inset-0 z-50 bg-black/60" />
+        <Drawer.Content className={`${DRAWER_CONTENT_CLASS} z-50 max-h-[90vh] overflow-y-auto`}>
+          <DrawerDragHandle />
+          <Drawer.Title className="mb-2 text-lg font-semibold text-[var(--text-primary)]">Today&apos;s tasks</Drawer.Title>
+          <form
+            className="mb-3"
+            onSubmit={(e) => {
+              e.preventDefault()
+              if (quickTaskText.trim()) {
+                const q = quickTaskText.trim()
+                const tid = addTask({
+                  businessId: businesses[0]?.id || '',
+                  text: q,
+                  tag: '',
+                  priority: 'med',
+                  done: false,
+                  xpValue: XP_VALUES.med,
+                })
+                void applyTaskDollarEstimateAfterCreate(tid, q)
+                setQuickTaskText('')
+                toast.success('Task added!')
+              }
+            }}
+          >
+            <input
+              value={quickTaskText}
+              onChange={(e) => setQuickTaskText(e.target.value)}
+              placeholder="Add task..."
+              className="w-full rounded-[8px] border border-[var(--border)] bg-[var(--surface2)] px-2.5 py-2 text-[14px] text-white placeholder:text-[var(--text-dim)] outline-none focus:border-[var(--accent)]/50"
+            />
+          </form>
+          <div className="space-y-2">
+            {sortedTasks.slice(0, 25).map((t) => (
+              <div key={t.id} className="flex items-center gap-2">
+                <motion.button
+                  type="button"
+                  onClick={() => {
+                    toggleTask(t.id)
+                    toast.success(`Done! +${t.xpValue} XP`)
+                  }}
+                  className="h-4 w-4 flex-shrink-0 rounded-[4px] border transition-colors hover:bg-white/[0.05]"
+                  style={{
+                    borderColor:
+                      t.priority === 'crit' ? 'var(--rose)' : t.priority === 'high' ? 'var(--amber)' : 'var(--border)',
+                  }}
+                  whileHover={{ scale: 1.2 }}
+                  whileTap={{ scale: 0.8 }}
+                />
+                <span className="flex-1 text-[13px] text-[var(--text-mid)]">{t.text}</span>
+                <button
+                  type="button"
+                  className="shrink-0 text-[12px] text-[var(--text-secondary)] hover:underline"
+                  onClick={() => onSkipTask?.(t.id)}
+                >
+                  Skip
+                </button>
+              </div>
+            ))}
+            {sortedTasks.length === 0 && <p className="text-[13px] italic text-[var(--text-dim)]">No tasks</p>}
+          </div>
+          <Link
+            href="/tasks"
+            className="mt-5 block w-full rounded-xl border border-[var(--border)] py-3 text-center text-[13px] font-semibold text-[var(--accent)]"
+          >
+            View full page →
+          </Link>
+        </Drawer.Content>
+      </Drawer.Portal>
+    </Drawer.Root>
   </div>
 </motion.div>
       )
-    case 'clients':
+    case 'clients': {
+      const activeClients = clients.filter((c) => c.active)
       return (
-<motion.div className="card rounded-[16px] p-5 w-full cursor-pointer" {...cardAnim(0.44)} whileHover={{ filter: 'brightness(1.05)' }}>
-  <span className="text-[13px] font-semibold text-[var(--text-secondary)]">Clients</span>
-  {clients.filter(c => c.active).length > 0 ? (
-    <div className="mt-3 space-y-2">
-      {clients.filter(c => c.active).slice(0, 6).map(c => (
-        <div key={c.id} className="flex items-center justify-between text-[12px]">
-          <span className="text-[var(--text)] font-medium truncate mr-2">{c.name}</span>
-          <div className="flex items-center gap-3">
-            <span className="data text-[var(--accent)]">${Math.round(getClientNet(c)).toLocaleString()}</span>
-            <span className="text-[var(--text-dim)]">{c.serviceType}</span>
-          </div>
-        </div>
-      ))}
-    </div>
-  ) : (
-    <p className="text-[12px] text-[var(--text-dim)] mt-3 italic">No active clients</p>
-  )}
-</motion.div>
+        <Drawer.Root>
+          <Drawer.Trigger asChild>
+            <motion.div className="card w-full cursor-pointer rounded-[16px] p-5" {...cardAnim(0.44)}>
+              <span className="text-[13px] font-semibold text-[var(--text-secondary)]">Clients</span>
+              <p className="mt-1 text-[11px] text-[var(--text-dim)]">Business overview · tap</p>
+              {activeClients.length > 0 ? (
+                <div className="mt-3 space-y-2">
+                  {activeClients.slice(0, 6).map((c) => {
+                    const biz = businesses.find((b) => b.id === (c as { businessId?: string }).businessId)
+                    return (
+                      <div key={c.id} className="flex items-center justify-between text-[12px]">
+                        <span className="mr-2 flex min-w-0 items-center gap-2 font-medium text-[var(--text)]">
+                          {biz && (
+                            <span
+                              className="h-2 w-2 shrink-0 rounded-full"
+                              style={{ background: biz.color || 'var(--accent)' }}
+                            />
+                          )}
+                          <span className="truncate">{c.name}</span>
+                        </span>
+                        <div className="flex items-center gap-3">
+                          <span className="data text-[var(--accent)]">${Math.round(getClientNet(c)).toLocaleString()}</span>
+                          <span className="text-[var(--text-dim)]">{c.serviceType}</span>
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              ) : (
+                <p className="mt-3 text-[12px] italic text-[var(--text-dim)]">No active clients</p>
+              )}
+            </motion.div>
+          </Drawer.Trigger>
+          <Drawer.Portal>
+            <Drawer.Overlay className="fixed inset-0 z-50 bg-black/60" />
+            <Drawer.Content className={`${DRAWER_CONTENT_CLASS} z-50 max-h-[88vh] overflow-y-auto`}>
+              <DrawerDragHandle />
+              <Drawer.Title className="mb-2 text-lg font-semibold text-[var(--text-primary)]">Clients</Drawer.Title>
+              <p className="mb-3 text-[13px] text-[var(--text-secondary)]">
+                Revenue clients across businesses — edit on the full page.
+              </p>
+              {activeClients.length > 0 ? (
+                <div className="space-y-2">
+                  {activeClients.map((c) => {
+                    const biz = businesses.find((b) => b.id === (c as { businessId?: string }).businessId)
+                    return (
+                      <div
+                        key={c.id}
+                        className="flex items-center justify-between rounded-xl border border-[var(--border)] bg-[var(--surface2)] px-3 py-2.5 text-[13px]"
+                      >
+                        <span className="flex min-w-0 items-center gap-2 font-medium text-[var(--text)]">
+                          {biz && (
+                            <span
+                              className="h-2.5 w-2.5 shrink-0 rounded-full"
+                              style={{ background: biz.color || 'var(--accent)' }}
+                            />
+                          )}
+                          <span className="truncate">{c.name}</span>
+                        </span>
+                        <span className="data shrink-0 text-[var(--accent)]">
+                          ${Math.round(getClientNet(c)).toLocaleString()}/mo
+                        </span>
+                      </div>
+                    )
+                  })}
+                </div>
+              ) : (
+                <p className="text-[14px] text-[var(--text-dim)]">No active clients yet.</p>
+              )}
+              <Link
+                href="/clients"
+                className="mt-5 block w-full rounded-xl border border-[var(--border)] py-3 text-center text-[13px] font-semibold text-[var(--accent)]"
+              >
+                View full page →
+              </Link>
+            </Drawer.Content>
+          </Drawer.Portal>
+        </Drawer.Root>
       )
+    }
     case 'habits': {
       const habitDrawerOpen = x.habitDrawerOpen as boolean
       const setHabitDrawerOpen = x.setHabitDrawerOpen as (v: boolean) => void
@@ -1305,9 +1548,8 @@ export function renderDashboardTile(tileId: string, x: DashboardTileRenderCtx): 
         <Drawer.Root open={habitDrawerOpen} onOpenChange={setHabitDrawerOpen}>
           <Drawer.Trigger asChild>
             <motion.div
-              className="w-full cursor-pointer rounded-2xl border border-[var(--border)] bg-[var(--bg-elevated)] p-5 shadow-[0_2px_12px_rgba(0,0,0,0.35)]"
+              className="w-full cursor-pointer rounded-2xl border border-[var(--border)] bg-[var(--bg-elevated)] p-5"
               {...cardAnim(0.19)}
-              whileHover={{ filter: 'brightness(1.06)' }}
             >
               <span className="text-[13px] font-semibold text-[var(--text-secondary)]">Habits</span>
               <div className="data mt-2" style={{ fontSize: 28, fontWeight: 700, color: 'var(--accent)' }}>
@@ -1332,10 +1574,16 @@ export function renderDashboardTile(tileId: string, x: DashboardTileRenderCtx): 
           </Drawer.Trigger>
           <Drawer.Portal>
             <Drawer.Overlay className="fixed inset-0 z-50 bg-black/60" />
-            <Drawer.Content className="fixed bottom-0 left-0 right-0 z-50 max-h-[85vh] overflow-y-auto rounded-t-[20px] border-t border-white/[0.06] bg-[var(--bg-elevated)] p-5">
-              <div className="mx-auto mb-4 h-1 w-10 rounded-full bg-white/10" />
-              <Drawer.Title className="text-lg font-semibold text-white mb-2">Habits</Drawer.Title>
+            <Drawer.Content className={`${DRAWER_CONTENT_CLASS} z-50`}>
+              <DrawerDragHandle />
+              <Drawer.Title className="mb-2 text-lg font-semibold text-[var(--text-primary)]">Habits</Drawer.Title>
               <HabitsDetailDrawerContent todayStr={todayStr} />
+              <Link
+                href="/health#habits"
+                className="mt-4 block w-full rounded-xl border border-[var(--border)] py-3 text-center text-[13px] font-semibold text-[var(--accent)]"
+              >
+                View full page →
+              </Link>
             </Drawer.Content>
           </Drawer.Portal>
         </Drawer.Root>
@@ -1343,7 +1591,7 @@ export function renderDashboardTile(tileId: string, x: DashboardTileRenderCtx): 
     }
     case 'gmb':
       return (
-<motion.div className="card rounded-[16px] p-5 w-full cursor-pointer" {...cardAnim(0.48)} whileHover={{ filter: 'brightness(1.05)' }}>
+<motion.div className="card rounded-[16px] p-5 w-full cursor-pointer" {...cardAnim(0.48)} >
   <span className="text-[13px] font-semibold text-[var(--text-secondary)]">GMB profiles</span>
   {gmbProfiles.length > 0 ? (
     <div className="mt-3 grid grid-cols-2 gap-2">

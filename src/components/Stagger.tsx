@@ -4,7 +4,7 @@ import { motion } from 'framer-motion'
 
 const container = {
   hidden: {},
-  show: { transition: { staggerChildren: 0.04 } },
+  show: { transition: { staggerChildren: 0.03 } },
 }
 
 const item = {
@@ -20,9 +20,17 @@ export function StaggerContainer({ children, className, style }: { children: Rea
   )
 }
 
-export function StaggerItem({ children, className }: { children: React.ReactNode; className?: string }) {
+export function StaggerItem({
+  children,
+  className,
+  id,
+}: {
+  children: React.ReactNode
+  className?: string
+  id?: string
+}) {
   return (
-    <motion.div variants={item} className={className}>
+    <motion.div variants={item} className={className} id={id}>
       {children}
     </motion.div>
   )

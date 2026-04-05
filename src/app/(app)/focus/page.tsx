@@ -6,6 +6,7 @@ import { toast } from 'sonner'
 import { Drawer } from 'vaul'
 import { useStore } from '@/stores/store'
 import PageTransition from '@/components/PageTransition'
+import { DRAWER_CONTENT_CLASS, DrawerDragHandle } from '@/components/ui/drawer-primitives'
 import type { FocusSession, Priority } from '@/stores/store'
 
 const PRI_ORDER: Record<Priority, number> = { crit: 0, high: 1, med: 2, low: 3 }
@@ -217,8 +218,8 @@ export default function FocusPage() {
         <Drawer.Root open={configOpen} onOpenChange={setConfigOpen}>
           <Drawer.Portal>
             <Drawer.Overlay className="fixed inset-0 z-[80] bg-black/50" />
-            <Drawer.Content className="fixed bottom-0 left-0 right-0 z-[90] max-h-[88vh] rounded-t-[20px] border border-[var(--border)] bg-[var(--surface)] p-6">
-              <div className="mx-auto mb-3 h-1 w-10 rounded-full bg-[var(--border)]" />
+            <Drawer.Content className={`${DRAWER_CONTENT_CLASS} z-[90]`}>
+              <DrawerDragHandle />
               <Drawer.Title className="text-lg font-semibold text-[var(--text)]">Configure session</Drawer.Title>
               <div className="mt-4 space-y-4">
                 <div>
@@ -370,8 +371,8 @@ export default function FocusPage() {
         <Drawer.Root open={completeOpen} onOpenChange={setCompleteOpen}>
           <Drawer.Portal>
             <Drawer.Overlay className="fixed inset-0 z-[80] bg-black/50" />
-            <Drawer.Content className="fixed bottom-0 left-0 right-0 z-[90] max-h-[88vh] rounded-t-[20px] border border-[var(--border)] bg-[var(--surface)] p-6">
-              <div className="mx-auto mb-3 h-1 w-10 rounded-full bg-[var(--border)]" />
+            <Drawer.Content className={`${DRAWER_CONTENT_CLASS} z-[90]`}>
+              <DrawerDragHandle />
               <Drawer.Title className="text-lg font-semibold text-[var(--text)]">Session complete</Drawer.Title>
               <p className="mt-1 text-[13px] text-[var(--text-secondary)]">Rate focus quality (1–5)</p>
               <input

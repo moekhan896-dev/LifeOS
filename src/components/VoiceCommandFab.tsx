@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Drawer } from 'vaul'
+import { DRAWER_CONTENT_CLASS, DrawerDragHandle } from '@/components/ui/drawer-primitives'
 import { useStore } from '@/stores/store'
 import { XP_VALUES } from '@/lib/constants'
 import { applyTaskDollarEstimateAfterCreate } from '@/lib/task-dollar-client'
@@ -272,10 +273,10 @@ export default function VoiceCommandFab() {
       <Drawer.Root open={disambigTasks.length > 0} onOpenChange={(o) => !o && setDisambigTasks([])}>
         <Drawer.Portal>
           <Drawer.Overlay className="fixed inset-0 z-[110] bg-black/60" />
-          <Drawer.Content className="fixed bottom-0 left-0 right-0 z-[120] max-h-[50vh] rounded-t-[20px] border border-[var(--border)] bg-[var(--bg-elevated)] p-5">
-            <div className="mx-auto mb-3 h-1 w-10 rounded-full bg-white/10" />
+          <Drawer.Content className={`${DRAWER_CONTENT_CLASS} z-[120]`}>
+            <DrawerDragHandle />
             <Drawer.Title className="text-lg font-semibold text-[var(--text-primary)]">Which task?</Drawer.Title>
-            <p className="mt-1 text-[14px] text-[var(--text-secondary)]">
+            <p className="mt-1 text-[17px] text-[var(--text-secondary)]">
               “{disambigQuery}” matched more than one. Pick the right one.
             </p>
             <div className="mt-4 flex flex-wrap gap-2">
@@ -293,7 +294,7 @@ export default function VoiceCommandFab() {
                       success: true,
                     })
                   }}
-                  className="rounded-full border border-[var(--border)] bg-[var(--bg-secondary)] px-4 py-2 text-left text-[14px] text-[var(--text-primary)] hover:border-[var(--accent)]"
+                  className="rounded-full border border-[var(--border)] bg-[var(--bg-secondary)] px-4 py-2 text-left text-[17px] text-[var(--text-primary)] hover:border-[var(--accent)]"
                 >
                   {t.text.slice(0, 72)}
                   {t.text.length > 72 ? '…' : ''}
@@ -310,7 +311,7 @@ export default function VoiceCommandFab() {
             initial={{ opacity: 0, y: 8 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0 }}
-            className="fixed bottom-[88px] right-6 z-[90] max-w-[min(90vw,320px)] rounded-2xl border border-[var(--border)] bg-[var(--bg-elevated)]/95 p-3 text-[13px] text-[var(--text-secondary)] shadow-2xl backdrop-blur-[40px] md:bottom-24"
+            className="fixed bottom-[88px] right-6 z-[90] max-w-[min(90vw,320px)] rounded-2xl border border-[var(--border)] bg-[var(--bg-elevated)]/95 p-3 text-[17px] text-[var(--text-secondary)] shadow-2xl backdrop-blur-[40px] md:bottom-24"
           >
             {text || 'Listening…'}
           </motion.div>
@@ -319,7 +320,8 @@ export default function VoiceCommandFab() {
       <motion.button
         type="button"
         aria-label="Voice command"
-        whileTap={{ scale: 0.96 }}
+        whileTap={{ scale: 0.97 }}
+        transition={{ duration: 0.1 }}
         onClick={toggle}
         className="fixed bottom-6 right-6 z-[100] flex h-14 w-14 items-center justify-center rounded-full bg-[var(--accent)] text-white shadow-lg md:bottom-8 md:right-8"
       >

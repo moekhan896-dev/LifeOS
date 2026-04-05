@@ -92,10 +92,10 @@ function PinEntry() {
   if (migrating) {
     return (
       <div
-        className="flex min-h-screen items-center justify-center px-4 text-[17px] text-[rgba(255,255,255,0.55)]"
+        className="flex min-h-screen items-center justify-center px-4 text-[17px] text-[var(--text-secondary)]"
         style={{
-          backgroundColor: '#1C1C1E',
-          backgroundImage: 'radial-gradient(ellipse at 50% 0%, rgba(60,55,50,0.12) 0%, #1C1C1E 70%)',
+          backgroundColor: 'var(--bg-primary)',
+          backgroundImage: 'var(--bg-warm-gradient)',
         }}
       >
         Preparing security…
@@ -107,10 +107,10 @@ function PinEntry() {
   if (!effectiveHash || effectiveHash.length < 64) {
     return (
       <div
-        className="flex min-h-screen flex-col items-center justify-center px-4 text-center text-[rgba(255,255,255,0.55)]"
+        className="flex min-h-screen flex-col items-center justify-center px-4 text-center text-[var(--text-secondary)]"
         style={{
-          backgroundColor: '#1C1C1E',
-          backgroundImage: 'radial-gradient(ellipse at 50% 0%, rgba(60,55,50,0.12) 0%, #1C1C1E 70%)',
+          backgroundColor: 'var(--bg-primary)',
+          backgroundImage: 'var(--bg-warm-gradient)',
         }}
       >
         <p className="max-w-sm text-[17px]">Finish onboarding to set a PIN, or reset the app from Settings.</p>
@@ -122,19 +122,19 @@ function PinEntry() {
     <div
       className="flex min-h-screen items-center justify-center px-4"
       style={{
-        backgroundColor: '#1C1C1E',
-        backgroundImage: 'radial-gradient(ellipse at 50% 0%, rgba(60,55,50,0.12) 0%, #1C1C1E 70%)',
+        backgroundColor: 'var(--bg-primary)',
+        backgroundImage: 'var(--bg-warm-gradient)',
       }}
     >
       <motion.div
         initial={{ scale: 0.96, opacity: 0 }}
         animate={{ scale: 1, opacity: 1 }}
-        className="w-full max-w-sm rounded-[16px] border border-[rgba(255,255,255,0.06)] bg-[rgba(44,44,46,0.85)] p-8 text-center shadow-2xl backdrop-blur-[40px]"
+        className="card-floating w-full max-w-sm rounded-[16px] p-8 text-center"
       >
-        <h2 className="text-[28px] font-bold tracking-[-0.5px] text-[#F5F5F7]">Enter your PIN</h2>
-        <p className="mt-1 text-[17px] text-[rgba(255,255,255,0.55)]">Access ART OS</p>
+        <h2 className="text-[28px] font-bold tracking-[-0.5px] text-[var(--text-primary)]">Enter your PIN</h2>
+        <p className="mt-1 text-[17px] text-[var(--text-secondary)]">Access ART OS</p>
         {locked ? (
-          <p className="mt-6 text-[15px] text-[rgba(255,255,255,0.35)]">
+          <p className="mt-6 text-[15px] text-[var(--text-tertiary)]">
             Too many attempts. Try again in {Math.ceil(lockoutRemainingMs / 1000)}s.
           </p>
         ) : (
@@ -149,7 +149,11 @@ function PinEntry() {
                 <div
                   key={i}
                   className={`h-4 w-4 shrink-0 rounded-full border ${
-                    error ? 'border-[#FF453A] bg-[#FF453A]' : d ? 'border-[#0A84FF] bg-[#0A84FF]' : 'border-[rgba(255,255,255,0.12)] bg-transparent'
+                    error
+                      ? 'border-[var(--negative)] bg-[var(--negative)]'
+                      : d
+                        ? 'border-[var(--accent)] bg-[var(--accent)]'
+                        : 'border-[var(--border-hover)] bg-transparent'
                   }`}
                 />
               ))}
@@ -158,7 +162,7 @@ function PinEntry() {
               {digits.filter(Boolean).length} of 4 digits entered
             </p>
             <PinKeypad disabled={locked} onDigit={pushDigit} onBackspace={backspace} />
-            {error && <p className="mt-3 text-[15px] text-[#FF453A]">Incorrect PIN</p>}
+            {error && <p className="mt-3 text-[15px] text-[var(--negative)]">Incorrect PIN</p>}
           </>
         )}
       </motion.div>
@@ -180,10 +184,10 @@ export default function Page() {
     if (hasPin) return <PinEntry />
     return (
       <div
-        className="flex min-h-screen flex-col items-center justify-center px-4 text-center text-[rgba(255,255,255,0.55)]"
+        className="flex min-h-screen flex-col items-center justify-center px-4 text-center text-[var(--text-secondary)]"
         style={{
-          backgroundColor: '#1C1C1E',
-          backgroundImage: 'radial-gradient(ellipse at 50% 0%, rgba(60,55,50,0.12) 0%, #1C1C1E 70%)',
+          backgroundColor: 'var(--bg-primary)',
+          backgroundImage: 'var(--bg-warm-gradient)',
         }}
       >
         <p className="max-w-sm text-[17px]">Finish onboarding to set a PIN, or reset the app from Settings.</p>

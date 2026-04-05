@@ -1,28 +1,32 @@
 'use client'
 
 import { useMemo, useState } from 'react'
-import { useStore } from '@/stores/store'
+import { useStore, isArchived } from '@/stores/store'
 import PageTransition from '@/components/PageTransition'
 import { StaggerContainer, StaggerItem } from '@/components/Stagger'
 import { buildEcosystemEdges } from '@/lib/ecosystem-graph'
 
 export default function EcosystemPage() {
   const { businesses, clients, anthropicKey } = useStore()
-  const edges = useMemo(() => buildEcosystemEdges(businesses, clients), [businesses, clients])
+  const activeBusinesses = useMemo(
+    () => businesses.filter((b) => !isArchived(b)),
+    [businesses]
+  )
+  const edges = useMemo(() => buildEcosystemEdges(activeBusinesses, clients), [activeBusinesses, clients])
 
   const positions = useMemo(() => {
     const map: Record<string, { x: number; y: number }> = {}
-    const n = businesses.length
-    businesses.forEach((b, i) => {
+    const n = activeBusinesses.length
+    activeBusinesses.forEach((b, i) => {
       const angle = (i / Math.max(n, 1)) * Math.PI * 2 - Math.PI / 2
       map[b.id] = { x: 50 + 38 * Math.cos(angle), y: 50 + 38 * Math.sin(angle) }
     })
     return map
-  }, [businesses])
+  }, [activeBusinesses])
 
   const [sel, setSel] = useState<string | null>(null)
 
-  if (businesses.length < 2) {
+  if (activeBusinesses.length < 2) {
     return (
       <PageTransition>
         <div className="mx-auto max-w-lg space-y-4 pb-20">
@@ -64,7 +68,7 @@ export default function EcosystemPage() {
                   />
                 )
               })}
-              {businesses.map((b) => {
+              {activeBusinesses.map((b) => {
                 const p = positions[b.id]
                 if (!p) return null
                 const selected = sel === b.id
@@ -104,8 +108,8 @@ export default function EcosystemPage() {
             ) : (
               <ul className="space-y-2">
                 {edges.map((e, i) => {
-                  const fa = businesses.find((b) => b.id === e.fromId)?.name
-                  const fb = businesses.find((b) => b.id === e.toId)?.name
+                  const fa = activeBusinesses.find((b) => b.id === e.fromId)?.name
+                  const fb = activeBusinesses.find((b) => b.id === e.toId)?.name
                   return (
                     <li key={i} className="text-[15px] text-[var(--text-secondary)]">
                       <span className="text-[var(--text-primary)]">{fa}</span> ↔{' '}

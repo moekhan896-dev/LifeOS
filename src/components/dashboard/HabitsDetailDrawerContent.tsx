@@ -187,6 +187,23 @@ export default function HabitsDetailDrawerContent({ todayStr }: { todayStr: stri
         logged today (built-in + visible custom).
       </p>
 
+      {streaks.length > 0 && (
+        <div className="rounded-xl border border-[var(--border)] bg-[var(--bg-secondary)]/40 p-3">
+          <p className="mb-2 text-[12px] font-semibold text-[var(--text-secondary)]">Streaks</p>
+          <ul className="space-y-1.5">
+            {streaks.map((s) => (
+              <li key={s.habit} className="flex items-center justify-between text-[13px]">
+                <span className="capitalize text-[var(--text-primary)]">{s.habit}</span>
+                <span className="font-mono text-[var(--accent)]">
+                  {s.currentStreak}d{' '}
+                  <span className="text-[12px] text-[var(--text-dim)]">(best {s.longestStreak})</span>
+                </span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
       <HabitRow
         emoji="💪"
         title="Gym"

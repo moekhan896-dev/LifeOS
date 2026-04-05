@@ -187,7 +187,10 @@ export default function SettingsPage() {
     a.href = url
     const d = new Date().toISOString().split('T')[0]
     a.download = `art-os-export-${d}.json`
+    a.style.display = 'none'
+    document.body.appendChild(a)
     a.click()
+    document.body.removeChild(a)
     URL.revokeObjectURL(url)
     toast.success('Data exported')
   }
@@ -341,7 +344,7 @@ export default function SettingsPage() {
                     <motion.div
                       className="absolute top-0.5 h-5 w-5 rounded-full bg-white shadow"
                       animate={{ left: trackingPrefs[key] ? 18 : 2 }}
-                      transition={{ type: 'spring', stiffness: 500, damping: 30 }}
+                      transition={{ duration: 0.25, ease: [0.25, 0.1, 0.25, 1] }}
                     />
                   </button>
                   <span className="text-sm text-[var(--color-text)] capitalize">{key.replace(/([A-Z])/g, ' $1').trim()}</span>
@@ -395,7 +398,7 @@ export default function SettingsPage() {
                 <motion.div
                   className="absolute top-0.5 h-5 w-5 rounded-full bg-white shadow"
                   animate={{ left: prayerAsrHanafi ? 18 : 2 }}
-                  transition={{ type: 'spring', stiffness: 500, damping: 30 }}
+                  transition={{ duration: 0.25, ease: [0.25, 0.1, 0.25, 1] }}
                 />
               </button>
               <span className="text-sm text-[var(--color-text)]">Hanafi Asr</span>
@@ -603,7 +606,7 @@ export default function SettingsPage() {
                   <motion.div
                     className="absolute top-0.5 h-5 w-5 rounded-full bg-white shadow"
                     animate={{ left: notificationPrefs[key] ? 18 : 2 }}
-                    transition={{ type: 'spring', stiffness: 500, damping: 30 }}
+                    transition={{ duration: 0.25, ease: [0.25, 0.1, 0.25, 1] }}
                   />
                 </button>
                 <span className="text-sm text-[var(--color-text)]">{label}</span>
@@ -621,7 +624,7 @@ export default function SettingsPage() {
                 <motion.div
                   className="absolute top-0.5 h-5 w-5 rounded-full bg-white shadow"
                   animate={{ left: notificationPrefs.quietHoursEnabled ? 18 : 2 }}
-                  transition={{ type: 'spring', stiffness: 500, damping: 30 }}
+                  transition={{ duration: 0.25, ease: [0.25, 0.1, 0.25, 1] }}
                 />
               </button>
               <span className="text-sm text-[var(--color-text)]">Quiet hours</span>
@@ -708,7 +711,7 @@ export default function SettingsPage() {
                 <motion.div
                   className="absolute top-0.5 h-5 w-5 rounded-full bg-white shadow"
                   animate={{ left: factorHealthInBusiness ? 18 : 2 }}
-                  transition={{ type: 'spring', stiffness: 500, damping: 30 }}
+                  transition={{ duration: 0.25, ease: [0.25, 0.1, 0.25, 1] }}
                 />
               </button>
               <span className="text-sm text-[var(--color-text)]">Factor health into business advice</span>
@@ -751,7 +754,7 @@ export default function SettingsPage() {
                     <motion.div
                       className="absolute top-0.5 h-5 w-5 rounded-full bg-white shadow"
                       animate={{ left: trackingPrefs[key] ? 18 : 2 }}
-                      transition={{ type: 'spring', stiffness: 500, damping: 30 }}
+                      transition={{ duration: 0.25, ease: [0.25, 0.1, 0.25, 1] }}
                     />
                   </button>
                   <span className="text-sm text-[var(--color-text)] capitalize">{key === 'coldEmail' ? 'Cold email' : key}</span>

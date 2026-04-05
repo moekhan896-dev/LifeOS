@@ -33,6 +33,7 @@ import {
   estimatedMonthlyWorkingHours,
   clientConcentrationWarnings,
 } from '@/lib/financials-metrics'
+import { DRAWER_CONTENT_CLASS, DrawerDragHandle } from '@/components/ui/drawer-primitives'
 
 function fmt(n: number) {
   return '$' + n.toLocaleString('en-US', { maximumFractionDigits: 0 })
@@ -149,8 +150,8 @@ export function FinancialsHero({
       <Drawer.Root open={open} onOpenChange={setOpen}>
         <Drawer.Portal>
           <Drawer.Overlay className="fixed inset-0 z-[80] bg-black/50" />
-          <Drawer.Content className="card-floating fixed bottom-0 left-0 right-0 z-[90] max-h-[88vh] rounded-t-[20px] p-6">
-            <div className="mx-auto mb-3 h-1 w-10 rounded-full bg-[var(--border)]" />
+          <Drawer.Content className={`${DRAWER_CONTENT_CLASS} z-[90]`}>
+            <DrawerDragHandle />
             <Drawer.Title className="text-lg font-semibold text-[var(--text)]">Monthly breakdown</Drawer.Title>
             <p className="mt-1 text-[13px] text-[var(--text-secondary)]">
               Estimated working hours: {estimatedMonthlyWorkingHours(workDayStart, workDayEnd)} / month (for time-cost).

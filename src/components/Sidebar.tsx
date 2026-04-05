@@ -1,8 +1,9 @@
 'use client'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
+import { useEffect, useState } from 'react'
 import { motion } from 'framer-motion'
-import { useStore, getExecutionScore, getBusinessHealth } from '@/stores/store'
+import { useStore, getExecutionScore, getBusinessHealth, isArchived } from '@/stores/store'
 import { NAV_SECTIONS } from '@/config/navigation'
 
 function getRevenueLabel(b: { monthlyRevenue: number; status: string }) {
@@ -14,6 +15,13 @@ function getRevenueLabel(b: { monthlyRevenue: number; status: string }) {
 
 export default function Sidebar() {
   const pathname = usePathname()
+  const [locHash, setLocHash] = useState('')
+  useEffect(() => {
+    const sync = () => setLocHash(typeof window !== 'undefined' ? window.location.hash : '')
+    sync()
+    window.addEventListener('hashchange', sync)
+    return () => window.removeEventListener('hashchange', sync)
+  }, [])
   const {
     theme, toggleTheme,
     businesses, tasks, revenueEntries, projects,
@@ -39,7 +47,16 @@ export default function Sidebar() {
   const xpInLevel = xp % 100
   const xpPercent = xpInLevel
 
-  const isActive = (href: string) => pathname === href || pathname?.startsWith(href + '/')
+  const isActive = (href: string) => {
+    if (href.includes('#')) {
+      const [path, frag] = href.split('#')
+      return pathname === path && locHash === `#${frag}`
+    }
+    if (href === '/health' && pathname === '/health') {
+      return locHash !== '#habits'
+    }
+    return pathname === href || pathname?.startsWith(href + '/')
+  }
 
   const ringRadius = 24
   const ringCircumference = 2 * Math.PI * ringRadius
@@ -77,7 +94,7 @@ export default function Sidebar() {
           className="touch-target-44 flex items-center justify-center rounded-xl text-[var(--color-text-mid)] transition-colors hover:bg-[var(--color-surface2)]"
           whileTap={{ scale: 0.9 }}
           animate={{ rotate: theme === 'dark' ? 0 : 180 }}
-          transition={{ type: 'spring', stiffness: 200, damping: 15 }}
+          transition={{ duration: 0.25, ease: [0.25, 0.1, 0.25, 1] }}
           title="Toggle theme"
           aria-label={theme === 'dark' ? 'Switch to light theme' : 'Switch to dark theme'}
         >
@@ -91,17 +108,6 @@ export default function Sidebar() {
             </svg>
           )}
         </motion.button>
-      </div>
-
-      {/* AI Strategist — subtle text link + purple dot (AI-only accent) */}
-      <div className="px-4 pb-3">
-        <Link
-          href="/ai"
-          className="flex items-center gap-2 px-1 py-2 text-[13px] font-medium text-[var(--ai)] transition-opacity hover:opacity-90"
-        >
-          <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-[var(--ai)]" aria-hidden />
-          <span>AI Strategist</span>
-        </Link>
       </div>
 
       {/* Scrollable Navigation */}
@@ -121,14 +127,14 @@ export default function Sidebar() {
                           ? 'bg-[var(--accent-bg)] text-[var(--color-text)] font-semibold'
                           : 'text-[var(--color-text-mid)]'
                       }`}
-                      whileHover={{ x: 1, backgroundColor: 'var(--color-surface2)', color: 'var(--color-text)' }}
+                      whileHover={{ backgroundColor: 'var(--color-surface2)', color: 'var(--color-text)' }}
                       transition={{ duration: 0.15, ease: 'easeOut' }}
                     >
                       {active && (
                         <motion.div
                           layoutId="sidebar-active"
                           className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-4 rounded-r-full bg-[var(--accent)]"
-                          transition={{ type: 'spring', stiffness: 300, damping: 30 }}
+                          transition={{ duration: 0.25, ease: [0.25, 0.1, 0.25, 1] }}
                         />
                       )}
                       <span className="w-4 text-center text-[14px] opacity-60 group-hover:opacity-100 transition-opacity leading-none">
@@ -159,11 +165,11 @@ export default function Sidebar() {
             />
           </div>
           <div className="space-y-0.5">
-            {businesses.map((b) => {
+            {businesses.filter((b) => !isArchived(b)).map((b) => {
               const href = `/business/${b.id}`
               const active = isActive(href)
               const health = getBusinessHealth(b, tasks, revenueEntries)
-              const dotColor = health === 'strong' ? 'var(--positive)' : health === 'weak' ? '#f59e0b' : '#ef4444'
+              const dotColor = health === 'strong' ? 'var(--positive)' : health === 'weak' ? 'var(--warning)' : 'var(--negative)'
               return (
                 <Link key={b.id} href={href} className="block group">
                   <motion.div
@@ -172,14 +178,14 @@ export default function Sidebar() {
                         ? 'bg-[var(--accent-bg)] text-[var(--color-text)] font-semibold'
                         : 'text-[var(--color-text-mid)]'
                     }`}
-                    whileHover={{ x: 1, backgroundColor: 'var(--color-surface2)', color: 'var(--color-text)' }}
+                    whileHover={{ backgroundColor: 'var(--color-surface2)', color: 'var(--color-text)' }}
                     transition={{ duration: 0.15, ease: 'easeOut' }}
                   >
                     {active && (
                       <motion.div
                         layoutId="sidebar-active"
                         className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-4 rounded-r-full bg-[var(--accent)]"
-                        transition={{ type: 'spring', stiffness: 300, damping: 30 }}
+                        transition={{ duration: 0.25, ease: [0.25, 0.1, 0.25, 1] }}
                       />
                     )}
                     {health === 'strong' ? (
@@ -213,7 +219,7 @@ export default function Sidebar() {
               <defs>
                 <linearGradient id="execRingGrad" x1="0%" y1="0%" x2="100%" y2="0%">
                   <stop offset="0%" stopColor="var(--accent)" />
-                  <stop offset="100%" stopColor="#06b6d4" />
+                  <stop offset="100%" stopColor="var(--info)" />
                 </linearGradient>
               </defs>
               <circle cx="30" cy="30" r={ringRadius} fill="none" stroke="var(--color-border)" strokeWidth="4" />
@@ -233,7 +239,7 @@ export default function Sidebar() {
                 key={executionScore}
                 initial={{ opacity: 0, scale: 0.8 }}
                 animate={{ opacity: 1, scale: 1 }}
-                transition={{ type: 'spring', stiffness: 300, damping: 25 }}
+                transition={{ duration: 0.25, ease: [0.25, 0.1, 0.25, 1] }}
                 className="gradient-text data text-[20px] font-bold"
               >
                 {executionScore}

@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { toast } from 'sonner'
-import { useStore, type KnowledgeEntry, type KnowledgeVaultStatus } from '@/stores/store'
+import { useStore, isArchived, type KnowledgeEntry, type KnowledgeVaultStatus } from '@/stores/store'
 import PageTransition from '@/components/PageTransition'
 
 const TYPES = ['book', 'podcast', 'article', 'video', 'idea', 'framework', 'swipe'] as const
@@ -61,18 +61,16 @@ export default function KnowledgePage() {
     })
     const doText = whatDo.trim()
     if (doText) {
-      const bid = businesses[0]?.id
-      if (bid) {
-        const tid = addTask({
-          businessId: bid,
-          text: doText,
-          tag: 'knowledge',
-          priority: 'med',
-          done: false,
-          xpValue: 5,
-        })
-        updateKnowledge(kid, { linkedTaskId: tid })
-      }
+      const bid = businesses.find((b) => !isArchived(b))?.id ?? ''
+      const tid = addTask({
+        businessId: bid,
+        text: doText,
+        tag: 'knowledge',
+        priority: 'med',
+        done: false,
+        xpValue: 5,
+      })
+      updateKnowledge(kid, { linkedTaskId: tid })
     }
     toast.success('Knowledge captured!')
     setTitle('')
@@ -153,10 +151,13 @@ export default function KnowledgePage() {
           )}
         </motion.div>
 
-        <div className="flex flex-wrap gap-1.5">
+        <div className="flex flex-wrap gap-1.5" role="tablist" aria-label="Knowledge type">
           {(['all', ...TYPES] as const).map((t) => (
             <button
               key={t}
+              type="button"
+              role="tab"
+              aria-selected={filter === t}
               onClick={() => setFilter(t)}
               className={`whitespace-nowrap rounded-full px-3 py-1.5 text-xs ${
                 filter === t ? 'bg-[var(--accent)] text-white' : 'border border-[var(--border)] text-[var(--text-dim)]'
@@ -167,8 +168,11 @@ export default function KnowledgePage() {
           ))}
         </div>
 
-        <div className="flex flex-wrap gap-1.5">
+        <div className="flex flex-wrap gap-1.5" role="tablist" aria-label="Knowledge status">
           <button
+            type="button"
+            role="tab"
+            aria-selected={statusFilter === 'all'}
             onClick={() => setStatusFilter('all')}
             className={`rounded-full px-3 py-1.5 text-xs ${statusFilter === 'all' ? 'bg-[var(--surface2)] text-[var(--text)]' : 'text-[var(--text-dim)]'}`}
           >
@@ -177,6 +181,9 @@ export default function KnowledgePage() {
           {STATUS_FLOW.map((s) => (
             <button
               key={s.value}
+              type="button"
+              role="tab"
+              aria-selected={statusFilter === s.value}
               onClick={() => setStatusFilter(s.value)}
               className={`rounded-full px-3 py-1.5 text-xs ${statusFilter === s.value ? 'bg-[var(--accent)] text-white' : 'border border-[var(--border)] text-[var(--text-dim)]'}`}
             >
@@ -221,19 +228,21 @@ function KnowledgeCard({
       onClick={() => onToggle()}
     >
       <button
+        type="button"
+        aria-label="Remove knowledge entry"
         onClick={(e) => {
           e.stopPropagation()
           deleteKnowledge(entry.id)
           toast.success('Deleted')
         }}
-        className="absolute right-3 top-3 text-[var(--text-dim)] opacity-0 transition-opacity group-hover:opacity-100 hover:text-[var(--rose)] text-xs"
+        className="absolute right-3 top-3 text-xs text-[var(--text-dim)] opacity-0 transition-opacity hover:text-[var(--rose)] group-hover:opacity-100"
       >
         ✕
       </button>
       <div className="flex items-start gap-2">
         <span className="text-base">{TYPE_META[entry.type]?.emoji}</span>
         <div className="min-w-0 flex-1">
-          <p className="text-[14px] font-semibold leading-tight text-[var(--text)]">{entry.title}</p>
+          <p className="text-[17px] font-semibold leading-tight text-[var(--text)]">{entry.title}</p>
           {entry.source && <p className="mt-0.5 text-[12px] text-[var(--text-mid)]">{entry.source}</p>}
         </div>
       </div>

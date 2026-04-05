@@ -68,7 +68,7 @@ export default function ReengagementBanner() {
         initial={{ opacity: 0, y: -8 }}
         animate={{ opacity: 1, y: 0 }}
         exit={{ opacity: 0, y: -8 }}
-        className="mb-4 rounded-2xl border border-[var(--border)] bg-[var(--bg-elevated)] p-4 shadow-[0_4px_24px_rgba(0,0,0,0.12)]"
+        className="mb-4 rounded-2xl border border-[var(--border)] bg-[var(--bg-elevated)] p-4 shadow-[0_4px_24px_color-mix(in_srgb,var(--text-primary)_12%,transparent)]"
         role="region"
         aria-label="Welcome back"
       >

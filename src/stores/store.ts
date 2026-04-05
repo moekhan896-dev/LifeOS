@@ -1,5 +1,6 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
+import { toast } from 'sonner'
 import { newId } from '@/lib/id'
 import { advanceRecurringDue, initialNextDue, type TaskRecurring } from '@/lib/task-recurring'
 import {
@@ -46,6 +47,8 @@ export interface Business {
   jobsPerMonth?: number
   createdAt: string
   updatedAt?: string
+  /** PRD §27.1 — soft delete; set on delete, cleared on undo, purged after 30d */
+  archivedAt?: string | null
 }
 
 export interface Client {
@@ -61,6 +64,7 @@ export interface Client {
   active: boolean
   createdAt: string
   updatedAt?: string
+  archivedAt?: string | null
 }
 
 /** PRD GAP 13 — AI task value lane */
@@ -96,6 +100,7 @@ export interface Task {
   createdAt: string
   completedAt?: string
   updatedAt?: string
+  archivedAt?: string | null
 }
 
 /** PRD Batch 2 — weekly AI goal grades (12-week chart slot) */
@@ -138,18 +143,52 @@ export interface CustomHabitDef {
 }
 export interface Streak { habit: string; currentStreak: number; longestStreak: number; lastCompleted?: string }
 export interface Idea { id: string; text: string; category: string; promoted: boolean; archived: boolean; createdAt: string }
-export interface RevenueDriver { id: string; businessId: string; category: string; name: string; impact: number; status: DriverStatus; notes?: string }
+export interface RevenueDriver {
+  id: string
+  businessId: string
+  category: string
+  name: string
+  impact: number
+  status: DriverStatus
+  notes?: string
+  archivedAt?: string | null
+}
 export interface Commitment { id: string; text: string; source: string; dueDate?: string; fulfilled: boolean; fulfilledDate?: string; createdAt: string }
 export interface Win { id: string; title: string; dollarValue?: number; businessId?: string; category: string; notes?: string; createdAt: string }
 export interface ScheduleBlock { time: string; title: string; type: 'prayer' | 'work' | 'health' | 'personal' | 'meal'; duration: number; completed: boolean }
 export interface AiMessage { id: string; role: 'user' | 'assistant'; content: string; businessContext?: string; createdAt: string }
 export interface PipelineDeal { id: string; companyName: string; contactName?: string; contactEmail?: string; stage: 'lead' | 'contacted' | 'call_booked' | 'proposal' | 'signed' | 'onboarding'; dealValue?: number; source?: string; notes?: string; createdAt: string }
 export interface Sprint { id: string; sprintNumber: number; weekStart: string; deliverables: { text: string; done: boolean }[]; status: 'completed' | 'active' | 'upcoming' }
-export interface SOP { id: string; businessId: string; title: string; status: 'not_started' | 'in_progress' | 'documented'; content?: string }
+export interface SOP {
+  id: string
+  businessId: string
+  title: string
+  status: 'not_started' | 'in_progress' | 'documented'
+  content?: string
+  archivedAt?: string | null
+}
 export interface EnergyLog { date: string; timeOfDay: 'morning' | 'afternoon' | 'evening'; level: number }
-export interface RevenueEntry { id: string; businessId: string; amount: number; date: string; source?: string; notes?: string }
+export interface RevenueEntry {
+  id: string
+  businessId: string
+  amount: number
+  date: string
+  source?: string
+  notes?: string
+  archivedAt?: string | null
+}
 export interface ExpenseEntry { id: string; category: string; amount: number; date: string; notes?: string; recurring: boolean }
-export interface GmbProfile { id: string; businessId: string; city: string; reviewCount: number; callsPerMonth: number; ranking: string; status: 'strong' | 'medium' | 'new'; hasAddress: boolean }
+export interface GmbProfile {
+  id: string
+  businessId: string
+  city: string
+  reviewCount: number
+  callsPerMonth: number
+  ranking: string
+  status: 'strong' | 'medium' | 'new'
+  hasAddress: boolean
+  archivedAt?: string | null
+}
 
 // ── New Strategic Types ──
 export type DripZone = 'double_down' | 'replace' | 'design' | 'eliminate'
@@ -166,13 +205,22 @@ export interface Goal {
 }
 
 export interface Project {
-  id: string; name: string; description: string; businessId?: string; goalId?: string
-  impact: number; confidence: number; ease: number
-  status: ProjectStatus; progress: number
+  id: string
+  name: string
+  description: string
+  businessId?: string
+  goalId?: string
+  impact: number
+  confidence: number
+  ease: number
+  status: ProjectStatus
+  progress: number
   /** Optional explicit start; else roadmap uses createdAt (GAP 9). */
   startDate?: string
   deadline?: string
   createdAt: string
+  /** Soft-delete / abandon; tasks unlinked when set */
+  archivedAt?: string | null
 }
 
 /** PRD §12.1 §6 — Profit First bucket percentages (should sum to 100). */
@@ -406,12 +454,15 @@ interface AppState {
   lastScoreZoneLabel: string | null
   syncScoreZoneFromExecution: () => void
   touchLastOpened: () => void
+  /** GAP 19 — when calendar day changes vs todayHealth.date */
+  maybeRollHealthDay: () => void
+  /** PRD §27.1 — drop soft-deleted rows older than 30 days */
+  purgeArchivedRecordsOlderThan30Days: () => void
   completeOnboarding: () => void
   updateProfile: (updates: Partial<Pick<AppState, 'userName' | 'userLocation' | 'userAge' | 'userSituation' | 'incomeTarget' | 'targetDate' | 'incomeWhy' | 'exitTarget' | 'exitBusinessId' | 'northStarMetric' | 'wakeUpTime' | 'actualWakeTime' | 'workDayStart' | 'workDayEnd' | 'exercise' | 'dietQuality' | 'caffeineType' | 'caffeineAmount' | 'phoneScreenTime' | 'energyLevel' | 'stressLevel' | 'hasFaith' | 'faithTradition' | 'trackPrayers' | 'faithConsistency' | 'faithRoleModel' | 'procrastination' | 'patterns' | 'biggestDistraction' | 'tryingToQuit' | 'lockedInMemory' | 'aiAvoidanceStyle' | 'aiPushStyle' | 'aiMotivators' | 'savingsRange' | 'anthropicKey' | 'stripeKey' | 'idealDay' | 'whatNeedsToBeTrue' | 'aiFrequency' | 'aiReasoningDisplay' | 'factorHealthInBusiness' | 'smokingStatus' | 'habitsToBuild' | 'faithDashboardVisibility' | 'calendarConnected' | 'plaidConnected' | 'exitIntent' | 'userLat' | 'userLng' | 'prayerCalcMethod' | 'prayerAsrHanafi' | 'profitFirstPct' | 'estimatedIncomeTaxRatePct'>>) => void
   setTrackingPrefs: (prefs: Partial<AppState['trackingPrefs']>) => void
   setNotificationPrefs: (prefs: Partial<AppState['notificationPrefs']>) => void
   resetAll: () => void
-  seedDefaultData: () => void
 
   // ── Theme ──
   theme: 'dark' | 'light'
@@ -425,7 +476,9 @@ interface AppState {
   businesses: Business[]
   addBusiness: (b: Omit<Business, 'id' | 'createdAt'>) => void
   updateBusiness: (id: string, updates: Partial<Business>) => void
-  deleteBusiness: (id: string) => void
+  /** PRD §27.1 — soft delete + cascade; undo via toast */
+  archiveBusiness: (id: string) => void
+  restoreArchivedBusiness: (id: string) => void
 
   // ── Net worth (user data only) ──
   balanceSheetAssets: BalanceSheetAsset[]
@@ -582,9 +635,12 @@ interface AppState {
 
   // ── Projects ──
   projects: Project[]
+  /** For AI: "You abandoned {name}" */
+  projectAbandonLog: { projectId: string; name: string; abandonedAt: string }[]
   addProject: (p: Omit<Project, 'id' | 'createdAt'>) => void
   updateProject: (id: string, updates: Partial<Project>) => void
-  deleteProject: (id: string) => void
+  /** Archives project, unlinks tasks */
+  archiveProject: (id: string) => void
 
   // ── Focus Sessions ──
   focusSessions: FocusSession[]
@@ -666,6 +722,24 @@ interface AppState {
 const uid = () => newId()
 const today = () => new Date().toISOString().split('T')[0]
 
+/** PRD §27.1 — hidden from UI while archived */
+export function isArchived<T extends { archivedAt?: string | null }>(x: T | null | undefined): boolean {
+  return x != null && x.archivedAt != null && x.archivedAt !== ''
+}
+
+function freshHealthLogForDate(dateStr: string): HealthLog {
+  return {
+    date: dateStr,
+    prayers: { fajr: false, dhuhr: false, asr: false, maghrib: false, isha: false },
+    gym: false,
+    energyDrinks: 0,
+    screenTimeHours: 0,
+    dailyScore: 0,
+  }
+}
+
+const ARCHIVE_PURGE_MS = 30 * 24 * 60 * 60 * 1000
+
 const PRAYER_TIME_OF_DAY: Record<string, string> = {
   fajr: 'morning',
   dhuhr: 'midday',
@@ -704,10 +778,12 @@ export function computeMonthlyMoneySnapshot(s: {
   clients: Client[]
   expenseEntries: ExpenseEntry[]
 }) {
-  const incomeStreams = s.businesses
-    .filter((b) => b.monthlyRevenue > 0 || s.clients.some((c) => c.businessId === b.id && c.active))
+  const businesses = s.businesses.filter((b) => !isArchived(b))
+  const clients = s.clients.filter((c) => !isArchived(c))
+  const incomeStreams = businesses
+    .filter((b) => b.monthlyRevenue > 0 || clients.some((c) => c.businessId === b.id && c.active))
     .map((b) => {
-      const bizClients = s.clients.filter((c) => c.businessId === b.id && c.active)
+      const bizClients = clients.filter((c) => c.businessId === b.id && c.active)
       const clientNet = bizClients.reduce((acc, c) => acc + getClientNet(c), 0)
       return clientNet > 0 ? clientNet : b.monthlyRevenue
     })
@@ -816,10 +892,13 @@ export const useStore = create<AppState>()(
       syncScoreZoneFromExecution: () => {
         const s = get()
         const day = s.todayHealth.date
-        const tasksDoneToday = s.tasks.filter((t) => t.done && t.completedAt?.startsWith(day)).length
+        const tasksDoneToday = s.tasks.filter(
+          (t) => !isArchived(t) && t.done && t.completedAt?.startsWith(day)
+        ).length
         const todayFocusCount = s.focusSessions.filter((f) => f.startedAt?.startsWith(day)).length
         const tasksCommitted = s.tasks.filter(
-          (t) => t.createdAt.startsWith(day) || (!t.done && t.priority !== 'low')
+          (t) =>
+            !isArchived(t) && (t.createdAt.startsWith(day) || (!t.done && t.priority !== 'low'))
         ).length
         const score = getExecutionScore(
           s.todayHealth,
@@ -846,8 +925,39 @@ export const useStore = create<AppState>()(
           lastSessionDaysSinceOpen: daysSinceLastOpen,
         })
         queueMicrotask(() => {
+          get().maybeRollHealthDay()
+          get().purgeArchivedRecordsOlderThan30Days()
           get().logEvent('app_opened', { daysSinceLastOpen })
         })
+      },
+      maybeRollHealthDay: () => {
+        const s = get()
+        const todayStr = today()
+        if (s.todayHealth.date === todayStr) return
+        const prev = s.todayHealth
+        const cutoff = new Date()
+        cutoff.setDate(cutoff.getDate() - 365)
+        const cutoffStr = cutoff.toISOString().split('T')[0]
+        const merged = [...s.healthHistory.filter((h) => h.date !== prev.date), prev].filter((h) => h.date >= cutoffStr)
+        set({
+          healthHistory: merged,
+          todayHealth: freshHealthLogForDate(todayStr),
+        })
+      },
+      purgeArchivedRecordsOlderThan30Days: () => {
+        const now = Date.now()
+        const stale = (iso: string | null | undefined) =>
+          iso != null && iso !== '' && now - new Date(iso).getTime() > ARCHIVE_PURGE_MS
+        set((s) => ({
+          tasks: s.tasks.filter((t) => !stale(t.archivedAt ?? null)),
+          clients: s.clients.filter((c) => !stale(c.archivedAt ?? null)),
+          revenueEntries: s.revenueEntries.filter((r) => !stale(r.archivedAt ?? null)),
+          gmbProfiles: s.gmbProfiles.filter((g) => !stale(g.archivedAt ?? null)),
+          drivers: s.drivers.filter((d) => !stale(d.archivedAt ?? null)),
+          sops: s.sops.filter((sp) => !stale(sp.archivedAt ?? null)),
+          businesses: s.businesses.filter((b) => !stale(b.archivedAt ?? null)),
+          projects: s.projects.filter((p) => !stale(p.archivedAt ?? null)),
+        }))
       },
       completeOnboarding: () => set({ onboardingComplete: true }),
       updateProfile: (updates) => set(updates),
@@ -911,11 +1021,8 @@ export const useStore = create<AppState>()(
           lastWeeklyScorecardWeekKey: null,
           lastWeeklyReportWeekKey: null,
           dashboardLayout: DEFAULT_DASHBOARD_LAYOUT,
+          projectAbandonLog: [],
         }),
-
-      seedDefaultData: () => {
-        // No-op: all data comes from onboarding. Kept for interface compatibility.
-      },
 
       // ── Theme ──
       theme: 'dark',
@@ -936,6 +1043,7 @@ export const useStore = create<AppState>()(
               id: newId(),
               createdAt: new Date().toISOString(),
               updatedAt: new Date().toISOString(),
+              archivedAt: null,
             },
           ],
         })),
@@ -945,7 +1053,41 @@ export const useStore = create<AppState>()(
             b.id === id ? { ...b, ...updates, updatedAt: new Date().toISOString() } : b
           ),
         })),
-      deleteBusiness: (id) => set((s) => ({ businesses: s.businesses.filter((b) => b.id !== id) })),
+      archiveBusiness: (id) => {
+        const ts = new Date().toISOString()
+        set((s) => ({
+          businesses: s.businesses.map((b) => (b.id === id ? { ...b, archivedAt: ts, updatedAt: ts } : b)),
+          tasks: s.tasks.map((t) => (t.businessId === id ? { ...t, archivedAt: ts } : t)),
+          clients: s.clients.map((c) => (c.businessId === id ? { ...c, archivedAt: ts, updatedAt: ts } : c)),
+          revenueEntries: s.revenueEntries.map((r) => (r.businessId === id ? { ...r, archivedAt: ts } : r)),
+          gmbProfiles: s.gmbProfiles.map((g) => (g.businessId === id ? { ...g, archivedAt: ts } : g)),
+          drivers: s.drivers.map((d) => (d.businessId === id ? { ...d, archivedAt: ts } : d)),
+          sops: s.sops.map((sp) => (sp.businessId === id ? { ...sp, archivedAt: ts } : sp)),
+        }))
+        queueMicrotask(() => {
+          toast('Business deleted.', {
+            duration: 5000,
+            action: {
+              label: 'Undo',
+              onClick: () => get().restoreArchivedBusiness(id),
+            },
+          })
+        })
+      },
+      restoreArchivedBusiness: (id) => {
+        const now = new Date().toISOString()
+        set((s) => ({
+          businesses: s.businesses.map((b) =>
+            b.id === id ? { ...b, archivedAt: null, updatedAt: now } : b
+          ),
+          tasks: s.tasks.map((t) => (t.businessId === id ? { ...t, archivedAt: null } : t)),
+          clients: s.clients.map((c) => (c.businessId === id ? { ...c, archivedAt: null, updatedAt: now } : c)),
+          revenueEntries: s.revenueEntries.map((r) => (r.businessId === id ? { ...r, archivedAt: null } : r)),
+          gmbProfiles: s.gmbProfiles.map((g) => (g.businessId === id ? { ...g, archivedAt: null } : g)),
+          drivers: s.drivers.map((d) => (d.businessId === id ? { ...d, archivedAt: null } : d)),
+          sops: s.sops.map((sp) => (sp.businessId === id ? { ...sp, archivedAt: null } : sp)),
+        }))
+      },
 
       balanceSheetAssets: [],
       balanceSheetDebts: [],
@@ -974,6 +1116,7 @@ export const useStore = create<AppState>()(
               id: newId(),
               createdAt: new Date().toISOString(),
               updatedAt: new Date().toISOString(),
+              archivedAt: null,
             },
           ],
         })),
@@ -998,6 +1141,7 @@ export const useStore = create<AppState>()(
               aiSuggested: t.aiSuggested ?? false,
               id,
               createdAt: new Date().toISOString(),
+              archivedAt: null,
             },
           ],
         }))
@@ -1068,6 +1212,7 @@ export const useStore = create<AppState>()(
               recurring: { frequency: target.recurring.frequency, nextDue },
               kanbanLane: 'todo',
               createdAt: new Date().toISOString(),
+              archivedAt: null,
             }
             tasks = [...tasks, spawned]
             queueMicrotask(() => {
@@ -1134,7 +1279,6 @@ export const useStore = create<AppState>()(
       addInsight: (i) => set((s) => ({ insights: [{ ...i, id: uid(), createdAt: new Date().toISOString() }, ...s.insights] })),
       rateInsight: (id, rating) => {
         set((s) => ({ insights: s.insights.map((i) => (i.id === id ? { ...i, rating } : i)) }))
-        get().logEvent('ai_feedback', { messageId: id, rating })
       },
       snoozeInsight: (id) => { const d = new Date(); d.setDate(d.getDate() + 7); set((s) => ({ insights: s.insights.map((i) => i.id === id ? { ...i, snoozedUntil: d.toISOString() } : i) })) },
       dismissInsight: (id) => set((s) => ({ insights: s.insights.filter((i) => i.id !== id) })),
@@ -1164,7 +1308,16 @@ export const useStore = create<AppState>()(
           })
         }
       },
-      saveHealthDay: () => set((s) => ({ healthHistory: [...s.healthHistory.filter((h) => h.date !== s.todayHealth.date), s.todayHealth] })),
+      saveHealthDay: () =>
+        set((s) => {
+          const cutoff = new Date()
+          cutoff.setDate(cutoff.getDate() - 365)
+          const cutoffStr = cutoff.toISOString().split('T')[0]
+          const merged = [...s.healthHistory.filter((h) => h.date !== s.todayHealth.date), s.todayHealth].filter(
+            (h) => h.date >= cutoffStr
+          )
+          return { healthHistory: merged }
+        }),
 
       customHabits: [],
       addCustomHabit: (h) => {
@@ -1228,7 +1381,7 @@ export const useStore = create<AppState>()(
       // ── Revenue Drivers ──
       drivers: [],
       updateDriverStatus: (id, status) => set((s) => ({ drivers: s.drivers.map((d) => d.id === id ? { ...d, status } : d) })),
-      addDriver: (d) => set((s) => ({ drivers: [...s.drivers, { ...d, id: uid() }] })),
+      addDriver: (d) => set((s) => ({ drivers: [...s.drivers, { ...d, id: uid(), archivedAt: null }] })),
       deleteDriver: (id) => set((s) => ({ drivers: s.drivers.filter((d) => d.id !== id) })),
 
       // ── Commitments ──
@@ -1322,7 +1475,7 @@ export const useStore = create<AppState>()(
 
       // ── SOPs ──
       sops: [],
-      addSop: (s_) => set((s) => ({ sops: [...s.sops, { ...s_, id: uid() }] })),
+      addSop: (s_) => set((s) => ({ sops: [...s.sops, { ...s_, id: uid(), archivedAt: null }] })),
       updateSop: (id, updates) => set((s) => ({ sops: s.sops.map((sp) => sp.id === id ? { ...sp, ...updates } : sp) })),
       deleteSop: (id) => set((s) => ({ sops: s.sops.filter((sp) => sp.id !== id) })),
 
@@ -1333,14 +1486,16 @@ export const useStore = create<AppState>()(
       // ── Revenue & Expenses ──
       revenueEntries: [],
       expenseEntries: [],
-      addRevenue: (r) => set((s) => ({ revenueEntries: [...s.revenueEntries, { ...r, id: uid() }] })),
+      addRevenue: (r) =>
+        set((s) => ({ revenueEntries: [...s.revenueEntries, { ...r, id: uid(), archivedAt: null }] })),
       addExpense: (e) => set((s) => ({ expenseEntries: [...s.expenseEntries, { ...e, id: uid() }] })),
       deleteRevenue: (id) => set((s) => ({ revenueEntries: s.revenueEntries.filter((r) => r.id !== id) })),
       deleteExpense: (id) => set((s) => ({ expenseEntries: s.expenseEntries.filter((e) => e.id !== id) })),
 
       // ── GMB Profiles ──
       gmbProfiles: [],
-      addGmbProfile: (g) => set((s) => ({ gmbProfiles: [...s.gmbProfiles, { ...g, id: uid() }] })),
+      addGmbProfile: (g) =>
+        set((s) => ({ gmbProfiles: [...s.gmbProfiles, { ...g, id: uid(), archivedAt: null }] })),
       updateGmbProfile: (id, updates) => set((s) => ({ gmbProfiles: s.gmbProfiles.map((g) => g.id === id ? { ...g, ...updates } : g) })),
       deleteGmbProfile: (id) => set((s) => ({ gmbProfiles: s.gmbProfiles.filter((g) => g.id !== id) })),
 
@@ -1392,7 +1547,11 @@ export const useStore = create<AppState>()(
 
       // ── Projects ──
       projects: [],
-      addProject: (p) => set((s) => ({ projects: [...s.projects, { ...p, id: uid(), createdAt: new Date().toISOString() }] })),
+      projectAbandonLog: [],
+      addProject: (p) =>
+        set((s) => ({
+          projects: [...s.projects, { ...p, id: uid(), createdAt: new Date().toISOString(), archivedAt: null }],
+        })),
       updateProject: (id, updates) => {
         const prev = get().projects.find((p) => p.id === id)
         set((s) => ({ projects: s.projects.map((p) => (p.id === id ? { ...p, ...updates } : p)) }))
@@ -1404,7 +1563,16 @@ export const useStore = create<AppState>()(
           })
         }
       },
-      deleteProject: (id) => set((s) => ({ projects: s.projects.filter((p) => p.id !== id) })),
+      archiveProject: (id) => {
+        const prev = get().projects.find((p) => p.id === id)
+        if (!prev || isArchived(prev)) return
+        const ts = new Date().toISOString()
+        set((s) => ({
+          projects: s.projects.map((p) => (p.id === id ? { ...p, archivedAt: ts } : p)),
+          tasks: s.tasks.map((t) => (t.projectId === id ? { ...t, projectId: undefined } : t)),
+          projectAbandonLog: [...s.projectAbandonLog, { projectId: id, name: prev.name, abandonedAt: ts }],
+        }))
+      },
 
       // ── Focus Sessions ──
       focusSessions: [],
@@ -1449,10 +1617,13 @@ export const useStore = create<AppState>()(
       logEvent: (eventType, eventData) =>
         set((s) => {
           const day = s.todayHealth.date
-          const tasksDoneToday = s.tasks.filter((t) => t.done && t.completedAt?.startsWith(day)).length
+          const tasksDoneToday = s.tasks.filter(
+            (t) => !isArchived(t) && t.done && t.completedAt?.startsWith(day)
+          ).length
           const todayFocusCount = s.focusSessions.filter((f) => f.startedAt?.startsWith(day)).length
           const tasksCommitted = s.tasks.filter(
-            (t) => t.createdAt.startsWith(day) || (!t.done && t.priority !== 'low')
+            (t) =>
+              !isArchived(t) && (t.createdAt.startsWith(day) || (!t.done && t.priority !== 'low'))
           ).length
           const score = getExecutionScore(
             s.todayHealth,
@@ -1463,7 +1634,7 @@ export const useStore = create<AppState>()(
           )
           return {
             behavioralEvents: [
-              ...s.behavioralEvents.slice(-500),
+              ...s.behavioralEvents.slice(-499),
               {
                 id: uid(),
                 eventType,
@@ -1553,9 +1724,9 @@ export const useStore = create<AppState>()(
         if (s.proactiveDayKey !== dayKey) gen = 0
         const { net: monthlyNet } = computeMonthlyMoneySnapshot(s)
         const candidates = buildProactiveCandidates({
-          clients: s.clients,
-          businesses: s.businesses,
-          tasks: s.tasks,
+          clients: s.clients.filter((c) => !isArchived(c)),
+          businesses: s.businesses.filter((b) => !isArchived(b)),
+          tasks: s.tasks.filter((t) => !isArchived(t)),
           commitments: s.commitments,
           revenueEntries: s.revenueEntries,
           proactiveMessages: s.proactiveMessages,
@@ -1680,6 +1851,7 @@ export const useStore = create<AppState>()(
         base.dashboardLayout = normalizeDashboardLayout(p?.dashboardLayout ?? current.dashboardLayout)
         base.notificationPrefs = { ...INITIAL_NOTIFICATIONS, ...base.notificationPrefs }
         if (!Array.isArray(base.customHabits)) base.customHabits = []
+        if (!Array.isArray(base.projectAbandonLog)) base.projectAbandonLog = []
         return base
       },
     }
@@ -1688,7 +1860,7 @@ export const useStore = create<AppState>()(
 
 // ── Computed helpers (call with store state) ──
 export function getAgencyTotals(clients: Client[]) {
-  const active = clients.filter((c) => c.active)
+  const active = clients.filter((c) => c.active && !isArchived(c))
   const gross = active.reduce((s, c) => s + c.grossMonthly, 0)
   const adSpend = active.reduce((s, c) => s + c.adSpend, 0)
   const net = active.reduce((s, c) => s + getClientNet(c), 0)
@@ -1732,6 +1904,87 @@ export function getExecutionScore(
   return Math.round(Math.min(100, commitment + energy + focus))
 }
 
+/** PRD §9.7 — execution drawer formula rows (must stay in sync with `getExecutionScore`). */
+export interface ExecutionScoreBreakdown {
+  prayerEnabled: boolean
+  commitment: { earned: number; max: number; label: string }
+  energy: { earned: number; max: number; parts: { label: string; earned: number; max: number }[] }
+  focus: { earned: number; max: number; sessions: number }
+  faith: { earned: number; max: number; prayersLogged: number } | null
+  total: number
+}
+
+export function getExecutionScoreBreakdown(
+  health: HealthLog,
+  tasksCommitted: number,
+  tasksDone: number,
+  focusSessionsToday: number,
+  prayerEnabled: boolean
+): ExecutionScoreBreakdown {
+  if (prayerEnabled) {
+    const commitmentEarned = tasksCommitted > 0 ? (tasksDone / tasksCommitted) * 35 : 0
+    const parts = [
+      { label: 'Gym / workout', earned: health.gym ? 10 : 0, max: 10 },
+      { label: 'Meal quality (good)', earned: health.mealQuality === 'good' ? 5 : 0, max: 5 },
+      { label: 'Energy drinks (<2)', earned: health.energyDrinks < 2 ? 5 : 0, max: 5 },
+      { label: 'Sleep & wake logged', earned: health.sleepTime && health.wakeTime ? 5 : 0, max: 5 },
+    ]
+    const energyEarned = parts.reduce((s, p) => s + p.earned, 0)
+    const focusEarned = Math.min(20, focusSessionsToday * 5)
+    const prayerCount = Object.values(health.prayers).filter(Boolean).length
+    const faithEarned = prayerCount * 4
+    const total = Math.round(
+      Math.min(100, commitmentEarned + energyEarned + focusEarned + faithEarned)
+    )
+    return {
+      prayerEnabled: true,
+      commitment: {
+        earned: Math.round(commitmentEarned * 10) / 10,
+        max: 35,
+        label: 'Commitment (tasks done vs committed today)',
+      },
+      energy: { earned: Math.round(energyEarned * 10) / 10, max: 25, parts },
+      focus: {
+        earned: Math.round(focusEarned * 10) / 10,
+        max: 20,
+        sessions: focusSessionsToday,
+      },
+      faith: {
+        earned: Math.round(faithEarned * 10) / 10,
+        max: 20,
+        prayersLogged: prayerCount,
+      },
+      total,
+    }
+  }
+  const commitmentEarned = tasksCommitted > 0 ? (tasksDone / tasksCommitted) * 43.75 : 0
+  const parts = [
+    { label: 'Gym / workout', earned: health.gym ? 12.5 : 0, max: 12.5 },
+    { label: 'Meal quality (good)', earned: health.mealQuality === 'good' ? 6.25 : 0, max: 6.25 },
+    { label: 'Energy drinks (<2)', earned: health.energyDrinks < 2 ? 6.25 : 0, max: 6.25 },
+    { label: 'Sleep & wake logged', earned: health.sleepTime && health.wakeTime ? 6.25 : 0, max: 6.25 },
+  ]
+  const energyEarned = parts.reduce((s, p) => s + p.earned, 0)
+  const focusEarned = Math.min(25, focusSessionsToday * 6.25)
+  const total = Math.round(Math.min(100, commitmentEarned + energyEarned + focusEarned))
+  return {
+    prayerEnabled: false,
+    commitment: {
+      earned: Math.round(commitmentEarned * 10) / 10,
+      max: 43.75,
+      label: 'Commitment (scaled — prayer tracking off)',
+    },
+    energy: { earned: Math.round(energyEarned * 10) / 10, max: 31.25, parts },
+    focus: {
+      earned: Math.round(focusEarned * 10) / 10,
+      max: 25,
+      sessions: focusSessionsToday,
+    },
+    faith: null,
+    total,
+  }
+}
+
 export function getProjectIce(p: Project) { return p.impact * p.confidence * p.ease }
 
 export function getScoreZone(score: number) {
@@ -1743,9 +1996,10 @@ export function getScoreZone(score: number) {
 }
 
 export function getBusinessHealth(biz: Business, tasks: Task[], revenueEntries: RevenueEntry[]): BusinessHealth {
-  const bizTasks = tasks.filter(t => t.businessId === biz.id)
+  const bizTasks = tasks.filter((t) => t.businessId === biz.id && !isArchived(t))
   const doneLast7 = bizTasks.filter(t => t.done && t.completedAt && new Date(t.completedAt) > new Date(Date.now() - 7 * 86400000)).length
-  const hasRevenue = biz.monthlyRevenue > 0 || revenueEntries.some(r => r.businessId === biz.id)
+  const hasRevenue =
+    biz.monthlyRevenue > 0 || revenueEntries.some((r) => r.businessId === biz.id && !isArchived(r))
   if (doneLast7 === 0 && biz.status !== 'dormant') return 'flatline'
   if (doneLast7 < 2 || (!hasRevenue && biz.status !== 'active_prerevenue' && biz.status !== 'dormant')) return 'weak'
   return 'strong'

@@ -19,11 +19,7 @@ export default function MetricCard({ label, value, sub, color, icon, accentColor
 
   return (
     <motion.div
-      className="card bg-[var(--surface)] border border-[var(--border)] rounded-[16px] p-5 group relative overflow-hidden"
-      whileHover={{
-        y: -2,
-        boxShadow: '0 8px 32px rgba(0,0,0,0.18)',
-      }}
+      className="card group relative overflow-hidden rounded-[16px] border border-[var(--border)] bg-[var(--surface)] p-5 hover:border-[var(--border-hover)] hover:bg-[var(--bg-secondary)]"
       transition={{ duration: 0.2 }}
     >
       {/* Top row */}

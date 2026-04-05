@@ -2,15 +2,15 @@
 
 import { useState, useRef, useEffect } from 'react'
 import { motion, AnimatePresence, useMotionValue, useTransform } from 'framer-motion'
-import { useStore, type Task } from '@/stores/store'
+import { useStore, type Task, isArchived } from '@/stores/store'
 import TaskDollarHint from '@/components/TaskDollarHint'
 import { PRIORITY_COLORS } from '@/lib/constants'
 import { toast } from 'sonner'
 
 const BORDER_COLORS: Record<string, string> = {
-  crit: 'rgb(244,63,94)',
-  high: 'rgb(245,158,11)',
-  med: 'rgb(59,130,246)',
+  crit: 'var(--negative)',
+  high: 'var(--warning)',
+  med: 'var(--accent)',
   low: 'var(--border)',
 }
 
@@ -27,10 +27,12 @@ export default function TaskItem({ task }: TaskItemProps) {
 
   const x = useMotionValue(0)
   const bgOpacity = useTransform(x, [-120, -50, 0, 50, 120], [1, 0.5, 0, 0.5, 1])
-  const bgColor = useTransform(x, (v) => (v > 0 ? 'rgba(16,185,129,0.25)' : 'rgba(239,68,68,0.25)'))
+  const bgColor = useTransform(x, (v) =>
+    v > 0 ? 'color-mix(in srgb, var(--positive) 25%, transparent)' : 'color-mix(in srgb, var(--negative) 25%, transparent)',
+  )
 
   const pColors = PRIORITY_COLORS[task.priority]
-  const business = businesses.find((b) => b.id === task.businessId)
+  const business = businesses.find((b) => b.id === task.businessId && !isArchived(b))
 
   useEffect(() => {
     if (editing && inputRef.current) inputRef.current.focus()
@@ -100,14 +102,16 @@ export default function TaskItem({ task }: TaskItemProps) {
         dragElastic={0.3}
         onDragEnd={handleDragEnd}
         whileHover={{ borderColor: 'var(--border-glow)' }}
-        transition={{ layout: { type: 'spring', stiffness: 300, damping: 30 } }}
+        transition={{ layout: { duration: 0.25, ease: [0.25, 0.1, 0.25, 1] } }}
       >
         {/* Checkbox */}
         <motion.button
+          type="button"
           onClick={handleToggle}
-          className={`mt-0.5 w-[18px] h-[18px] rounded-[6px] border-2 flex-shrink-0 flex items-center justify-center transition-colors ${
+          aria-label={task.done ? 'Mark task incomplete' : 'Mark task complete'}
+          className={`mt-0.5 flex h-[18px] w-[18px] flex-shrink-0 items-center justify-center rounded-[6px] border-2 transition-colors ${
             task.done
-              ? 'bg-[var(--accent)] border-[var(--accent)]'
+              ? 'border-[var(--accent)] bg-[var(--accent)]'
               : 'border-[var(--border)] hover:border-[var(--accent)]'
           }`}
           whileTap={{ scale: 0.85 }}
@@ -138,12 +142,12 @@ export default function TaskItem({ task }: TaskItemProps) {
               onChange={(e) => setEditText(e.target.value)}
               onBlur={handleEditSave}
               onKeyDown={handleEditKeyDown}
-              className="w-full bg-transparent text-[13px] text-[var(--text)] outline-none border-b border-[var(--accent)] pb-0.5"
+              className="w-full border-b border-[var(--accent)] bg-transparent pb-0.5 text-[17px] text-[var(--text)] outline-none"
             />
           ) : (
             <motion.div
-              className={`text-[13px] cursor-text ${
-                task.done ? 'line-through text-[var(--text-dim)]' : 'text-[var(--text)]'
+              className={`cursor-text text-[17px] ${
+                task.done ? 'text-[var(--text-dim)] line-through' : 'text-[var(--text)]'
               }`}
               animate={{ opacity: task.done ? 0.4 : 1 }}
               transition={{ duration: 0.3 }}
@@ -177,10 +181,12 @@ export default function TaskItem({ task }: TaskItemProps) {
 
         {/* Delete button */}
         <motion.button
+          type="button"
           onClick={() => { deleteTask(task.id); toast('Task deleted') }}
-          className="text-[var(--rose)] mt-1"
+          className="mt-1 text-[var(--rose)]"
+          aria-label="Delete task"
           initial={{ opacity: 0, x: 4 }}
-          whileHover={{ opacity: 1, scale: 1.1 }}
+          whileHover={{ opacity: 1 }}
           animate={{ opacity: 0, x: 4 }}
           whileTap={{ scale: 0.9 }}
           style={{ pointerEvents: 'auto' }}

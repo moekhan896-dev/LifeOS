@@ -6,7 +6,7 @@ import Link from 'next/link'
 import { motion } from 'framer-motion'
 import { toast } from 'sonner'
 import { AreaChart, Area, BarChart, Bar, ResponsiveContainer, Tooltip, XAxis } from 'recharts'
-import { useStore, getClientNet, getAgencyTotals, type Business, type Client, type GmbProfile } from '@/stores/store'
+import { useStore, getClientNet, getAgencyTotals, isArchived, type Business, type Client, type GmbProfile } from '@/stores/store'
 import PageTransition from '@/components/PageTransition'
 import {
   TAGS, XP_VALUES, PRIORITY_COLORS, DRIVER_STATUSES, DRIVER_STATUS_COLORS,
@@ -21,8 +21,8 @@ const STATUS_BADGE_COLORS: Record<string, string> = {
   active_healthy: 'bg-[rgba(48,209,88,0.15)] text-[var(--positive)]',
   active_slow: 'bg-[rgba(255,159,10,0.15)] text-[var(--warning)]',
   active_prerevenue: 'bg-[rgba(191,90,242,0.15)] text-[var(--ai)]',
-  dormant: 'bg-[rgba(255,255,255,0.06)] text-[var(--text-tertiary)]',
-  backburner: 'bg-[rgba(255,255,255,0.06)] text-[var(--text-tertiary)]',
+  dormant: 'bg-[var(--bg-secondary)] text-[var(--text-tertiary)]',
+  backburner: 'bg-[var(--bg-secondary)] text-[var(--text-tertiary)]',
   idea: 'bg-[var(--accent-bg)] text-[var(--accent)]',
 }
 
@@ -47,7 +47,7 @@ export default function BusinessPage() {
 
   const {
     businesses, clients, gmbProfiles, tasks, drivers, revenueEntries,
-    updateBusiness, deleteBusiness,
+    updateBusiness, archiveBusiness,
     addClient, updateClient, deleteClient,
     addGmbProfile, updateGmbProfile, deleteGmbProfile,
     addTask, toggleTask, deleteTask, updateTask,
@@ -55,7 +55,7 @@ export default function BusinessPage() {
     addRevenue, deleteRevenue,
   } = useStore()
 
-  const biz = businesses.find((b) => b.id === id)
+  const biz = businesses.find((b) => b.id === id && !isArchived(b))
 
   // ── Local State ──
   const [editing, setEditing] = useState(false)
@@ -148,9 +148,12 @@ export default function BusinessPage() {
   }
 
   function handleDelete() {
-    if (!confirmDelete) { setConfirmDelete(true); return }
-    deleteBusiness(biz!.id)
-    toast.success('Business deleted')
+    if (!confirmDelete) {
+      setConfirmDelete(true)
+      return
+    }
+    archiveBusiness(biz!.id)
+    setConfirmDelete(false)
   }
 
   function handleAddClient() {
@@ -501,7 +504,7 @@ export default function BusinessPage() {
             </div>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               {bizGmb.map((g) => (
-                <motion.div key={g.id} whileHover={{ y: -2 }} className="card rounded-[16px] p-5 group relative" style={{ borderTop: `3px solid ${GMB_TOP_BORDER[g.status] ?? 'var(--border)'}` }}>
+                <motion.div key={g.id} className="card group relative rounded-[16px] p-5" style={{ borderTop: `3px solid ${GMB_TOP_BORDER[g.status] ?? 'var(--border)'}` }}>
                   <button onClick={() => { deleteGmbProfile(g.id); toast.success('Profile deleted') }}
                     className="absolute top-3 right-3 opacity-0 group-hover:opacity-100 text-rose text-xs transition">Del</button>
                   <p className="font-semibold mb-2">{g.city}</p>

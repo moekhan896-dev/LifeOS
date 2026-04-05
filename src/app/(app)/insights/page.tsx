@@ -53,7 +53,6 @@ export default function InsightsPage() {
           ].map((stat) => (
             <StaggerItem key={stat.label}>
               <motion.div
-                whileHover={{ y: -1, boxShadow: '0 4px 12px rgba(0,0,0,0.08)' }}
                 className="card p-3 flex items-center gap-3"
               >
                 <span className="text-lg">{stat.icon}</span>

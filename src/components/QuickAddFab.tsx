@@ -58,8 +58,7 @@ export default function QuickAddFab() {
         aria-expanded={open}
         whileTap={{ scale: 0.95 }}
         onClick={() => setOpen(!open)}
-        className="flex h-11 w-11 items-center justify-center rounded-full text-[22px] font-light leading-none text-[var(--text-primary)] shadow-lg"
-        style={{ background: 'rgba(255,255,255,0.08)' }}
+        className="flex h-11 w-11 items-center justify-center rounded-full bg-[var(--bg-secondary)] text-[22px] font-light leading-none text-[var(--text-primary)] shadow-lg"
       >
         +
       </motion.button>

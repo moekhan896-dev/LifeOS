@@ -1,5 +1,6 @@
 import type { useStore } from '@/stores/store'
-import { computeMonthlyMoneySnapshot, getExecutionScore } from '@/stores/store'
+import type { AiMessage } from '@/stores/store'
+import { computeMonthlyMoneySnapshot, getExecutionScore, isArchived } from '@/stores/store'
 
 type StoreState = ReturnType<typeof useStore.getState>
 
@@ -42,7 +43,7 @@ function gymTaskCorrelation(history: StoreState['healthHistory'], tasks: StoreSt
   let restDays = 0
   let restTasks = 0
   for (const h of days) {
-    const done = tasks.filter((t) => t.done && t.completedAt?.startsWith(h.date)).length
+    const done = tasks.filter((t) => !isArchived(t) && t.done && t.completedAt?.startsWith(h.date)).length
     if (h.gym) {
       gymDays++
       gymTasks += done
@@ -73,7 +74,7 @@ function score7DayTrend(history: StoreState['healthHistory']): string {
 }
 
 function mostProductiveHourRange(tasks: StoreState['tasks']): string {
-  const done = tasks.filter((t) => t.done && t.completedAt)
+  const done = tasks.filter((t) => !isArchived(t) && t.done && t.completedAt)
   if (done.length < 5) return 'insufficient completion timestamps — complete more tasks with logged times'
   const hours: number[] = []
   for (const t of done.slice(-80)) {
@@ -114,7 +115,7 @@ function prayerProductivityLines(history: StoreState['healthHistory'], tasks: St
   let partialTaskSum = 0
   for (const h of hist) {
     const pc = Object.values(h.prayers).filter(Boolean).length
-    const done = tasks.filter((t) => t.done && t.completedAt?.startsWith(h.date)).length
+    const done = tasks.filter((t) => !isArchived(t) && t.done && t.completedAt?.startsWith(h.date)).length
     if (pc >= 5) {
       fullDays++
       fullTaskSum += done
@@ -160,12 +161,16 @@ function screenScoreCorrelation(history: StoreState['healthHistory']) {
 }
 
 function behavioralHeuristics(state: StoreState): { strength: string; weakness: string; corePattern: string } {
-  const open = state.tasks.filter((t) => !t.done)
+  const open = state.tasks.filter((t) => !isArchived(t) && !t.done)
   const stale = open.filter(
     (t) => Date.now() - new Date(t.createdAt).getTime() > 7 * 86400000
   ).length
   const doneWeek = state.tasks.filter(
-    (t) => t.done && t.completedAt && Date.now() - new Date(t.completedAt).getTime() < 7 * 86400000
+    (t) =>
+      !isArchived(t) &&
+      t.done &&
+      t.completedAt &&
+      Date.now() - new Date(t.completedAt).getTime() < 7 * 86400000
   ).length
   const ideas = state.ideas.filter((i) => !i.archived).length
   const promoted = state.ideas.filter((i) => i.promoted).length
@@ -202,12 +207,80 @@ Day 14+: Direct confrontation (critical). "[x] days on list; cumulative cost $[z
 When generating proactive copy, match tier tone; include task dollar value and commitment follow-through rate in tier 2–4 messages.`
 }
 
-function conversationDigest(messages: StoreState['aiMessages']): string {
-  const last = messages.slice(-10)
-  if (last.length === 0) return 'No AI chat history yet.'
-  return last
-    .map((m) => `${m.role.toUpperCase()} (${new Date(m.createdAt).toLocaleDateString()}): ${m.content.slice(0, 280)}${m.content.length > 280 ? '…' : ''}`)
-    .join('\n')
+const CONVERSATION_GAP_MS = 2 * 60 * 60 * 1000
+
+/** Split flat message log into sessions (gap > 2h starts a new conversation). */
+function segmentAiConversations(messages: AiMessage[]): AiMessage[][] {
+  const sorted = [...messages].sort(
+    (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
+  )
+  if (sorted.length === 0) return []
+  const segments: AiMessage[][] = []
+  let cur: AiMessage[] = [sorted[0]]
+  for (let i = 1; i < sorted.length; i++) {
+    const prev = sorted[i - 1]
+    const m = sorted[i]
+    const gap = new Date(m.createdAt).getTime() - new Date(prev.createdAt).getTime()
+    if (gap > CONVERSATION_GAP_MS) {
+      segments.push(cur)
+      cur = [m]
+    } else {
+      cur.push(m)
+    }
+  }
+  segments.push(cur)
+  return segments
+}
+
+function extractKeyDataPoints(text: string): string {
+  const parts: string[] = []
+  const money = text.match(/\$[\d,]+(?:\.\d{2})?/g)
+  if (money) parts.push(...money.slice(0, 6))
+  const pct = text.match(/\b\d+(?:\.\d+)?%/g)
+  if (pct) parts.push(...pct.slice(0, 4))
+  const dates = text.match(/\b20\d{2}-\d{2}-\d{2}\b/g)
+  if (dates) parts.push(...dates.slice(0, 3))
+  return parts.length ? [...new Set(parts)].join(', ') : '—'
+}
+
+/** PRD §8.5 — structured summary per conversation for system prompt (not raw excerpts). */
+function formatConversationSummary(msgs: AiMessage[]): string {
+  const userMsgs = msgs.filter((m) => m.role === 'user')
+  const asstMsgs = msgs.filter((m) => m.role === 'assistant')
+  const firstUser = userMsgs[0]?.content ?? ''
+  const topic = (firstUser || asstMsgs[0]?.content || 'General chat')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .slice(0, 140)
+  const userPosition = userMsgs.length
+    ? userMsgs
+        .map((u) => u.content)
+        .join(' ')
+        .replace(/\s+/g, ' ')
+        .trim()
+        .slice(0, 320)
+    : '—'
+  const aiRecommendation = asstMsgs.length
+    ? asstMsgs[asstMsgs.length - 1].content
+        .replace(/\s+/g, ' ')
+        .trim()
+        .slice(0, 360)
+    : '—'
+  const blob = msgs.map((m) => m.content).join('\n')
+  const keyData = extractKeyDataPoints(blob)
+  return `Topic: ${topic}
+User position: ${userPosition}
+AI recommendation: ${aiRecommendation}
+Key data points: ${keyData}`
+}
+
+function conversationSummariesLast10(messages: StoreState['aiMessages']): string {
+  const segments = segmentAiConversations(messages)
+  const last10 = segments.slice(-10)
+  if (last10.length === 0) return 'No AI chat history yet.'
+  return last10
+    .map((seg, i) => `--- Conversation ${i + 1} (${seg.length} messages) ---\n${formatConversationSummary(seg)}`)
+    .join('\n\n')
 }
 
 function daysSinceLastOpen(lastOpenedAt: string | null): string {
@@ -226,13 +299,14 @@ export function buildFullSystemPrompt(state: StoreState): string {
   const gap = state.incomeTarget > 0 ? Math.max(0, state.incomeTarget - net) : 0
   const bh = behavioralHeuristics(state)
   const cf = commitmentFollowThrough30d(state.commitments)
-  const tasksDoneToday = state.tasks.filter(
-    (t) => t.done && t.completedAt?.startsWith(new Date().toISOString().split('T')[0])
-  ).length
-  const tasksRemaining = state.tasks.filter((t) => !t.done).length
   const todayStr = new Date().toISOString().split('T')[0]
+  const tasksDoneToday = state.tasks.filter(
+    (t) => !isArchived(t) && t.done && t.completedAt?.startsWith(todayStr)
+  ).length
+  const tasksRemaining = state.tasks.filter((t) => !isArchived(t) && !t.done).length
   const tasksCommitted = state.tasks.filter(
-    (t) => t.createdAt.startsWith(todayStr) || (!t.done && t.priority !== 'low')
+    (t) =>
+      !isArchived(t) && (t.createdAt.startsWith(todayStr) || (!t.done && t.priority !== 'low'))
   ).length
   const todayFocus = state.focusSessions.filter((s) => s.startedAt.startsWith(todayStr)).length
   const execScore = getExecutionScore(
@@ -254,26 +328,37 @@ export function buildFullSystemPrompt(state: StoreState): string {
             : 'Restart'
 
   const valueDoneToday = state.tasks
-    .filter((t) => t.done && t.completedAt?.startsWith(todayStr))
+    .filter((t) => !isArchived(t) && t.done && t.completedAt?.startsWith(todayStr))
     .reduce((s, t) => s + (t.dollarValue ?? 0), 0)
   const valueRemaining = state.tasks
-    .filter((t) => !t.done)
+    .filter((t) => !isArchived(t) && !t.done)
     .reduce((s, t) => s + (t.dollarValue ?? 0), 0)
 
   const avoidedTasks = state.tasks
-    .filter((t) => !t.done)
+    .filter((t) => !isArchived(t) && !t.done)
     .map((t) => ({
       text: t.text,
       days: Math.floor((Date.now() - new Date(t.createdAt).getTime()) / 86400000),
-      biz: state.businesses.find((b) => b.id === t.businessId)?.name ?? '',
+      biz: state.businesses.find((b) => b.id === t.businessId && !isArchived(b))?.name ?? '',
     }))
     .sort((a, b) => b.days - a.days)
     .slice(0, 8)
 
+  const abandonBlock =
+    state.projectAbandonLog && state.projectAbandonLog.length > 0
+      ? state.projectAbandonLog
+          .slice(-12)
+          .map((a) => `  • You abandoned "${a.name}" on ${a.abandonedAt.slice(0, 10)}`)
+          .join('\n')
+      : ''
+
+  const activeBusinessCount = state.businesses.filter((b) => !isArchived(b)).length
+
   const bizBlock = state.businesses
+    .filter((b) => !isArchived(b))
     .map((b) => {
       const cs = state.clients
-        .filter((c) => c.businessId === b.id && c.active)
+        .filter((c) => !isArchived(c) && c.businessId === b.id && c.active)
         .map(
           (c) =>
             `${c.name}: gross $${c.grossMonthly}/mo, ad $${c.adSpend}, health ${c.relationshipHealth ?? '—'}`
@@ -356,8 +441,11 @@ North star: "${state.northStarMetric || '—'}"
 Ideal day: "${(state.idealDay || '').slice(0, 400)}"
 Why: "${(state.incomeWhy || '').slice(0, 400)}"
 
-BUSINESSES (${state.businesses.length} total):
+BUSINESSES (${activeBusinessCount} active):
 ${bizBlock || '  (none)'}
+
+ABANDONED PROJECTS (reference naturally if relevant):
+${abandonBlock || '  (none)'}
 
 FINANCES:
 Monthly income (computed): $${Math.round(totalIncome)}
@@ -402,7 +490,7 @@ Tasks avoided / stale (sample): ${avoidedTasks.map((t) => `"${t.text.slice(0, 60
 Most productive time (from completion timestamps): ${mostProductiveHourRange(state.tasks)}
 7-day daily score trend: ${score7DayTrend(state.healthHistory)}
 Avg execution score (today): ${execScore}/100 (${zone})
-Idea → execution: ${state.ideas.filter((i) => !i.archived).length} active ideas, ${state.ideas.filter((i) => i.promoted).length} promoted; tasks completed last 7d: ${state.tasks.filter((t) => t.done && t.completedAt && Date.now() - new Date(t.completedAt).getTime() < 7 * 86400000).length}
+Idea → execution: ${state.ideas.filter((i) => !i.archived).length} active ideas, ${state.ideas.filter((i) => i.promoted).length} promoted; tasks completed last 7d: ${state.tasks.filter((t) => !isArchived(t) && t.done && t.completedAt && Date.now() - new Date(t.completedAt).getTime() < 7 * 86400000).length}
 Action-to-result: use pipeline / task completion dates when present; cold outreach → closed deal timing varies by user data.
 AI PARTNER FEEDBACK (thumbs — PRD §8.8):
 ${aiPartnerFeedbackSummary(state.behavioralEvents)}
@@ -423,8 +511,8 @@ ${
     .join('\n') || '  (none yet)'
 }
 
-RECENT AI CONVERSATION EXCERPTS (last 10 messages — PRD §8.5):
-${conversationDigest(state.aiMessages)}
+RECENT AI CONVERSATIONS (last 10 sessions, structured summaries — PRD §8.5):
+${conversationSummariesLast10(state.aiMessages)}
 
 CURRENT CONTEXT:
 Date: ${todayStr}, Time: ${new Date().toLocaleTimeString()}
@@ -450,11 +538,11 @@ export function buildDecisionContextAppendix(state: StoreState): string {
 /** PRD Batch 2 — compact context for “Let AI suggest tasks”. */
 export function buildTaskSuggestContext(state: StoreState): string {
   const goals = state.goals.filter((g) => new Date(g.cycleEnd) >= new Date())
-  const projects = state.projects.filter((p) => p.status !== 'complete')
+  const projects = state.projects.filter((p) => !isArchived(p) && p.status !== 'complete')
   const h = behavioralHeuristics(state)
-  const open = state.tasks.filter((t) => !t.done)
+  const open = state.tasks.filter((t) => !isArchived(t) && !t.done)
   const bottlenecks = state.businesses
-    .filter((b) => b.bottleneck?.trim())
+    .filter((b) => !isArchived(b) && b.bottleneck?.trim())
     .map((b) => `${b.name}: ${b.bottleneck}`)
     .slice(0, 5)
   return [

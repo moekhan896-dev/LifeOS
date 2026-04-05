@@ -22,6 +22,7 @@ export const DASHBOARD_TILE_CATALOG: { id: string; label: string; defaultSpan: D
   { id: 'morning_brief', label: 'Morning briefing', defaultSpan: 12 },
   { id: 'one_thing', label: 'The one thing', defaultSpan: 12 },
   { id: 'net_income', label: 'Net income', defaultSpan: 3 },
+  { id: 'daily_score', label: 'Score ring (daily)', defaultSpan: 3 },
   { id: 'execution', label: 'Execution score', defaultSpan: 3 },
   { id: 'energy', label: 'Energy', defaultSpan: 3 },
   { id: 'prayers', label: 'Prayers', defaultSpan: 3 },

@@ -213,7 +213,7 @@ export default function CommandInput() {
             )}
 
             {transcript && (
-              <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="text-[13px] leading-relaxed text-[var(--text-primary)]">
+              <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="text-[17px] leading-relaxed text-[var(--text-primary)]">
                 {transcript}
               </motion.p>
             )}
@@ -226,17 +226,17 @@ export default function CommandInput() {
           className="glass mx-auto flex max-w-[640px] items-center gap-3 rounded-2xl p-3"
           animate={{
             boxShadow: focused
-              ? '0 12px 40px rgba(0,0,0,0.3), 0 0 0 1px rgba(10,132,255,0.25)'
-              : '0 8px 24px rgba(0,0,0,0.2)',
+              ? '0 12px 40px color-mix(in srgb, var(--text-primary) 18%, transparent), 0 0 0 1px color-mix(in srgb, var(--accent) 25%, transparent)'
+              : '0 8px 24px color-mix(in srgb, var(--text-primary) 12%, transparent)',
           }}
           transition={{ duration: 0.2 }}
         >
           <button
             type="button"
             onClick={toggleRecording}
-            className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-full bg-[#0A84FF] transition hover:bg-[var(--accent-hover)]"
-            style={{ backgroundColor: recording ? 'var(--negative)' : '#0A84FF' }}
-            title={recording ? 'Stop recording' : 'Voice input'}
+            aria-label={recording ? 'Stop recording' : 'Voice input'}
+            className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-full bg-[var(--accent)] transition-colors hover:bg-[var(--accent-hover)]"
+            style={{ backgroundColor: recording ? 'var(--negative)' : undefined }}
           >
             <svg
               width="16"

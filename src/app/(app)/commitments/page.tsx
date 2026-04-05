@@ -90,14 +90,20 @@ export default function CommitmentsPage() {
         </StaggerItem>
 
         <StaggerItem>
-          <div className="flex rounded-[12px] border border-[var(--border)] p-1">
+          <div
+            className="flex rounded-[12px] border border-[var(--border)] p-1"
+            role="tablist"
+            aria-label="Commitment filter"
+          >
             {(['active', 'fulfilled', 'all'] as const).map((t) => (
               <button
                 key={t}
                 type="button"
+                role="tab"
+                aria-selected={tab === t}
                 onClick={() => setTab(t)}
                 className={`flex-1 rounded-[10px] py-2 text-[13px] font-medium capitalize ${
-                  tab === t ? 'bg-[var(--accent)] text-black' : 'text-[var(--text-secondary)]'
+                  tab === t ? 'bg-[var(--accent)] text-white' : 'text-[var(--text-secondary)]'
                 }`}
               >
                 {t}
