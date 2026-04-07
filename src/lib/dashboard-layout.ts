@@ -49,7 +49,8 @@ export const DEFAULT_DASHBOARD_LAYOUT: DashboardLayoutState = {
 
 export function spanToClass(span: DashboardGridSpan): string {
   const map: Record<DashboardGridSpan, string> = {
-    3: 'col-span-12 md:col-span-3',
+    /** PRD §9.2 — small tiles half-width on mobile (<768px), full row for larger sizes */
+    3: 'col-span-6 md:col-span-3',
     4: 'col-span-12 md:col-span-4',
     6: 'col-span-12 md:col-span-6',
     8: 'col-span-12 md:col-span-8',

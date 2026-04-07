@@ -1,7 +1,7 @@
 'use client'
 
 import { useMemo } from 'react'
-import { useStore, getAgencyTotals, getClientNet, isArchived } from '@/stores/store'
+import { useStore, getAgencyTotals, getClientNet, isArchived, toMoneyNumber } from '@/stores/store'
 import PageTransition from '@/components/PageTransition'
 import { StaggerContainer, StaggerItem } from '@/components/Stagger'
 import {
@@ -73,11 +73,14 @@ export default function FinancialsPage() {
 
   const incomeStreams = useMemo(() => {
     return activeBusinesses
-      .filter(b => b.monthlyRevenue > 0 || clients.some(c => c.businessId === b.id && c.active))
-      .map(b => {
-        const bizClients = clients.filter(c => c.businessId === b.id && c.active)
+      .filter(
+        (b) =>
+          toMoneyNumber(b.monthlyRevenue) > 0 || clients.some((c) => c.businessId === b.id && c.active)
+      )
+      .map((b) => {
+        const bizClients = clients.filter((c) => c.businessId === b.id && c.active)
         const clientNet = bizClients.reduce((s, c) => s + getClientNet(c), 0)
-        const net = clientNet > 0 ? clientNet : b.monthlyRevenue
+        const net = clientNet > 0 ? clientNet : toMoneyNumber(b.monthlyRevenue)
         const detail = bizClients.length > 0
           ? `${bizClients.length} client${bizClients.length !== 1 ? 's' : ''}, net after ad spend`
           : b.notes || ''
@@ -85,8 +88,10 @@ export default function FinancialsPage() {
       })
   }, [activeBusinesses, clients])
 
-  const TOTAL_INCOME = incomeStreams.reduce((s, i) => s + i.net, 0)
-  const TOTAL_COSTS = expenseEntries.filter((e) => e.recurring).reduce((s, e) => s + e.amount, 0)
+  const TOTAL_INCOME = incomeStreams.reduce((s, i) => s + toMoneyNumber(i.net), 0)
+  const TOTAL_COSTS = expenseEntries
+    .filter((e) => e.recurring)
+    .reduce((s, e) => s + toMoneyNumber(e.amount), 0)
   const NET_TAKE_HOME = TOTAL_INCOME - TOTAL_COSTS
 
   const netTakeHomePL = useMemo(() => {

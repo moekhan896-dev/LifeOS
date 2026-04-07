@@ -221,6 +221,10 @@ function TasksPageInner() {
 
   const getBusiness = (id: string) => activeBusinesses.find((b) => b.id === id)
 
+  const showEmptyList = viewMode === 'list' && incompleteTasks.length === 0 && !showNewTask
+  const showEmptyBoard = viewMode === 'board' && filtered.length === 0
+  const showEmptyTasks = showEmptyList || showEmptyBoard
+
   const stats = [
     { label: 'Today', value: todayUndone, color: 'text-[var(--text-primary)]' },
     { label: 'This week', value: thisWeekCount, color: 'text-[var(--text-primary)]' },
@@ -386,7 +390,7 @@ function TasksPageInner() {
           </div>
           <div className="flex flex-wrap items-center gap-2">
             <div
-              className="inline-flex rounded-xl border border-[var(--border)] bg-[var(--bg-secondary)] p-1"
+              className="inline-flex rounded-[8px] bg-[var(--bg-secondary)] p-1"
               role="tablist"
               aria-label="Task view"
             >
@@ -395,8 +399,8 @@ function TasksPageInner() {
                 role="tab"
                 aria-selected={viewMode === 'list'}
                 onClick={() => setViewMode('list')}
-                className={`rounded-lg px-4 py-2 text-[14px] font-medium ${
-                  viewMode === 'list' ? 'bg-[var(--accent-bg)] text-[var(--accent)]' : 'text-[var(--text-secondary)]'
+                className={`rounded-[8px] px-4 py-2 text-[14px] font-medium transition-colors ${
+                  viewMode === 'list' ? 'bg-[var(--bg-elevated)] text-[var(--text-primary)]' : 'text-[var(--text-secondary)]'
                 }`}
               >
                 List
@@ -406,8 +410,8 @@ function TasksPageInner() {
                 role="tab"
                 aria-selected={viewMode === 'board'}
                 onClick={() => setViewMode('board')}
-                className={`rounded-lg px-4 py-2 text-[14px] font-medium ${
-                  viewMode === 'board' ? 'bg-[var(--accent-bg)] text-[var(--accent)]' : 'text-[var(--text-secondary)]'
+                className={`rounded-[8px] px-4 py-2 text-[14px] font-medium transition-colors ${
+                  viewMode === 'board' ? 'bg-[var(--bg-elevated)] text-[var(--text-primary)]' : 'text-[var(--text-secondary)]'
                 }`}
               >
                 Board
@@ -540,7 +544,35 @@ function TasksPageInner() {
           </motion.button>
         </div>
 
-        {viewMode === 'list' ? (
+        {showEmptyTasks ? (
+          <div className="text-center py-20">
+            <p className="text-[17px] text-[var(--text-secondary)] mb-6">
+              No tasks yet. Add your first task, or let AI suggest tasks based on your goals.
+            </p>
+            <div className="flex flex-wrap gap-3 justify-center">
+              <motion.button
+                type="button"
+                whileTap={{ scale: 0.97 }}
+                onClick={() => {
+                  setNewBusiness(activeBusinesses[0]?.id || '')
+                  setShowNewTask(true)
+                }}
+                className="bg-[var(--accent)] text-white px-6 py-3 rounded-[14px] text-[17px] font-semibold min-h-[44px]"
+              >
+                + Add a task
+              </motion.button>
+              <motion.button
+                type="button"
+                whileTap={{ scale: 0.97 }}
+                disabled={suggestLoading}
+                onClick={() => void handleSuggestTasks()}
+                className="bg-[rgba(255,255,255,0.08)] text-[var(--text-primary)] px-6 py-3 rounded-[14px] text-[17px] font-semibold min-h-[44px] disabled:opacity-40"
+              >
+                Let AI suggest tasks
+              </motion.button>
+            </div>
+          </div>
+        ) : viewMode === 'list' ? (
           <div>
             <AnimatePresence initial={false}>
               {showNewTask && (
@@ -605,14 +637,11 @@ function TasksPageInner() {
 
               {incompleteTasks.map((task, i) => renderTaskCard(task, i))}
             </AnimatePresence>
-
-            {incompleteTasks.length === 0 && !showNewTask && (
-              <p className="py-8 text-center text-[17px] text-[var(--text-secondary)]">No tasks to show</p>
-            )}
           </div>
         ) : (
           <TaskKanbanBoard
             tasks={filtered}
+            businesses={activeBusinesses}
             onColumnChange={handleColumnChange}
             onTaskClick={(t) => setDetailTaskId(t.id)}
           />

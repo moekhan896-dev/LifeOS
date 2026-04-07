@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from 'next'
 import Providers from '@/components/Providers'
+import { ErrorBoundary } from '@/components/ErrorBoundary'
 import './globals.css'
 
 export const metadata: Metadata = {
@@ -22,7 +23,11 @@ export const viewport: Viewport = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en" className="h-full antialiased">
-      <body className="min-h-full flex flex-col font-sans">{children}</body>
+      <body className="min-h-full flex flex-col font-sans">
+        <Providers>
+          <ErrorBoundary>{children}</ErrorBoundary>
+        </Providers>
+      </body>
     </html>
   )
 }

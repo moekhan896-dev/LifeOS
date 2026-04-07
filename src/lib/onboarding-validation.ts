@@ -5,18 +5,20 @@ export function canProceedStep(
   step: number,
   draft: OnboardingDraft,
   identitySubStep: number,
-  healthScheduleSubStep: number,
-  businessEditIndex: number
+  foundationSubStep: number,
+  businessEditIndex: number,
+  strugglesSubStep: number
 ): boolean {
-  return validateStep(step, draft, identitySubStep, healthScheduleSubStep, businessEditIndex).ok
+  return validateStep(step, draft, identitySubStep, foundationSubStep, businessEditIndex, strugglesSubStep).ok
 }
 
 export function validateStep(
   step: number,
   draft: OnboardingDraft,
   identitySubStep: number,
-  healthScheduleSubStep: number,
-  businessEditIndex: number
+  foundationSubStep: number,
+  businessEditIndex: number,
+  strugglesSubStep: number
 ): { ok: boolean; errors: string[] } {
   const errors: string[] = []
 
@@ -86,10 +88,22 @@ export function validateStep(
     case 6: {
       const h = draft.health
       const sch = draft.schedule
-      if (healthScheduleSubStep === 0) {
+      if (foundationSubStep === 0) {
         add('health.targetWake', !!h.targetWake.trim())
         add('health.actualWake', !!h.actualWake.trim())
-      } else if (healthScheduleSubStep === 1) {
+      } else if (foundationSubStep === 1) {
+        add('health.exercise', !!h.exercise.trim())
+        add('health.dietQuality', !!h.dietQuality.trim())
+      } else if (foundationSubStep === 2) {
+        add('health.caffeine', !!h.caffeine.trim())
+        add('health.smoking', !!h.smoking.trim())
+      } else if (foundationSubStep === 3) {
+        add('health.screenTimeHours', typeof h.screenTimeHours === 'number' && h.screenTimeHours >= 0)
+        add('health.energy', typeof h.energy === 'number')
+        add('health.stress', typeof h.stress === 'number')
+      } else if (foundationSubStep === 4) {
+        /* habits optional */
+      } else if (foundationSubStep === 5) {
         add('schedule.workStart', !!sch.workStart.trim())
         add('schedule.workEnd', !!sch.workEnd.trim())
       }
@@ -100,8 +114,20 @@ export function validateStep(
         'faith.level',
         ['central', 'sometimes', 'spiritual', 'no', 'prefer_not'].includes(String(draft.faith.level))
       )
+      if (
+        draft.faith.tradition === 'Islam' &&
+        (draft.faith.islamPrayerTracking === 'build' || draft.faith.islamPrayerTracking === 'consistent')
+      ) {
+        add('faith.prayerConsistency', !!draft.faith.prayerConsistency.trim())
+      }
       break
     case 8:
+      if (strugglesSubStep === 0) {
+        add('struggles.procrastination', !!draft.struggles.procrastinationPattern.trim())
+        add('struggles.patterns', !!draft.struggles.behaviorPatterns.trim())
+      } else if (strugglesSubStep === 1) {
+        add('struggles.distraction', !!draft.struggles.biggestDistraction.trim())
+      }
       break
     case 9:
       add('ai.communicationStyle', !!draft.ai.communicationStyle.trim())

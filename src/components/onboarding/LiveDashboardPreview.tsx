@@ -5,6 +5,7 @@ import { Drawer } from 'vaul'
 import { DRAWER_CONTENT_CLASS, DrawerDragHandle } from '@/components/ui/drawer-primitives'
 import { useState } from 'react'
 import { capitalizeDisplayName } from '@/lib/display-name'
+import { toMoneyNumber } from '@/stores/store'
 import type { OnboardingDraft } from './onboarding-types'
 
 const ease = [0.25, 0.1, 0.25, 1] as const
@@ -15,16 +16,16 @@ const previewTile =
 type TileId = 'greeting' | 'income' | 'goal' | 'businesses' | 'habits' | 'faith' | 'schedule'
 
 function estMonthlyPersonalExp(f: OnboardingDraft['finance']) {
-  const cars = (f.cars ?? []).reduce((s, c) => s + (c.payment || 0), 0)
-  const other = (f.otherExpenses ?? []).reduce((s, o) => s + (o.amount || 0), 0)
-  const debts = (f.debts ?? []).reduce((s, d) => s + (d.monthlyPayment || 0), 0)
+  const cars = (f.cars ?? []).reduce((s, c) => s + toMoneyNumber(c.payment), 0)
+  const other = (f.otherExpenses ?? []).reduce((s, o) => s + toMoneyNumber(o.amount), 0)
+  const debts = (f.debts ?? []).reduce((s, d) => s + toMoneyNumber(d.monthlyPayment), 0)
   return (
-    (f.housingFree ? 0 : f.housing) +
+    (f.housingFree ? 0 : toMoneyNumber(f.housing)) +
     cars +
-    f.carInsurance +
-    f.phone +
-    f.subscriptions +
-    f.food +
+    toMoneyNumber(f.carInsurance) +
+    toMoneyNumber(f.phone) +
+    toMoneyNumber(f.subscriptions) +
+    toMoneyNumber(f.food) +
     other +
     debts
   )
@@ -33,12 +34,12 @@ function estMonthlyPersonalExp(f: OnboardingDraft['finance']) {
 export function LiveDashboardPreview({
   draft,
   stepIndex,
-  healthScheduleSubStep = 0,
+  foundationSubStep = 0,
   pulseBusinessIndex = null,
 }: {
   draft: OnboardingDraft
   stepIndex: number
-  healthScheduleSubStep?: number
+  foundationSubStep?: number
   pulseBusinessIndex?: number | null
 }) {
   const [open, setOpen] = useState<TileId | null>(null)
@@ -46,7 +47,7 @@ export function LiveDashboardPreview({
   const nameRaw = draft.identity.name.trim()
   const name = nameRaw ? capitalizeDisplayName(nameRaw) : '—'
   const loc = draft.identity.location.trim() || '—'
-  const totalRev = draft.businesses.reduce((s, b) => s + (b.monthlyRevenue || 0), 0)
+  const totalRev = draft.businesses.reduce((s, b) => s + toMoneyNumber(b.monthlyRevenue), 0)
   const bizShown = draft.businesses.filter((b) => b.name.trim()).slice(0, 4)
 
   const incomeTarget = draft.goals.incomeTarget
@@ -56,10 +57,8 @@ export function LiveDashboardPreview({
   const showBusinesses = stepIndex >= 2
   const showFinance = stepIndex >= 4
   const showGoal = stepIndex >= 5
-  /** Habits sub-step (health step sub 2) or any step after health/schedule is done */
-  const showHabits = stepIndex > 6 || (stepIndex === 6 && healthScheduleSubStep >= 2)
-  /** Work-hours sub-step or later */
-  const showSchedule = stepIndex > 6 || (stepIndex === 6 && healthScheduleSubStep >= 1)
+  const showHabits = stepIndex > 6 || (stepIndex === 6 && foundationSubStep >= 4)
+  const showSchedule = stepIndex > 6 || (stepIndex === 6 && foundationSubStep >= 5)
   const showFaith = stepIndex >= 7
   const showFull = stepIndex >= 12
 
@@ -99,7 +98,23 @@ export function LiveDashboardPreview({
       <div className="relative flex flex-1 flex-col gap-3 p-1">
         <p className="label text-center">Live preview</p>
 
-        <div className="grid auto-rows-min grid-cols-4 gap-3">
+        {stepIndex === 0 && (
+          <div className="onboarding-shimmer-wrap space-y-3">
+            <div className="onboarding-shimmer h-16 rounded-[16px]" />
+            <div className="grid grid-cols-2 gap-3">
+              <div className="onboarding-shimmer h-24 rounded-[16px]" />
+              <div className="onboarding-shimmer h-24 rounded-[16px]" />
+            </div>
+            <div className="onboarding-shimmer h-20 rounded-[16px]" />
+            <div className="grid grid-cols-2 gap-3">
+              <div className="onboarding-shimmer h-16 rounded-[16px]" />
+              <div className="onboarding-shimmer h-16 rounded-[16px]" />
+            </div>
+            <div className="onboarding-shimmer h-14 rounded-[16px]" />
+          </div>
+        )}
+
+        <div className={`grid auto-rows-min grid-cols-4 gap-3 ${stepIndex === 0 ? 'hidden' : ''}`}>
           {(showGreeting || showFull) && (
             <motion.button
               type="button"

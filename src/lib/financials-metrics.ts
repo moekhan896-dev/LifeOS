@@ -1,5 +1,5 @@
 import type { Business, Client, DailyNetSnapshot, ExpenseEntry } from '@/stores/store'
-import { getClientNet } from '@/stores/store'
+import { getClientNet, toMoneyNumber } from '@/stores/store'
 
 /** Parse rough monthly $ from free-text compensation (best-effort). */
 export function parseMonthlyDollars(text: string): number {
@@ -31,11 +31,11 @@ export function parseToolsMonthly(tools: string | undefined): number {
 }
 
 export function grossRevenue(businesses: Business[]): number {
-  return businesses.reduce((s, b) => s + (b.monthlyRevenue || 0), 0)
+  return businesses.reduce((s, b) => s + toMoneyNumber(b.monthlyRevenue), 0)
 }
 
 export function totalAdSpend(clients: Client[]): number {
-  return clients.filter((c) => c.active).reduce((s, c) => s + c.adSpend, 0)
+  return clients.filter((c) => c.active).reduce((s, c) => s + toMoneyNumber(c.adSpend), 0)
 }
 
 export function businessCosts(businesses: Business[], clients: Client[]): number {
@@ -51,7 +51,9 @@ export function netRevenue(gross: number, costs: number, fees: number): number {
 }
 
 export function personalExpensesRecurring(expenseEntries: ExpenseEntry[]): number {
-  return expenseEntries.filter((e) => e.recurring).reduce((s, e) => s + e.amount, 0)
+  return expenseEntries
+    .filter((e) => e.recurring)
+    .reduce((s, e) => s + toMoneyNumber(e.amount), 0)
 }
 
 export function takeHome(netRev: number, personal: number): number {

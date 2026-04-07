@@ -31,9 +31,12 @@ interface OnboardingWizardState {
   /** Which business card is being edited (step 2) */
   businessEditIndex: number
   setBusinessEditIndex: (n: number) => void
-  /** Step 6: 0 = wake times, 1 = work hours, 2 = optional health + schedule */
-  healthScheduleSubStep: number
-  setHealthScheduleSubStep: (n: number) => void
+  /** Step 6: 0 wake, 1 exercise+diet, 2 caffeine+smoke, 3 sliders, 4 habits+quit, 5 work schedule */
+  foundationSubStep: number
+  setFoundationSubStep: (n: number) => void
+  /** Step 8 struggles: 0–2 */
+  strugglesSubStep: number
+  setStrugglesSubStep: (n: number) => void
   /** Inline validation keys (empty = none) */
   validationErrors: string[]
   setValidationErrors: (keys: string[]) => void
@@ -56,8 +59,10 @@ export const useOnboardingStore = create<OnboardingWizardState>()(
       setIdentitySubStep: (n) => set({ identitySubStep: Math.max(0, Math.min(3, n)) }),
       businessEditIndex: 0,
       setBusinessEditIndex: (n) => set({ businessEditIndex: Math.max(0, n) }),
-      healthScheduleSubStep: 0,
-      setHealthScheduleSubStep: (n) => set({ healthScheduleSubStep: Math.max(0, Math.min(2, n)) }),
+      foundationSubStep: 0,
+      setFoundationSubStep: (n) => set({ foundationSubStep: Math.max(0, Math.min(5, n)) }),
+      strugglesSubStep: 0,
+      setStrugglesSubStep: (n) => set({ strugglesSubStep: Math.max(0, Math.min(2, n)) }),
       validationErrors: [],
       setValidationErrors: (keys) => set({ validationErrors: keys }),
       clearValidationErrors: () => set({ validationErrors: [] }),
@@ -69,13 +74,22 @@ export const useOnboardingStore = create<OnboardingWizardState>()(
         set({
           step: next,
           ...(step === 1 && next !== 1 ? { identitySubStep: 0 } : {}),
-          ...(next !== 6 ? { healthScheduleSubStep: 0 } : {}),
+          ...(next !== 6 ? { foundationSubStep: 0 } : {}),
+          ...(next !== 8 ? { strugglesSubStep: 0 } : {}),
         })
       },
       prevStep: () => {
-        const { step, identitySubStep } = get()
+        const { step, identitySubStep, foundationSubStep, strugglesSubStep } = get()
         if (step === 1 && identitySubStep > 0) {
           set({ identitySubStep: identitySubStep - 1 })
+          return
+        }
+        if (step === 6 && foundationSubStep > 0) {
+          set({ foundationSubStep: foundationSubStep - 1 })
+          return
+        }
+        if (step === 8 && strugglesSubStep > 0) {
+          set({ strugglesSubStep: strugglesSubStep - 1 })
           return
         }
         set({ step: Math.max(0, step - 1) })
@@ -91,7 +105,8 @@ export const useOnboardingStore = create<OnboardingWizardState>()(
           step: 0,
           identitySubStep: 0,
           businessEditIndex: 0,
-          healthScheduleSubStep: 0,
+          foundationSubStep: 0,
+          strugglesSubStep: 0,
           validationErrors: [],
           draft: createInitialDraft(),
         }),
@@ -102,7 +117,13 @@ export const useOnboardingStore = create<OnboardingWizardState>()(
         const p = persisted as Partial<OnboardingWizardState> | undefined
         const base = { ...current, ...p } as OnboardingWizardState
         if (typeof base.businessEditIndex !== 'number') base.businessEditIndex = 0
-        if (typeof base.healthScheduleSubStep !== 'number') base.healthScheduleSubStep = 0
+        if (typeof base.foundationSubStep !== 'number') {
+          const legacy = (base as { healthScheduleSubStep?: number }).healthScheduleSubStep
+          if (legacy === 1) base.foundationSubStep = 5
+          else if (legacy === 2) base.foundationSubStep = 4
+          else base.foundationSubStep = 0
+        }
+        if (typeof base.strugglesSubStep !== 'number') base.strugglesSubStep = 0
         if (!Array.isArray(base.validationErrors)) base.validationErrors = []
         const fd = base.draft as { faith?: { level?: string } }
         if (fd.faith && (fd.faith.level === undefined || fd.faith.level === null)) {
@@ -110,7 +131,17 @@ export const useOnboardingStore = create<OnboardingWizardState>()(
         }
         return base
       },
-      onRehydrateStorage: () => (state) => {
+      onRehydrateStorage: () => (state, error) => {
+        if (error) {
+          console.error('Onboarding draft hydration failed:', error)
+          try {
+            localStorage.removeItem('art-os-onboarding-draft')
+          } catch {
+            /* ignore */
+          }
+          if (typeof window !== 'undefined') window.location.reload()
+          return
+        }
         if (!state?.draft) return
         const d = state.draft as unknown as Record<string, unknown>
         if (!d.schedule) {

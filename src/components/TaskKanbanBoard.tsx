@@ -13,7 +13,7 @@ import {
   type DragEndEvent,
   type DragStartEvent,
 } from '@dnd-kit/core'
-import type { Task } from '@/stores/store'
+import type { Business, Task } from '@/stores/store'
 import { taskKanbanColumn, type KanbanColumnId } from '@/lib/task-kanban'
 
 const COL_IDS: Record<KanbanColumnId, string> = {
@@ -22,31 +22,35 @@ const COL_IDS: Record<KanbanColumnId, string> = {
   done: 'col-done',
 }
 
-const PRIORITY_DOT: Record<Task['priority'], string> = {
-  crit: 'bg-[var(--negative)]',
-  high: 'bg-[var(--warning)]',
-  med: 'bg-[var(--accent)]',
-  low: 'bg-[var(--text-tertiary)]',
+const PRIORITY_PILL: Record<Task['priority'], string> = {
+  crit: 'bg-[rgba(255,69,58,0.15)] text-[var(--negative)]',
+  high: 'bg-[rgba(255,159,10,0.15)] text-[var(--warning)]',
+  med: 'bg-[var(--accent-bg)] text-[var(--accent)]',
+  low: 'bg-[var(--bg-secondary)] text-[var(--text-tertiary)]',
 }
 
 function DroppableColumn({
   id,
   title,
+  count,
   children,
 }: {
   id: string
   title: string
+  count: number
   children: React.ReactNode
 }) {
   const { setNodeRef, isOver } = useDroppable({ id })
   return (
     <div
       ref={setNodeRef}
-      className={`flex min-h-[280px] flex-1 flex-col rounded-2xl border border-[var(--border)] bg-[var(--bg-secondary)]/40 p-3 ${
+      className={`flex min-h-[280px] flex-1 flex-col rounded-2xl border border-[var(--border)] bg-[var(--bg-elevated)] p-3 ${
         isOver ? 'ring-2 ring-[var(--accent)]/60' : ''
       }`}
     >
-      <h3 className="mb-3 text-[13px] font-semibold uppercase tracking-wide text-[var(--text-tertiary)]">{title}</h3>
+      <h3 className="mb-3 text-[13px] font-semibold uppercase tracking-wide text-[var(--text-tertiary)]">
+        {title} <span className="text-[var(--text-secondary)]">({count})</span>
+      </h3>
       <div className="flex flex-1 flex-col gap-2">{children}</div>
     </div>
   )
@@ -54,9 +58,11 @@ function DroppableColumn({
 
 function DraggableCard({
   task,
+  businesses,
   onCardClick,
 }: {
   task: Task
+  businesses: Business[]
   onCardClick: (t: Task) => void
 }) {
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({ id: task.id })
@@ -69,6 +75,8 @@ function DraggableCard({
           task.dollarValue
         )
       : '—'
+
+  const biz = businesses.find((b) => b.id === task.businessId)
 
   return (
     <div
@@ -92,17 +100,25 @@ function DraggableCard({
         onClick={() => onCardClick(task)}
         className="min-w-0 flex-1 p-3 pl-0 text-left"
       >
-        <div className="flex items-start gap-2">
-          <span className={`mt-1.5 h-2 w-2 shrink-0 rounded-full ${PRIORITY_DOT[task.priority]}`} />
-          <div className="min-w-0 flex-1">
-            <p
-              className={`line-clamp-3 text-[14px] font-medium leading-snug text-[var(--text-primary)] ${
-                task.done ? 'opacity-50 line-through' : ''
-              }`}
-            >
-              {task.text}
-            </p>
-            <p className="mt-2 text-[12px] text-[var(--text-secondary)]">{dollars}</p>
+        <div className="min-w-0 flex-1">
+          <p
+            className={`line-clamp-3 text-[14px] font-medium leading-snug text-[var(--text-primary)] ${
+              task.done ? 'opacity-50 line-through' : ''
+            }`}
+          >
+            {task.text}
+          </p>
+          <div className="mt-2 flex flex-wrap items-center gap-2">
+            <span className={`caption rounded-md px-2 py-0.5 capitalize ${PRIORITY_PILL[task.priority]}`}>
+              {task.priority}
+            </span>
+            {biz && (
+              <span className="caption flex items-center gap-1.5 text-[var(--text-secondary)]">
+                <span className="h-1.5 w-1.5 shrink-0 rounded-full" style={{ backgroundColor: biz.color }} />
+                {biz.name}
+              </span>
+            )}
+            <span className="caption text-[var(--text-secondary)]">{dollars}</span>
           </div>
         </div>
       </button>
@@ -112,11 +128,12 @@ function DraggableCard({
 
 export interface TaskKanbanBoardProps {
   tasks: Task[]
+  businesses: Business[]
   onColumnChange: (taskId: string, column: KanbanColumnId) => void
   onTaskClick: (task: Task) => void
 }
 
-export default function TaskKanbanBoard({ tasks, onColumnChange, onTaskClick }: TaskKanbanBoardProps) {
+export default function TaskKanbanBoard({ tasks, businesses, onColumnChange, onTaskClick }: TaskKanbanBoardProps) {
   const [activeId, setActiveId] = useState<string | null>(null)
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -169,19 +186,19 @@ export default function TaskKanbanBoard({ tasks, onColumnChange, onTaskClick }: 
       onDragEnd={handleDragEnd}
     >
       <div className="flex flex-col gap-4 lg:flex-row">
-        <DroppableColumn id={COL_IDS.todo} title="To do">
+        <DroppableColumn id={COL_IDS.todo} title="To Do" count={grouped.todo.length}>
           {grouped.todo.map((t) => (
-            <DraggableCard key={t.id} task={t} onCardClick={onTaskClick} />
+            <DraggableCard key={t.id} task={t} businesses={businesses} onCardClick={onTaskClick} />
           ))}
         </DroppableColumn>
-        <DroppableColumn id={COL_IDS.in_progress} title="In progress">
+        <DroppableColumn id={COL_IDS.in_progress} title="In Progress" count={grouped.progress.length}>
           {grouped.progress.map((t) => (
-            <DraggableCard key={t.id} task={t} onCardClick={onTaskClick} />
+            <DraggableCard key={t.id} task={t} businesses={businesses} onCardClick={onTaskClick} />
           ))}
         </DroppableColumn>
-        <DroppableColumn id={COL_IDS.done} title="Done">
+        <DroppableColumn id={COL_IDS.done} title="Done" count={grouped.done.length}>
           {grouped.done.map((t) => (
-            <DraggableCard key={t.id} task={t} onCardClick={onTaskClick} />
+            <DraggableCard key={t.id} task={t} businesses={businesses} onCardClick={onTaskClick} />
           ))}
         </DroppableColumn>
       </div>

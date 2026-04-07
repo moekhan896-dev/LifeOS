@@ -11,6 +11,13 @@ import {
 } from '@/lib/dashboard-layout'
 import { buildProactiveCandidates } from '@/lib/proactive-engine'
 
+/** Coerce persisted/onboarding values to finite numbers so `+` never string-concatenates. */
+export function toMoneyNumber(v: unknown): number {
+  if (typeof v === 'number' && Number.isFinite(v)) return v
+  const n = Number(v)
+  return Number.isFinite(n) ? n : 0
+}
+
 // ── Types ──
 export type Priority = 'crit' | 'high' | 'med' | 'low'
 export type InsightType = 'revenue' | 'risk' | 'efficiency'
@@ -769,7 +776,9 @@ const INITIAL_NOTIFICATIONS = {
 }
 
 export function getClientNet(c: Client) {
-  return c.grossMonthly - c.adSpend - c.grossMonthly * 0.03
+  const gross = toMoneyNumber(c.grossMonthly)
+  const ad = toMoneyNumber(c.adSpend)
+  return gross - ad - gross * 0.03
 }
 
 /** Aligns with Financial Command: client net when present, else business MRR. */
@@ -781,14 +790,20 @@ export function computeMonthlyMoneySnapshot(s: {
   const businesses = s.businesses.filter((b) => !isArchived(b))
   const clients = s.clients.filter((c) => !isArchived(c))
   const incomeStreams = businesses
-    .filter((b) => b.monthlyRevenue > 0 || clients.some((c) => c.businessId === b.id && c.active))
+    .filter(
+      (b) =>
+        toMoneyNumber(b.monthlyRevenue) > 0 || clients.some((c) => c.businessId === b.id && c.active)
+    )
     .map((b) => {
       const bizClients = clients.filter((c) => c.businessId === b.id && c.active)
       const clientNet = bizClients.reduce((acc, c) => acc + getClientNet(c), 0)
-      return clientNet > 0 ? clientNet : b.monthlyRevenue
+      const mrr = toMoneyNumber(b.monthlyRevenue)
+      return clientNet > 0 ? clientNet : mrr
     })
-  const totalIncome = incomeStreams.reduce((a, n) => a + n, 0)
-  const recurringCosts = s.expenseEntries.filter((e) => e.recurring).reduce((a, e) => a + e.amount, 0)
+  const totalIncome = incomeStreams.reduce((a, n) => a + toMoneyNumber(n), 0)
+  const recurringCosts = s.expenseEntries
+    .filter((e) => e.recurring)
+    .reduce((a, e) => a + toMoneyNumber(e.amount), 0)
   return { totalIncome, recurringCosts, net: totalIncome - recurringCosts }
 }
 
@@ -1488,7 +1503,10 @@ export const useStore = create<AppState>()(
       expenseEntries: [],
       addRevenue: (r) =>
         set((s) => ({ revenueEntries: [...s.revenueEntries, { ...r, id: uid(), archivedAt: null }] })),
-      addExpense: (e) => set((s) => ({ expenseEntries: [...s.expenseEntries, { ...e, id: uid() }] })),
+      addExpense: (e) =>
+        set((s) => ({
+          expenseEntries: [...s.expenseEntries, { ...e, amount: toMoneyNumber(e.amount), id: uid() }],
+        })),
       deleteRevenue: (id) => set((s) => ({ revenueEntries: s.revenueEntries.filter((r) => r.id !== id) })),
       deleteExpense: (id) => set((s) => ({ expenseEntries: s.expenseEntries.filter((e) => e.id !== id) })),
 
@@ -1852,7 +1870,24 @@ export const useStore = create<AppState>()(
         base.notificationPrefs = { ...INITIAL_NOTIFICATIONS, ...base.notificationPrefs }
         if (!Array.isArray(base.customHabits)) base.customHabits = []
         if (!Array.isArray(base.projectAbandonLog)) base.projectAbandonLog = []
+        if (Array.isArray(base.expenseEntries)) {
+          base.expenseEntries = base.expenseEntries.map((e) => ({
+            ...e,
+            amount: toMoneyNumber(e.amount),
+          }))
+        }
         return base
+      },
+      onRehydrateStorage: () => (state, error) => {
+        if (error) {
+          console.error('Store hydration failed:', error)
+          try {
+            localStorage.removeItem('art-os-store')
+          } catch {
+            /* ignore */
+          }
+          if (typeof window !== 'undefined') window.location.reload()
+        }
       },
     }
   )
@@ -1861,8 +1896,8 @@ export const useStore = create<AppState>()(
 // ── Computed helpers (call with store state) ──
 export function getAgencyTotals(clients: Client[]) {
   const active = clients.filter((c) => c.active && !isArchived(c))
-  const gross = active.reduce((s, c) => s + c.grossMonthly, 0)
-  const adSpend = active.reduce((s, c) => s + c.adSpend, 0)
+  const gross = active.reduce((s, c) => s + toMoneyNumber(c.grossMonthly), 0)
+  const adSpend = active.reduce((s, c) => s + toMoneyNumber(c.adSpend), 0)
   const net = active.reduce((s, c) => s + getClientNet(c), 0)
   return { gross, adSpend, net, count: active.length }
 }

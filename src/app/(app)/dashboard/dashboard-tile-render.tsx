@@ -96,11 +96,6 @@ export function renderDashboardTile(tileId: string, x: DashboardTileRenderCtx): 
   const addEnergyLog = x.addEnergyLog as (l: { date: string; timeOfDay: string; level: number }) => void
   const energyLogs = x.energyLogs as { date: string; timeOfDay: string; level: number }[]
   const togglePrayer = x.togglePrayer as (p: 'fajr' | 'dhuhr' | 'asr' | 'maghrib' | 'isha') => void
-  const lifeY = x.lifeY as number
-  const lifeD = x.lifeD as number
-  const lifeH = x.lifeH as number
-  const lifeM = x.lifeM as number
-  const lifeS = x.lifeS as number
   const lifeRemainingSec = x.lifeRemainingSec as number
   const lifeModel = x.lifeModel as {
     baselineYearsRemaining: number
@@ -187,10 +182,14 @@ export function renderDashboardTile(tileId: string, x: DashboardTileRenderCtx): 
   switch (tileId) {
 
     case 'morning_brief': {
+      /** PRD §9.21 — only before noon; after noon hide unless customizing layout */
       if (!isMorningBriefWindow && !editMode) {
+        return null
+      }
+      if (!isMorningBriefWindow && editMode) {
         return (
           <div className="w-full rounded-2xl border border-[var(--border)] border-dashed bg-[var(--bg-secondary)]/40 p-6 text-center text-[14px] text-[var(--text-secondary)]">
-            Morning briefing appears before 2 PM. Use Customize to reorder this tile.
+            Morning briefing only appears before noon (your local time). Reorder or resize while in Customize.
           </div>
         )
       }
@@ -815,7 +814,17 @@ export function renderDashboardTile(tileId: string, x: DashboardTileRenderCtx): 
   </Drawer.Portal>
 </Drawer.Root>
       )
-    case 'life_horizon':
+    case 'life_horizon': {
+      const totalSec = Math.max(0, Math.floor(lifeRemainingSec))
+      const years = Math.floor(totalSec / 31536000)
+      const months = Math.floor((totalSec % 31536000) / 2592000)
+      const days = Math.floor((totalSec % 2592000) / 86400)
+      const lifeHuman =
+        years > 0
+          ? `~${years} year${years === 1 ? '' : 's'}${months > 0 ? `, ${months} mo` : ''}`
+          : months > 0
+            ? `~${months} month${months === 1 ? '' : 's'}`
+            : `~${days} day${days === 1 ? '' : 's'}`
       return (
 <Drawer.Root>
   <Drawer.Trigger asChild>
@@ -827,13 +836,10 @@ export function renderDashboardTile(tileId: string, x: DashboardTileRenderCtx): 
         <span className="text-[13px] font-semibold text-[var(--text-secondary)]">Life horizon</span>
         <p className="text-[10px] text-[var(--text-mid)]">Est. remaining — tap for adjustment breakdown</p>
       </div>
-      <div className="flex flex-wrap items-baseline gap-4 sm:justify-end">
+      <div className="flex flex-wrap items-baseline gap-2 sm:justify-end">
         <div className="data text-[22px] font-bold leading-tight text-[var(--text-primary)]">
-          {lifeY}y {lifeD}d {lifeH}h {lifeM}m {lifeS}s
+          {lifeHuman}
         </div>
-        <p className="font-mono text-[12px] text-[var(--text-dim)]">
-          {Math.floor(lifeRemainingSec).toLocaleString()}s total
-        </p>
       </div>
     </motion.div>
   </Drawer.Trigger>
@@ -888,6 +894,7 @@ export function renderDashboardTile(tileId: string, x: DashboardTileRenderCtx): 
   </Drawer.Portal>
 </Drawer.Root>
       )
+    }
     case 'schedule':
       return (
 <Drawer.Root>

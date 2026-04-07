@@ -3,7 +3,7 @@
 import { motion, AnimatePresence } from 'framer-motion'
 import type { DraggableAttributes } from '@dnd-kit/core'
 import type { DashboardTileConfig } from '@/lib/dashboard-layout'
-import { cycleSpan, spanToClass } from '@/lib/dashboard-layout'
+import { cycleSpan } from '@/lib/dashboard-layout'
 
 interface DashboardTileChromeProps {
   entry: DashboardTileConfig
@@ -26,10 +26,15 @@ export default function DashboardTileChrome({
   dragListeners,
   children,
 }: DashboardTileChromeProps) {
-  const spanClass = spanToClass(entry.gridColumn)
+  const minH =
+    entry.gridColumn === 3
+      ? 'min-h-[120px]'
+      : entry.gridColumn === 4
+        ? 'min-h-[180px]'
+        : 'min-h-[120px]'
 
   return (
-    <div className={`relative ${spanClass}`}>
+    <div className="relative h-full min-w-0">
       <AnimatePresence>
         {editMode && (
           <motion.div
@@ -79,7 +84,7 @@ export default function DashboardTileChrome({
         initial={false}
         animate={{ scale: editMode ? 0.99 : 1 }}
         transition={{ duration: 0.2 }}
-        className={editMode ? 'pt-7' : ''}
+        className={`${minH} ${editMode ? 'pt-7' : ''}`}
       >
         {children}
       </motion.div>

@@ -20,8 +20,8 @@ import {
   inputCls,
   glassPanel,
   btnPrimary,
-  aiBubbleCls,
 } from './onboarding-constants'
+import { AiBubble } from './AiBubble'
 
 const variants = {
   enter: { opacity: 0, y: 8 },
@@ -63,10 +63,6 @@ function Chip({
   )
 }
 
-function AiBubble({ children }: { children: React.ReactNode }) {
-  return <div className={aiBubbleCls}>{children}</div>
-}
-
 function fieldErrClass(show: boolean) {
   return show ? ' border-[var(--negative)]' : ''
 }
@@ -76,13 +72,15 @@ export function OnboardingStepBody({
   draft,
   patchDraft,
   identitySubStep = 0,
-  healthScheduleSubStep = 0,
+  foundationSubStep = 0,
+  strugglesSubStep = 0,
 }: {
   step: number
   draft: OnboardingDraft
   patchDraft: (fn: (d: OnboardingDraft) => OnboardingDraft) => void
   identitySubStep?: number
-  healthScheduleSubStep?: number
+  foundationSubStep?: number
+  strugglesSubStep?: number
 }) {
   const validationErrors = useOnboardingStore((s) => s.validationErrors)
   const bizEdit = useOnboardingStore((s) => s.businessEditIndex)
@@ -115,7 +113,7 @@ export function OnboardingStepBody({
           Ready?
         </AiBubble>
         <p className="body max-w-md text-[var(--text-secondary)]">
-          Everything you share is stored locally on this device until you connect cloud sync.
+          Everything is stored locally and never shared.
         </p>
       </motion.div>
     )
@@ -1302,10 +1300,10 @@ export function OnboardingStepBody({
       focusDuration: '',
       commitments: [] as import('./onboarding-types').OnboardingScheduleCommitmentDraft[],
     }
-    const hs = healthScheduleSubStep
+    const fs = foundationSubStep
     return (
       <motion.div key="s6" variants={variants} initial="enter" animate="center" exit="exit" transition={transition} className="space-y-4">
-        {hs === 0 && (
+        {fs === 0 && (
           <>
             <AiBubble>Your body and mind run the business. First, when do you actually wake?</AiBubble>
             <div className={glassPanel + ' space-y-3'}>
@@ -1343,7 +1341,7 @@ export function OnboardingStepBody({
           </>
         )}
 
-        {hs === 1 && (
+        {fs === 5 && (
           <>
             <AiBubble>When are you generally available for deep work?</AiBubble>
             <div className={glassPanel + ' space-y-3'}>
@@ -1511,9 +1509,9 @@ export function OnboardingStepBody({
           </>
         )}
 
-        {hs === 2 && (
+        {fs === 1 && (
           <>
-            <AiBubble>Let&apos;s baseline health habits we&apos;ll track.</AiBubble>
+            <AiBubble>Let&apos;s baseline movement and fuel.</AiBubble>
             <div className={glassPanel + ' space-y-3'}>
           <div>
             <label className={labelCls}>Exercise</label>
@@ -1528,6 +1526,9 @@ export function OnboardingStepBody({
                 </Chip>
               ))}
             </div>
+            {fe('health.exercise') && (
+              <p className="mt-1 text-[13px] text-[var(--negative)]">Pick one option</p>
+            )}
             {h.exercise && h.exercise !== 'Never' && (
               <input
                 className={inputCls + ' mt-2'}
@@ -1568,10 +1569,21 @@ export function OnboardingStepBody({
                 </Chip>
               ))}
             </div>
+            {fe('health.dietQuality') && (
+              <p className="mt-1 text-[13px] text-[var(--negative)]">Pick one option</p>
+            )}
           </div>
+            </div>
+          </>
+        )}
+
+        {fs === 2 && (
+          <>
+            <AiBubble>Caffeine and smoking — honesty here improves your energy model.</AiBubble>
+            <div className={glassPanel + ' space-y-3'}>
           <div>
             <label className={labelCls}>Caffeine</label>
-            <div className="flex flex-wrap gap-2">
+            <div className={`flex flex-wrap gap-2 ${fe('health.caffeine') ? 'rounded-[14px] border border-[var(--negative)] p-2' : ''}`}>
               {['None', 'Coffee', 'Energy drinks', 'Tea', 'Multiple'].map((x) => (
                 <Chip
                   key={x}
@@ -1582,6 +1594,9 @@ export function OnboardingStepBody({
                 </Chip>
               ))}
             </div>
+            {fe('health.caffeine') && (
+              <p className="mt-1 text-[13px] text-[var(--negative)]">Pick one option</p>
+            )}
             <input
               className={inputCls + ' mt-2'}
               placeholder="Amount / day"
@@ -1593,7 +1608,7 @@ export function OnboardingStepBody({
           </div>
           <div>
             <label className={labelCls}>Smoking / vaping</label>
-            <div className="flex flex-wrap gap-2">
+            <div className={`flex flex-wrap gap-2 ${fe('health.smoking') ? 'rounded-[14px] border border-[var(--negative)] p-2' : ''}`}>
               {['No', 'Cigarettes', 'Vape', 'Other', 'Trying to quit'].map((x) => (
                 <Chip
                   key={x}
@@ -1604,7 +1619,18 @@ export function OnboardingStepBody({
                 </Chip>
               ))}
             </div>
+            {fe('health.smoking') && (
+              <p className="mt-1 text-[13px] text-[var(--negative)]">Pick one option</p>
+            )}
           </div>
+            </div>
+          </>
+        )}
+
+        {fs === 3 && (
+          <>
+            <AiBubble>Energy, stress, and screen time — sliders update your dashboard model.</AiBubble>
+            <div className={glassPanel + ' space-y-3'}>
           <div>
             <label className={labelCls}>Non-productive phone time (hrs/day): {h.screenTimeHours}</label>
             <input
@@ -1645,6 +1671,14 @@ export function OnboardingStepBody({
               className="w-full accent-[var(--negative)]"
             />
           </div>
+            </div>
+          </>
+        )}
+
+        {fs === 4 && (
+          <>
+            <AiBubble>Habits you want to build — and what you&apos;re trying to leave behind.</AiBubble>
+            <div className={glassPanel + ' space-y-3'}>
           <div>
             <label className={labelCls}>Habits to build</label>
             <div className="flex flex-wrap gap-2">
@@ -1757,7 +1791,7 @@ export function OnboardingStepBody({
               </div>
               {fa.tradition === 'Islam' && (
                 <div>
-                  <label className={labelCls}>Track five daily prayers?</label>
+                  <label className={labelCls}>Do you want to track daily prayers?</label>
                   <div className="flex flex-wrap gap-2">
                     {[
                       ['build', 'Build consistency'],
@@ -1780,17 +1814,45 @@ export function OnboardingStepBody({
                   </div>
                 </div>
               )}
-              <div>
-                <label className={labelCls}>Consistency (self-assessment)</label>
-                <input
-                  className={inputCls}
-                  value={fa.prayerConsistency}
-                  onChange={(e) =>
-                    patchDraft((d) => ({ ...d, faith: { ...d.faith, prayerConsistency: e.target.value } }))
-                  }
-                  placeholder="How it looks today"
-                />
-              </div>
+              {fa.tradition === 'Islam' && (fa.islamPrayerTracking === 'build' || fa.islamPrayerTracking === 'consistent') && (
+                <div>
+                  <label className={labelCls}>Current consistency?</label>
+                  <div className={`flex flex-wrap gap-2 ${fe('faith.prayerConsistency') ? 'rounded-[14px] border border-[var(--negative)] p-2' : ''}`}>
+                    {['All 5 daily', '3-4 prayers', '1-2 prayers', 'Rarely', 'Want to start'].map((lab) => (
+                      <Chip
+                        key={lab}
+                        selected={fa.prayerConsistency === lab}
+                        onClick={() =>
+                          patchDraft((d) => ({
+                            ...d,
+                            faith: { ...d.faith, prayerConsistency: lab },
+                          }))
+                        }
+                      >
+                        {lab}
+                      </Chip>
+                    ))}
+                  </div>
+                  {fe('faith.prayerConsistency') && (
+                    <p className="mt-1 text-[13px] text-[var(--negative)]">Pick one option</p>
+                  )}
+                </div>
+              )}
+              {(fa.level === 'central' || fa.level === 'sometimes' || fa.level === 'spiritual') &&
+                fa.tradition &&
+                fa.tradition !== 'Islam' && (
+                  <div>
+                    <label className={labelCls}>Consistency (self-assessment)</label>
+                    <input
+                      className={inputCls}
+                      value={fa.prayerConsistency}
+                      onChange={(e) =>
+                        patchDraft((d) => ({ ...d, faith: { ...d.faith, prayerConsistency: e.target.value } }))
+                      }
+                      placeholder="How it looks today"
+                    />
+                  </div>
+                )}
               <div>
                 <label className={labelCls}>Someone who models the consistency you want (optional)</label>
                 <input
@@ -1833,119 +1895,146 @@ export function OnboardingStepBody({
 
   if (step === 8) {
     const s = draft.struggles
+    const ss = strugglesSubStep
     return (
       <motion.div key="s8" variants={variants} initial="enter" animate="center" exit="exit" transition={transition} className="space-y-4">
         <AiBubble>Real talk — what actually holds you back? This stays private and sharpens coaching.</AiBubble>
         <div className={glassPanel + ' space-y-3'}>
-          <div>
-            <label className={labelCls}>#1 thing you procrastinate on</label>
-            <textarea
-              className={inputCls + ' min-h-[72px] resize-none'}
-              value={s.procrastinationPattern}
-              onChange={(e) =>
-                patchDraft((d) => ({
-                  ...d,
-                  struggles: { ...d.struggles, procrastinationPattern: e.target.value },
-                }))
-              }
-            />
-          </div>
-          <div>
-            <label className={labelCls}>Patterns you wish you could change</label>
-            <textarea
-              className={inputCls + ' min-h-[72px] resize-none'}
-              value={s.behaviorPatterns}
-              onChange={(e) =>
-                patchDraft((d) => ({
-                  ...d,
-                  struggles: { ...d.struggles, behaviorPatterns: e.target.value },
-                }))
-              }
-            />
-          </div>
-          <div>
-            <label className={labelCls}>Biggest distraction</label>
-            <div className="flex flex-wrap gap-2">
-              {DISTRACTION_OPTIONS.map((x) => (
-                <Chip
-                  key={x}
-                  selected={s.biggestDistraction === x}
-                  onClick={() =>
+          {ss === 0 && (
+            <>
+              <div>
+                <label className={labelCls}>Procrastination pattern</label>
+                <textarea
+                  className={inputCls + ' min-h-[72px] resize-none' + fieldErrClass(fe('struggles.procrastination'))}
+                  value={s.procrastinationPattern}
+                  onChange={(e) =>
                     patchDraft((d) => ({
                       ...d,
-                      struggles: { ...d.struggles, biggestDistraction: x },
+                      struggles: { ...d.struggles, procrastinationPattern: e.target.value },
                     }))
                   }
-                >
-                  {x}
-                </Chip>
-              ))}
-            </div>
-            {s.biggestDistraction === 'Other' && (
-              <input
-                className={inputCls + ' mt-2'}
-                placeholder="Describe"
-                onChange={(e) =>
-                  patchDraft((d) => ({
-                    ...d,
-                    struggles: { ...d.struggles, biggestDistraction: `Other: ${e.target.value}` },
-                  }))
-                }
-              />
-            )}
-          </div>
-          <div>
-            <label className={labelCls}>Trying to quit or reduce (optional)</label>
-            <textarea
-              className={inputCls + ' min-h-[60px] resize-none'}
-              value={s.tryingToQuitDetail}
-              onChange={(e) =>
-                patchDraft((d) => ({
-                  ...d,
-                  struggles: { ...d.struggles, tryingToQuitDetail: e.target.value },
-                }))
-              }
-            />
-            <label className="mt-1 flex items-center gap-2 text-xs text-white/45">
-              <input
-                type="checkbox"
-                checked={s.tryingToQuitPrivate}
-                onChange={(e) =>
-                  patchDraft((d) => ({
-                    ...d,
-                    struggles: { ...d.struggles, tryingToQuitPrivate: e.target.checked },
-                  }))
-                }
-              />
-              Private — AI only
-            </label>
-          </div>
-          <div>
-            <label className={labelCls}>Last time you felt truly locked in</label>
-            <textarea
-              className={inputCls + ' min-h-[80px] resize-none'}
-              value={s.lastLockedIn}
-              onChange={(e) =>
-                patchDraft((d) => ({
-                  ...d,
-                  struggles: { ...d.struggles, lastLockedIn: e.target.value },
-                }))
-              }
-            />
-          </div>
-          <div>
-            <label className={labelCls}>What would need to be true to feel in control?</label>
-            <textarea
-              className={inputCls + ' min-h-[80px] resize-none'}
-              value={s.whatNeedsToBeTrue}
-              onChange={(e) =>
-                patchDraft((d) => ({
-                  ...d,
-                  struggles: { ...d.struggles, whatNeedsToBeTrue: e.target.value },
-                }))
-              }
-            />
-          </div>
+                />
+                {fe('struggles.procrastination') && (
+                  <p className="mt-1 text-[13px] text-[var(--negative)]">This field is required</p>
+                )}
+              </div>
+              <div>
+                <label className={labelCls}>Patterns you wish you could change</label>
+                <textarea
+                  className={inputCls + ' min-h-[72px] resize-none' + fieldErrClass(fe('struggles.patterns'))}
+                  value={s.behaviorPatterns}
+                  onChange={(e) =>
+                    patchDraft((d) => ({
+                      ...d,
+                      struggles: { ...d.struggles, behaviorPatterns: e.target.value },
+                    }))
+                  }
+                />
+                {fe('struggles.patterns') && (
+                  <p className="mt-1 text-[13px] text-[var(--negative)]">This field is required</p>
+                )}
+              </div>
+            </>
+          )}
+          {ss === 1 && (
+            <>
+              <div>
+                <label className={labelCls}>Biggest distraction</label>
+                <div className={`flex flex-wrap gap-2 ${fe('struggles.distraction') ? 'rounded-[14px] border border-[var(--negative)] p-2' : ''}`}>
+                  {DISTRACTION_OPTIONS.map((x) => (
+                    <Chip
+                      key={x}
+                      selected={
+                        s.biggestDistraction === x ||
+                        (x === 'Other' && (s.biggestDistraction === 'Other' || s.biggestDistraction.startsWith('Other:')))
+                      }
+                      onClick={() =>
+                        patchDraft((d) => ({
+                          ...d,
+                          struggles: { ...d.struggles, biggestDistraction: x },
+                        }))
+                      }
+                    >
+                      {x}
+                    </Chip>
+                  ))}
+                </div>
+                {(s.biggestDistraction === 'Other' ||
+                  (s.biggestDistraction.length > 0 && s.biggestDistraction.startsWith('Other:'))) && (
+                  <input
+                    className={inputCls + ' mt-2'}
+                    placeholder="Describe"
+                    value={s.biggestDistraction.startsWith('Other:') ? s.biggestDistraction.slice(7).trim() : ''}
+                    onChange={(e) =>
+                      patchDraft((d) => ({
+                        ...d,
+                        struggles: { ...d.struggles, biggestDistraction: `Other: ${e.target.value}` },
+                      }))
+                    }
+                  />
+                )}
+                {fe('struggles.distraction') && (
+                  <p className="mt-1 text-[13px] text-[var(--negative)]">Pick one option</p>
+                )}
+              </div>
+              <div>
+                <label className={labelCls}>Trying to quit — impact on your life</label>
+                <textarea
+                  className={inputCls + ' min-h-[72px] resize-none'}
+                  value={s.tryingToQuitDetail}
+                  onChange={(e) =>
+                    patchDraft((d) => ({
+                      ...d,
+                      struggles: { ...d.struggles, tryingToQuitDetail: e.target.value },
+                    }))
+                  }
+                />
+                <label className="mt-1 flex items-center gap-2 text-xs text-white/45">
+                  <input
+                    type="checkbox"
+                    checked={s.tryingToQuitPrivate}
+                    onChange={(e) =>
+                      patchDraft((d) => ({
+                        ...d,
+                        struggles: { ...d.struggles, tryingToQuitPrivate: e.target.checked },
+                      }))
+                    }
+                  />
+                  Private — AI only
+                </label>
+              </div>
+            </>
+          )}
+          {ss === 2 && (
+            <>
+              <div>
+                <label className={labelCls}>Last time you felt truly locked in</label>
+                <textarea
+                  className={inputCls + ' min-h-[80px] resize-none'}
+                  value={s.lastLockedIn}
+                  onChange={(e) =>
+                    patchDraft((d) => ({
+                      ...d,
+                      struggles: { ...d.struggles, lastLockedIn: e.target.value },
+                    }))
+                  }
+                />
+              </div>
+              <div>
+                <label className={labelCls}>What would need to be true to feel in control?</label>
+                <textarea
+                  className={inputCls + ' min-h-[80px] resize-none'}
+                  value={s.whatNeedsToBeTrue}
+                  onChange={(e) =>
+                    patchDraft((d) => ({
+                      ...d,
+                      struggles: { ...d.struggles, whatNeedsToBeTrue: e.target.value },
+                    }))
+                  }
+                />
+              </div>
+            </>
+          )}
         </div>
       </motion.div>
     )

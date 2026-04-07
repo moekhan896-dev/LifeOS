@@ -17,6 +17,16 @@ import { CATEGORY_TITLES, btnPrimary, btnSecondary, glassPanel, aiBubbleCls } fr
 import { validateStep, canProceedStep } from '@/lib/onboarding-validation'
 import { emptyBusinessDraft } from './onboarding-types'
 import { newId } from '@/lib/id'
+import { AiBubble } from './AiBubble'
+import {
+  ONBOARDING_AI_TIMING,
+  computeAdvanceAiOnContinue,
+  financeSummaryText,
+  businessesCompleteSummary,
+  advanceAiLeavingStruggles,
+  advanceAiPinConfirmed,
+  type AdvanceAiResult,
+} from '@/lib/onboarding-ai-messages'
 
 const PALETTE = ['#0A84FF', '#60A5FA', '#A78BFA', '#FB7185', '#FBBF24', '#06B6D4', '#D4A853', '#F472B6']
 
@@ -35,8 +45,10 @@ export function OnboardingWizard({ mode = 'default' as 'default' | 'profileUpdat
     replaceDraft,
     businessEditIndex,
     setBusinessEditIndex,
-    healthScheduleSubStep,
-    setHealthScheduleSubStep,
+    foundationSubStep,
+    setFoundationSubStep,
+    strugglesSubStep,
+    setStrugglesSubStep,
     setValidationErrors,
     clearValidationErrors,
     setStep,
@@ -52,6 +64,49 @@ export function OnboardingWizard({ mode = 'default' as 'default' | 'profileUpdat
   const [profileGate, setProfileGate] = useState(mode !== 'profileUpdate')
   const pinRefs = [useRef<HTMLInputElement>(null), useRef<HTMLInputElement>(null), useRef<HTMLInputElement>(null), useRef<HTMLInputElement>(null)]
   const confirmRefs = [useRef<HTMLInputElement>(null), useRef<HTMLInputElement>(null), useRef<HTMLInputElement>(null), useRef<HTMLInputElement>(null)]
+  const [aiOverlayText, setAiOverlayText] = useState<string | null>(null)
+  const [financeOverlay, setFinanceOverlay] = useState(false)
+  const aiTimersRef = useRef<number[]>([])
+
+  const clearAiTimers = useCallback(() => {
+    aiTimersRef.current.forEach((id) => window.clearTimeout(id))
+    aiTimersRef.current = []
+  }, [])
+
+  const runAiSequence = useCallback(
+    (result: AdvanceAiResult, onDone: () => void) => {
+      clearAiTimers()
+      if (result.kind === 'none' || (result.kind === 'messages' && result.messages.length === 0)) {
+        onDone()
+        return
+      }
+      if (result.kind !== 'messages') {
+        onDone()
+        return
+      }
+      const { delayShowMs, displayMs } = ONBOARDING_AI_TIMING
+      const queue = [...result.messages]
+      const stepNext = () => {
+        if (queue.length === 0) {
+          setAiOverlayText(null)
+          onDone()
+          return
+        }
+        const line = queue.shift()!
+        const t1 = window.setTimeout(() => {
+          setAiOverlayText(line)
+          const t2 = window.setTimeout(() => {
+            setAiOverlayText(null)
+            stepNext()
+          }, displayMs)
+          aiTimersRef.current.push(t2)
+        }, delayShowMs)
+        aiTimersRef.current.push(t1)
+      }
+      stepNext()
+    },
+    [clearAiTimers]
+  )
 
   useEffect(() => {
     if (step !== 11) {
@@ -63,7 +118,7 @@ export function OnboardingWizard({ mode = 'default' as 'default' | 'profileUpdat
 
   useEffect(() => {
     clearValidationErrors()
-  }, [step, identitySubStep, healthScheduleSubStep, clearValidationErrors])
+  }, [step, identitySubStep, foundationSubStep, strugglesSubStep, clearValidationErrors])
 
   useEffect(() => {
     if (mode === 'profileUpdate') return
@@ -83,15 +138,18 @@ export function OnboardingWizard({ mode = 'default' as 'default' | 'profileUpdat
     replaceDraft(d)
     setIdentitySubStep(0)
     setBusinessEditIndex(0)
-    setHealthScheduleSubStep(0)
+    setFoundationSubStep(0)
+    setStrugglesSubStep(0)
     setBusinessInterstitial(null)
     setStep(12)
     setProfileGate(true)
-  }, [mode, replaceDraft, setStep, setIdentitySubStep, setBusinessEditIndex, setHealthScheduleSubStep])
+  }, [mode, replaceDraft, setStep, setIdentitySubStep, setBusinessEditIndex, setFoundationSubStep, setStrugglesSubStep])
 
   useEffect(() => {
     if (step !== 2) setBusinessInterstitial(null)
   }, [step])
+
+  useEffect(() => () => clearAiTimers(), [clearAiTimers])
 
   const launch = useCallback(async () => {
     if (launchOnceRef.current) return
@@ -155,6 +213,39 @@ export function OnboardingWizard({ mode = 'default' as 'default' | 'profileUpdat
     [patchDraft, step]
   )
 
+  const executeStepAdvance = () => {
+    const st = useOnboardingStore.getState()
+    const { step: stp, identitySubStep: is, foundationSubStep: fs, strugglesSubStep: ss, businessEditIndex: bi } = st
+    if (stp === 1) {
+      if (is < 3) setIdentitySubStep(is + 1)
+      else nextStep()
+      return
+    }
+    if (stp === 2) {
+      setBusinessInterstitial(bi)
+      return
+    }
+    if (stp === 6) {
+      if (fs < 5) {
+        setFoundationSubStep(fs + 1)
+        return
+      }
+      setFoundationSubStep(0)
+      nextStep()
+      return
+    }
+    if (stp === 8) {
+      if (ss < 2) {
+        setStrugglesSubStep(ss + 1)
+        return
+      }
+      setStrugglesSubStep(0)
+      nextStep()
+      return
+    }
+    if (stp < 11) nextStep()
+  }
+
   const onPinDigit = (phase: 'set' | 'confirm', i: number, v: string) => {
     if (!/^\d?$/.test(v)) return
     const arr = [...pinWorking]
@@ -178,7 +269,7 @@ export function OnboardingWizard({ mode = 'default' as 'default' | 'profileUpdat
         if (code === expected) {
           patchDraft((d) => ({ ...d, pinConfirm: code }))
           clearValidationErrors()
-          nextStep()
+          runAiSequence(advanceAiPinConfirmed(), () => nextStep())
         } else {
           setPinErr("Codes didn't match. Try again.")
           setValidationErrors(['pinConfirm'])
@@ -194,12 +285,17 @@ export function OnboardingWizard({ mode = 'default' as 'default' | 'profileUpdat
   const progressPct =
     step === 0
       ? 0
-      : ((step >= 2 ? step - 1 : 0) + (step === 1 ? (identitySubStep + 1) / 4 : 0)) / 13 * 100
+      : ((step >= 2 ? step - 1 : 0) +
+          (step === 1 ? (identitySubStep + 1) / 4 : 0) +
+          (step === 6 ? (foundationSubStep + 1) / 6 : 0) +
+          (step === 8 ? (strugglesSubStep + 1) / 3 : 0)) /
+        13 *
+        100
 
   const catLabel = CATEGORY_TITLES[step] ?? ''
 
   const runValidationAndAdvance = () => {
-    const v = validateStep(step, draft, identitySubStep, healthScheduleSubStep, businessEditIndex)
+    const v = validateStep(step, draft, identitySubStep, foundationSubStep, businessEditIndex, strugglesSubStep)
     if (!v.ok) {
       setValidationErrors(v.errors)
       return false
@@ -209,42 +305,43 @@ export function OnboardingWizard({ mode = 'default' as 'default' | 'profileUpdat
   }
 
   const footerContinueDisabled =
-    step === 0 || (step === 2 && businessInterstitial !== null) || step >= 11 || step === 12
+    step === 0 ||
+    (step === 2 && businessInterstitial !== null) ||
+    step >= 11 ||
+    step === 12 ||
+    !!aiOverlayText ||
+    financeOverlay
 
-  const canProceed = canProceedStep(step, draft, identitySubStep, healthScheduleSubStep, businessEditIndex)
+  const canProceed = canProceedStep(step, draft, identitySubStep, foundationSubStep, businessEditIndex, strugglesSubStep)
   const continueBlockedByValidation =
     step > 0 && step < 11 && !(step === 2 && businessInterstitial !== null) && !canProceed
 
   const handleMainContinue = () => {
+    if (aiOverlayText || financeOverlay) return
     if (!runValidationAndAdvance()) return
 
-    if (step === 1) {
-      if (identitySubStep < 3) setIdentitySubStep(identitySubStep + 1)
-      else nextStep()
+    if (step === 4) {
+      setFinanceOverlay(true)
       return
     }
 
-    if (step === 2) {
-      setBusinessInterstitial(businessEditIndex)
+    if (step === 8 && strugglesSubStep === 2) {
+      runAiSequence(advanceAiLeavingStruggles(), executeStepAdvance)
       return
     }
 
-    if (step === 6) {
-      if (healthScheduleSubStep < 2) {
-        setHealthScheduleSubStep(healthScheduleSubStep + 1)
-        return
-      }
-      setHealthScheduleSubStep(0)
-      nextStep()
-      return
-    }
-
-    if (step < 11) nextStep()
+    const ai = computeAdvanceAiOnContinue({ step, draft, identitySubStep, foundationSubStep })
+    runAiSequence(ai, executeStepAdvance)
   }
 
   const handleBack = () => {
-    if (step === 6 && healthScheduleSubStep > 0) {
-      setHealthScheduleSubStep(healthScheduleSubStep - 1)
+    if (aiOverlayText || financeOverlay) return
+    if (step === 6 && foundationSubStep > 0) {
+      setFoundationSubStep(foundationSubStep - 1)
+      return
+    }
+    if (step === 8 && strugglesSubStep > 0) {
+      setStrugglesSubStep(strugglesSubStep - 1)
       return
     }
     if (step === 1 && identitySubStep > 0) {
@@ -259,8 +356,14 @@ export function OnboardingWizard({ mode = 'default' as 'default' | 'profileUpdat
   /** After business interstitial: recurring-clients step (3) unless no business has recurring clients. */
   const advanceAfterBusinessInterstitial = (businessesForCheck: typeof draft.businesses) => {
     const anyRecurring = businessesForCheck.some((b) => b.recurringClients === true)
-    if (anyRecurring) nextStep()
-    else setStep(4)
+    const go = () => {
+      if (anyRecurring) nextStep()
+      else setStep(4)
+    }
+    runAiSequence(
+      { kind: 'messages', messages: [businessesCompleteSummary({ ...draft, businesses: businessesForCheck })] },
+      go
+    )
   }
 
   if (mode === 'profileUpdate' && !profileGate) {
@@ -274,7 +377,7 @@ export function OnboardingWizard({ mode = 'default' as 'default' | 'profileUpdat
   return (
     <div className="relative min-h-screen bg-[var(--bg-primary)] text-[var(--text-primary)]" style={{ background: 'var(--bg-warm-gradient)' }}>
       {step > 0 && (
-        <div className="fixed left-0 right-0 top-0 z-50 h-[2px] bg-[var(--separator)]">
+        <div className="fixed left-0 right-0 top-0 z-50 h-[2px] bg-[var(--bg-secondary)]">
           <motion.div
             className="h-full bg-[var(--accent)]"
             animate={{ width: `${progressPct}%` }}
@@ -371,7 +474,8 @@ export function OnboardingWizard({ mode = 'default' as 'default' | 'profileUpdat
                 draft={draft}
                 patchDraft={patchDraft}
                 identitySubStep={identitySubStep}
-                healthScheduleSubStep={healthScheduleSubStep}
+                foundationSubStep={foundationSubStep}
+                strugglesSubStep={strugglesSubStep}
               />
             )}
           </AnimatePresence>
@@ -481,7 +585,16 @@ export function OnboardingWizard({ mode = 'default' as 'default' | 'profileUpdat
                       Continue →
                     </button>
                     {step === 8 && (
-                      <button type="button" onClick={() => nextStep()} className="text-[15px] font-medium text-[var(--accent)]">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          runAiSequence(advanceAiLeavingStruggles(), () => {
+                            setStrugglesSubStep(0)
+                            nextStep()
+                          })
+                        }}
+                        className="text-[15px] font-medium text-[var(--accent)]"
+                      >
                         Skip this section →
                       </button>
                     )}
@@ -497,7 +610,7 @@ export function OnboardingWizard({ mode = 'default' as 'default' | 'profileUpdat
           <LiveDashboardPreview
             draft={draft}
             stepIndex={step}
-            healthScheduleSubStep={healthScheduleSubStep}
+            foundationSubStep={foundationSubStep}
             pulseBusinessIndex={businessInterstitial}
           />
         </div>
@@ -511,6 +624,38 @@ export function OnboardingWizard({ mode = 'default' as 'default' | 'profileUpdat
             : '—'}
         </p>
       </div>
+
+      {aiOverlayText && (
+        <div className="pointer-events-none fixed inset-0 z-[190] flex items-end justify-center pb-20 md:pb-14">
+          <div className="max-w-[600px] px-4">
+            <AiBubble text={aiOverlayText} />
+          </div>
+        </div>
+      )}
+
+      {financeOverlay && (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/55 p-4">
+          <div className="w-full max-w-lg space-y-5 rounded-2xl border border-[var(--border)] bg-[var(--bg-elevated)] p-6 shadow-[0_8px_32px_rgba(0,0,0,0.4)]">
+            <p className="text-[17px] leading-relaxed text-[var(--text-primary)]">{financeSummaryText(draft)}</p>
+            <div className="flex flex-wrap justify-center gap-3">
+              <button
+                type="button"
+                className={btnPrimary}
+                onClick={() => {
+                  setFinanceOverlay(false)
+                  patchDraft((d) => ({ ...d, finance: { ...d.finance, financeConfirmed: true } }))
+                  nextStep()
+                }}
+              >
+                Looks right ✓
+              </button>
+              <button type="button" className={btnSecondary} onClick={() => setFinanceOverlay(false)}>
+                Adjust
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <OnboardingVoiceFab onTranscript={handleVoice} />
     </div>

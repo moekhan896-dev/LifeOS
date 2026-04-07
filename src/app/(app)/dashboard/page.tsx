@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useMemo, useEffect, useCallback } from 'react'
+import { format } from 'date-fns'
 import { computeCostOfInactionGap17 } from '@/lib/cost-of-inaction-gap17'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
@@ -204,14 +205,6 @@ export default function DashboardPage() {
   }, [])
 
   const lifeRemainingSec = Math.max(0, (lifeModel.expectedEnd.getTime() - nowTick) / 1000)
-  const lifeY = Math.floor(lifeRemainingSec / (365.25 * 24 * 3600))
-  let lifeR = lifeRemainingSec - lifeY * 365.25 * 24 * 3600
-  const lifeD = Math.floor(lifeR / (24 * 3600))
-  lifeR -= lifeD * 24 * 3600
-  const lifeH = Math.floor(lifeR / 3600)
-  lifeR -= lifeH * 3600
-  const lifeM = Math.floor(lifeR / 60)
-  const lifeS = Math.floor(lifeR - lifeM * 60)
 
   const latestEnergy = useMemo(() => {
     const today = energyLogs.filter(e => e.date === todayStr)
@@ -579,11 +572,6 @@ export default function DashboardPage() {
       habitDoneToday,
       habitTotalToday,
       togglePrayer,
-      lifeY,
-      lifeD,
-      lifeH,
-      lifeM,
-      lifeS,
       lifeRemainingSec,
       lifeModel,
       todaySchedule,
@@ -670,11 +658,6 @@ export default function DashboardPage() {
       habitDoneToday,
       habitTotalToday,
       togglePrayer,
-      lifeY,
-      lifeD,
-      lifeH,
-      lifeM,
-      lifeS,
       lifeRemainingSec,
       lifeModel,
       todaySchedule,
@@ -724,12 +707,17 @@ export default function DashboardPage() {
 
   return (
     <PageTransition>
-      <div className="pb-32">
+      <div className="mx-auto max-w-[1440px] px-4 pb-32 pt-2 md:px-6">
         <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-          <p className="text-[15px] text-[var(--text-secondary)]">
-            {getGreeting()},{' '}
-            <span className="font-semibold text-[var(--text-primary)]">{userName?.trim() || 'there'}</span>
-          </p>
+          <div>
+            <p className="text-[28px] font-bold tracking-[-0.3px] text-[var(--text-primary)]">
+              {getGreeting()},{' '}
+              <span>{userName?.trim() || 'there'}</span>
+            </p>
+            <p className="mt-1 text-[13px] font-medium text-[var(--text-secondary)]">
+              {format(new Date(), 'EEEE, MMMM d, yyyy')}
+            </p>
+          </div>
           <div className="flex items-center gap-2">
             {editMode ? (
               <>
@@ -762,7 +750,10 @@ export default function DashboardPage() {
 
         <DndContext sensors={sensors} collisionDetection={closestCorners} onDragEnd={onDragEnd}>
           <SortableContext items={sortedVisibleTiles.map((t) => t.tileId)} strategy={rectSortingStrategy}>
-            <div className="grid grid-cols-12 gap-4" {...(!editMode ? longPressGrid : {})}>
+            <div
+              className="grid grid-cols-12 gap-3 md:gap-4"
+              {...(!editMode ? longPressGrid : {})}
+            >
               <AnimatePresence mode="popLayout">
                 {sortedVisibleTiles.map((entry) => (
                   <motion.div

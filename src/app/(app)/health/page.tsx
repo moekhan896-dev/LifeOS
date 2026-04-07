@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo } from 'react'
+import { useMemo, useEffect } from 'react'
 import { useStore } from '@/stores/store'
 import { prayerRecordTo12 } from '@/lib/prayer-times'
 import PageTransition from '@/components/PageTransition'
@@ -104,6 +104,14 @@ export default function HealthPage() {
   const xpInLevel = xp % 100
   const xpToNext = 100 - xpInLevel
   const xpProgress = xpInLevel
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    if (window.location.hash !== '#habits') return
+    requestAnimationFrame(() => {
+      document.getElementById('habits')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    })
+  }, [])
 
   return (
     <PageTransition>

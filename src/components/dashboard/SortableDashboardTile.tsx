@@ -4,6 +4,7 @@ import { useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import type { DraggableAttributes } from '@dnd-kit/core'
 import type { DashboardTileConfig } from '@/lib/dashboard-layout'
+import { spanToClass } from '@/lib/dashboard-layout'
 import DashboardTileChrome from './DashboardTileChrome'
 
 interface SortableDashboardTileProps {
@@ -32,8 +33,11 @@ export default function SortableDashboardTile({
     zIndex: isDragging ? 5 : undefined,
   }
 
+  /** Column span must be on the grid item (direct child of `grid`), not nested inside tile chrome. */
+  const spanClass = spanToClass(entry.gridColumn)
+
   return (
-    <div ref={setNodeRef} style={style}>
+    <div ref={setNodeRef} style={style} className={spanClass}>
       <DashboardTileChrome
         entry={entry}
         editMode={editMode}

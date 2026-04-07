@@ -37,6 +37,20 @@ export class ErrorBoundary extends React.Component<Props, State> {
             >
               Reload
             </button>
+            <button
+              type="button"
+              className="inline-flex min-h-[44px] items-center justify-center rounded-xl border border-[var(--negative)]/50 bg-[var(--color-surface2)] px-5 text-[17px] font-medium text-[var(--color-text)]"
+              onClick={() => {
+                try {
+                  localStorage.clear()
+                } catch {
+                  /* ignore */
+                }
+                window.location.href = '/'
+              }}
+            >
+              Reset and start fresh
+            </button>
           </div>
         </div>
       )
