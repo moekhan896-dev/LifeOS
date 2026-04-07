@@ -43,4 +43,7 @@ next-env.d.ts
 # local dumps
 full-codebase.txt
 
+# Cursor / Claude local worktrees (nested git repos)
+.claude/worktrees/
+
 .vercel
